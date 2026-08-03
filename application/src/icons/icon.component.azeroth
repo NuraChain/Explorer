@@ -1,0 +1,28 @@
+import { ICONS, type IconName } from './registry.ts';
+
+// Lucide ships each icon as `[tag, attrs][]`, which markup renders through <Dynamic>'s string-tag
+// form - so there is no per-icon component and no hand-copied SVG path anywhere in the app.
+export default component Icon(props: {
+    name: IconName;
+    size?: number;
+    class?: string;
+})
+{
+    <svg
+        class={ props.class }
+        width={ props.size ?? 16 }
+        height={ props.size ?? 16 }
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        focusable="false"
+    >
+        <For each={ ICONS[props.name] } key={ (node) => JSON.stringify(node) }>
+        { (node) => <Dynamic component={ node[0] } props={ node[1] } /> }
+        </For>
+    </svg>
+}

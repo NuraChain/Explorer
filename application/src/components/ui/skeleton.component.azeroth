@@ -1,0 +1,11 @@
+// The third state every list has and none of the pages showed: loading. A blank panel reads as
+// broken, and on a cold visit - which is most visits - that blank is the first thing a reader
+// sees. Inert to assistive tech: there is nothing to announce until data arrives.
+//
+// One bar per element, repeated by the caller. Building the repeat INSIDE the component meant a
+// control-flow block whose only job was to count, and it broke server rendering on the two pages
+// that used it - a placeholder is not worth a render path of its own.
+export default component Skeleton(props: { class?: string })
+{
+    <span class={ `block animate-pulse rounded-md bg-raised ${ props.class ?? 'h-4 w-full' }` } aria-hidden="true"></span>
+}

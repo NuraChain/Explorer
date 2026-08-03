@@ -1,0 +1,63 @@
+import { Link } from 'azerothjs';
+
+import type { Block } from '../../api.ts';
+import { formatCount, gasShare, timeAgo } from '../../lib/format.ts';
+
+// The home page's thesis. A chain's characteristic property is its METRONOME - a block every few
+// seconds, forever - so the page opens with that pulse rather than the four-stat grid every
+// explorer opens with. Each tick is one block: height is how full it was, and a block that
+// carried transactions is lit in amber rather than drawn in line colour.
+//
+// The motion is data-driven only - ticks appear because blocks arrived - and is disabled
+// wholesale under prefers-reduced-motion.
+export default component CadenceStrip(props: {
+    blocks: Block[];
+    symbol: string;
+})
+{
+    // A tick has to be visible even for an empty block, so the scale starts above zero and the
+    // fullest block in view sets the top. Relative, not absolute: a quiet chain still reads as
+    // a heartbeat instead of a flat line.
+    derived heights = ((): number[] =>
+    {
+        const shares = props.blocks.map(block => gasShare(block.gasUsed, block.gasLimit));
+        const peak = Math.max(0.04, ...shares);
+        return shares.map(share => 12 + Math.round((share / peak) * 76));
+    })();
+
+    <div class="panel overflow-hidden p-4 sm:p-5">
+        <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">Cadence</h2>
+            <p class="text-[12px] text-muted">
+                last { formatCount(props.blocks.length) } blocks &middot; height is gas used
+            </p>
+        </div>
+
+        <div class="flex h-[92px] items-end gap-[3px]" role="img" aria-label={ `Gas used across the last ${ props.blocks.length } blocks` }>
+            <For each={ props.blocks } key={ (block) => String(block.number) }>
+            { (block, index) =>
+                <Link
+                    to={ `/block/${ block.number }` }
+                    class={ block.txCount > 0
+                        ? 'group relative flex-1 rounded-t-[2px] bg-nur transition-opacity duration-150 hover:opacity-100 motion-safe:animate-land'
+                        : 'group relative flex-1 rounded-t-[2px] bg-line transition-opacity duration-150 hover:opacity-100 motion-safe:animate-land' }
+                    style={ `height: ${ heights[index] ?? 12 }px` }
+                    aria-label={ `Block ${ block.number }, ${ block.txCount } transactions` }
+                >
+                    <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-raised px-2 py-1 text-[11px] text-text group-hover:block">
+                        <span class="data">#{ block.number }</span> &middot; { block.txCount } tx
+                    </span>
+                </Link>
+            }
+            </For>
+        </div>
+
+        <Show when={ props.blocks.length > 0 }>
+            <div class="mt-3 flex items-baseline justify-between text-[12px] text-muted">
+                <span>{ timeAgo(props.blocks[0]!.at) }</span>
+                <span class="data">{ props.symbol }</span>
+                <span>now</span>
+            </div>
+        </Show>
+    </div>
+}

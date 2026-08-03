@@ -1,0 +1,59 @@
+import { Link } from 'azerothjs';
+
+import { client } from '../api.ts';
+import { formatCount, formatDateTime, gasShare, timeAgo } from '../lib/format.ts';
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import Pagination from '../components/ui/pagination.component.azeroth';
+import EmptyState from '../components/ui/empty-state.component.azeroth';
+import { useTitle } from '../lib/title.ts';
+import Tooltip from '../components/ui/tooltip.component.azeroth';
+import Skeleton from '../components/ui/skeleton.component.azeroth';
+
+export default component BlocksPage()
+{
+    state page = 1;
+
+    resource blocks = (at: string) => client.blocks.list({ query: { page: Number(at), limit: 25 } })
+        with { source: String(page) };
+
+    useTitle(() => 'Blocks');
+
+    <div class="flex flex-col gap-4">
+        <h1 class="text-[22px] font-bold tracking-tight">Blocks</h1>
+
+        <section class="panel overflow-hidden">
+            <ul class="divide-y divide-line">
+                <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) }>
+                { (block) =>
+                    <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
+                        <Link to={ `/block/${ block.number }` } class="data w-24 shrink-0 text-[14px] font-semibold text-nur no-underline hover:underline">
+                            #{ block.number }
+                        </Link>
+                        <div class="min-w-0 flex-1">
+                            <HashLink value={ block.hash } to={ `/block/${ block.number }` } tone="muted" lead={ 14 } tail={ 8 } />
+                            <Tooltip label={ formatDateTime(block.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(block.at) }</p></Tooltip>
+                        </div>
+                        <div class="text-end">
+                            <p class="data text-[13px]">{ block.txCount } tx</p>
+                            <Tooltip label={ `${ formatCount(Number(block.gasUsed)) } of ${ formatCount(Number(block.gasLimit)) } gas used` } class="flex justify-end"><p class="text-[11px] text-muted">{ (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }% gas</p></Tooltip>
+                        </div>
+                    </li>
+                }
+                </For>
+            </ul>
+            <Show when={ blocks.data() === undefined }>
+                <div class="flex flex-col gap-2 px-4 py-4"><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /></div>
+            </Show>
+            <Show when={ blocks.data()?.rows.length === 0 }>
+                <EmptyState icon="block" title="No blocks indexed yet" hint="Blocks appear here as the indexer reads them from the chain." />
+            </Show>
+            <Show when={ blocks.data() !== undefined }>
+            { () => <Pagination page={ blocks.data()!.page } pages={ blocks.data()!.pages } onChange={ (next) => page = next } /> }
+            </Show>
+        </section>
+
+        <Show when={ blocks.data() !== undefined }>
+        { () => <p class="text-[12px] text-muted">{ formatCount(blocks.data()!.total) } blocks indexed.</p> }
+        </Show>
+    </div>
+}

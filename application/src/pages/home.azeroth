@@ -1,0 +1,164 @@
+import { Link } from 'azerothjs';
+
+import { client } from '../api.ts';
+import { formatCount, formatDateTime, formatGwei, formatValue, gasShare, shortHash, timeAgo } from '../lib/format.ts';
+import Icon from '../icons/icon.component.azeroth';
+import SearchBar from '../components/layout/search-bar.component.azeroth';
+import CadenceStrip from '../components/chain/cadence-strip.component.azeroth';
+import Badge from '../components/ui/badge.component.azeroth';
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import EmptyState from '../components/ui/empty-state.component.azeroth';
+import { useTitle } from '../lib/title.ts';
+import Tooltip from '../components/ui/tooltip.component.azeroth';
+
+// The hero is the chain's pulse and the search - the two things a visitor came for. Counters sit
+// UNDER them as a quiet strip rather than being the headline: an explorer's job is to find one
+// thing, not to display totals.
+export default component Home()
+{
+    resource stats = () => client.stats.summary();
+    resource cadence = () => client.stats.cadence();
+    resource blocks = () => client.blocks.list({ query: { limit: 8 } });
+    resource txs = () => client.txs.list({ query: { limit: 8 } });
+
+    // Blocks arrive every few seconds, so the page follows them instead of going stale until a
+    // reload. One timer, cleared when the page unmounts.
+    effect
+    {
+        const timer = setInterval(() =>
+        {
+            stats.refetch();
+            cadence.refetch();
+            blocks.refetch();
+            txs.refetch();
+        }, 5000);
+        return () => clearInterval(timer);
+    }
+
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived behind = ((): number =>
+    {
+        const summary = stats.data();
+        return summary === undefined ? 0 : Math.max(0, summary.chainHead - summary.head);
+    })();
+
+    useTitle(() => `${ stats.data()?.chain.name ?? 'Chain' } explorer`);
+
+    <div class="flex flex-col gap-6">
+        <section class="pt-2">
+            <h1 class="text-[26px] font-bold leading-tight tracking-tight sm:text-[32px]">
+                Follow the <span class="text-nur">light</span> through
+                <Show when={ stats.data() !== undefined } fallback={ <span> the chain</span> }>
+                { () => <span> { stats.data()!.chain.name }</span> }
+                </Show>
+            </h1>
+            <p class="mb-5 mt-2 max-w-xl text-[14px] leading-relaxed text-muted">
+                Every block, transaction and transfer, indexed so you can see exactly where value moved.
+            </p>
+            <div class="max-w-2xl">
+                <SearchBar />
+            </div>
+        </section>
+
+        <Show when={ cadence.data() !== undefined }>
+        { () => <CadenceStrip blocks={ cadence.data()!.rows } symbol={ symbol } /> }
+        </Show>
+
+        {/* The index trails the node during a backfill. Saying so is the honest alternative to a
+            reader concluding the chain has stopped. */}
+        <Show when={ behind > 2 }>
+            <p class="flex items-center gap-2 rounded-lg border border-line bg-field px-4 py-2.5 text-[13px] text-muted">
+                <Icon name="activity" size={ 14 } class="text-nur" />
+                Indexing - { formatCount(behind) } blocks behind the node.
+            </p>
+        </Show>
+
+        <Show when={ stats.data() !== undefined }>
+        { () =>
+            <dl class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+                <div class="panel px-4 py-3">
+                    <dt class="text-[12px] text-muted">Height</dt>
+                    <dd class="data mt-0.5 text-[17px] font-bold">{ formatCount(stats.data()!.head) }</dd>
+                </div>
+                <div class="panel px-4 py-3">
+                    <dt class="text-[12px] text-muted">Transactions</dt>
+                    <dd class="data mt-0.5 text-[17px] font-bold">{ formatCount(stats.data()!.indexed.transactions) }</dd>
+                </div>
+                <div class="panel px-4 py-3">
+                    <dt class="text-[12px] text-muted">Block time</dt>
+                    <dd class="data mt-0.5 text-[17px] font-bold">{ stats.data()!.blockTime.toFixed(2) }s</dd>
+                </div>
+                <div class="panel px-4 py-3">
+                    <dt class="text-[12px] text-muted">Base fee</dt>
+                    <dd class="data mt-0.5 text-[17px] font-bold">{ formatGwei(stats.data()!.gasPrice) }</dd>
+                </div>
+            </dl>
+        }
+        </Show>
+
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section class="panel overflow-hidden">
+                <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
+                    <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">Latest blocks</h2>
+                    <Link to="/blocks" class="text-[12px] text-beam no-underline hover:underline">All</Link>
+                </div>
+                <ul class="divide-y divide-line">
+                    <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) }>
+                    { (block) =>
+                        <li class="flex items-center gap-3 px-4 py-2.5">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-nur">
+                                <Icon name="block" size={ 14 } />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <Link to={ `/block/${ block.number }` } class="data text-[13px] font-semibold text-text no-underline hover:text-nur">
+                                    #{ block.number }
+                                </Link>
+                                <Tooltip label={ formatDateTime(block.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(block.at) }</p></Tooltip>
+                            </div>
+                            <div class="text-end">
+                                <p class="data text-[12px]">{ block.txCount } tx</p>
+                                <p class="text-[11px] text-muted">{ (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }% gas</p>
+                            </div>
+                        </li>
+                    }
+                    </For>
+                </ul>
+                <Show when={ blocks.data()?.rows.length === 0 }>
+                    <EmptyState icon="block" title="Waiting for the first block" />
+                </Show>
+            </section>
+
+            <section class="panel overflow-hidden">
+                <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
+                    <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">Latest transactions</h2>
+                    <Link to="/txs" class="text-[12px] text-beam no-underline hover:underline">All</Link>
+                </div>
+                <ul class="divide-y divide-line">
+                    <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash }>
+                    { (row) =>
+                        <li class="flex items-center gap-3 px-4 py-2.5">
+                            <Badge
+                                tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
+                                icon={ row.status === 'reverted' ? 'alert' : 'success' }
+                            >
+                                { row.status }
+                            </Badge>
+                            <div class="min-w-0 flex-1">
+                                <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 12 } tail={ 6 } />
+                                <p class="text-[11px] text-muted">
+                                    { row.to === null ? 'contract creation' : `to ${ shortHash(row.to, 8, 6) }` }
+                                </p>
+                            </div>
+                            <p class="data shrink-0 text-[12px]">{ formatValue(row.value, symbol, decimals) }</p>
+                        </li>
+                    }
+                    </For>
+                </ul>
+                <Show when={ txs.data()?.rows.length === 0 }>
+                    <EmptyState icon="activity" title="No transactions yet" />
+                </Show>
+            </section>
+        </div>
+    </div>
+}

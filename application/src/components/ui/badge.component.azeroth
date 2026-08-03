@@ -1,0 +1,22 @@
+import type { Child } from 'azerothjs';
+
+import { TONE_CLASS, type Tone } from './variants.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+import type { IconName } from '../../icons/registry.ts';
+
+// A small status mark. Colour NEVER carries the meaning alone - a badge always shows its label,
+// and takes an icon when the state is one a reader scans for (a reverted transaction).
+export default component Badge(props: {
+    tone?: Tone;
+    icon?: IconName;
+    children?: Child;
+})
+{
+    <span class={ `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${ TONE_CLASS[props.tone ?? 'neutral'] }` }>
+        <Show when={ props.icon !== undefined }>
+            <Icon name={ props.icon ?? 'help' } size={ 12 } />
+        </Show>
+        { props.children }
+    </span>
+}

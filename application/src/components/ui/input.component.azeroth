@@ -1,0 +1,49 @@
+import Icon from '../../icons/icon.component.azeroth';
+import type { IconName } from '../../icons/registry.ts';
+
+// The one text field. Chain input is monospace by default - an address or a hash pasted into a
+// proportional field is unreadable and impossible to check by eye.
+export default component Input(props: {
+    value?: string;
+    placeholder?: string;
+    type?: string;
+    icon?: IconName;
+
+    /** The accessible name; fields here never rely on a visually attached label. */
+    label: string;
+
+    /** Proportional text instead of monospace, for the rare non-chain field. */
+    prose?: boolean;
+    size?: 'sm' | 'md';
+    onInput?: (value: string) => void;
+
+    /** The field element, for callers that must focus it (the global search shortcut). */
+    ref?: AzerothRef<'input'>;
+})
+{
+    derived big = props.size !== 'sm';
+
+    <div class={ big
+        ? 'flex items-center gap-3 rounded-xl border border-line bg-field px-4 py-3 focus-within:border-nur'
+        : 'flex items-center gap-2 rounded-lg border border-line bg-field px-3 py-2 focus-within:border-nur' }
+    >
+        <Show when={ props.icon !== undefined }>
+            <Icon name={ props.icon ?? 'help' } size={ big ? 18 : 15 } class="shrink-0 text-muted" />
+        </Show>
+        <input
+            class={ [
+                'min-w-0 flex-1 bg-transparent text-text outline-none placeholder:font-sans placeholder:text-muted',
+                props.prose === true ? '' : 'hash',
+                big ? 'text-[15px]' : 'text-[13px]'
+            ].filter(Boolean).join(' ') }
+            type={ props.type ?? 'text' }
+            value={ props.value ?? '' }
+            placeholder={ props.placeholder }
+            aria-label={ props.label }
+            spellcheck={ false }
+            autocomplete="off"
+            onInput={ (event) => props.onInput?.((event.target as HTMLInputElement).value) }
+            ref={ props.ref }
+        />
+    </div>
+}

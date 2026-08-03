@@ -1,0 +1,100 @@
+import { onMount, useNavigate } from 'azerothjs';
+
+import { client } from '../../api.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import Button from '../ui/button.component.azeroth';
+import Input from '../ui/input.component.azeroth';
+
+// The way people actually use an explorer: paste a thing, land on its page. The SERVER decides
+// what the thing was - a 32-byte hash is a transaction or a block and only the index knows
+// which, so guessing here would send half of all hash searches to a 404.
+export default component SearchBar(props: { size?: 'hero' | 'compact' })
+{
+    const { navigate } = useNavigate();
+    const toasts = useToasts();
+
+    state term = '';
+    state busy = false;
+
+    derived hero = props.size !== 'compact';
+
+    let field: HTMLInputElement | null = null;
+
+    // `/` jumps to search and Escape leaves it - what the power users of every explorer already
+    // have in their fingers. Guarded on the active element, so typing a slash INTO a field is
+    // still just a slash.
+    onMount(() =>
+    {
+        const onKey = (event: KeyboardEvent): void =>
+        {
+            const active = document.activeElement;
+            const typing = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+
+            if (event.key === '/' && !typing)
+            {
+                event.preventDefault();
+                field?.focus();
+            }
+            else if (event.key === 'Escape' && active === field)
+            {
+                term = '';
+                field?.blur();
+            }
+        };
+
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    });
+
+    const submit = async (event: Event): Promise<void> =>
+    {
+        event.preventDefault();
+        const query = term.trim();
+        if (query === '' || busy)
+        {
+            return;
+        }
+        busy = true;
+        try
+        {
+            const found = await client.search.resolve({ query: { q: query } });
+            if (found.path === null)
+            {
+                // An unindexed value and an unreachable index are different problems, and
+                // telling them apart is the difference between waiting and retyping.
+                toasts.push('error', 'Nothing indexed under that value. Check it, or wait if the block is very recent.', 'alert');
+                return;
+            }
+            navigate(found.path);
+            term = '';
+        }
+        catch
+        {
+            toasts.push('error', 'Search failed - the explorer could not reach its index.', 'alert');
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    <form class="w-full" role="search" onSubmit={ (event) => void submit(event) }>
+        <div class="flex items-center gap-2">
+            <div class="min-w-0 flex-1">
+                <Input
+                    icon="search"
+                    size={ hero ? 'md' : 'sm' }
+                    type="search"
+                    label="Search by address, transaction hash, or block number"
+                    placeholder={ hero ? 'Address, transaction hash, or block number' : 'Search' }
+                    value={ term }
+                    onInput={ (next) => term = next }
+                    ref={ (element) => field = element }
+                />
+            </div>
+            <Show when={ term.trim() !== '' }>
+                <Button variant="primary" size={ hero ? 'md' : 'sm' } type="submit" busy={ busy }>Go</Button>
+            </Show>
+        </div>
+    </form>
+}

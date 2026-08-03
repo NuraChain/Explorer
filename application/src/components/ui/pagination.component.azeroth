@@ -1,0 +1,108 @@
+import Icon from '../../icons/icon.component.azeroth';
+
+// Paging for the long lists. Numbered rather than prev/next alone: on a chain the page number is
+// a position in history, and jumping to the far end - the genesis blocks, the oldest transfers -
+// is a normal thing to want. Prev/next only makes that a hundred clicks.
+//
+// The window is fixed at seven slots so the control never reflows as the page number grows: first,
+// last, the current page with a neighbour either side, and gaps for what is skipped. A gap is
+// rendered as text, not a button, because there is no single page it could sensibly go to.
+export default component Pagination(props: {
+    page: number;
+    pages: number;
+    onChange: (page: number) => void;
+})
+{
+    derived window = ((): Array<{ position: number; value: number | 'gap' }> =>
+    {
+        let items: Array<number | 'gap'>;
+        if (props.pages <= 7)
+        {
+            items = Array.from({ length: props.pages }, (_item, index) => index + 1);
+        }
+        else
+        {
+            const current = props.page;
+            const middle = [current - 1, current, current + 1].filter((page) => page > 1 && page < props.pages);
+            items = [1];
+            if ((middle[0] ?? props.pages) > 2)
+            {
+                items.push('gap');
+            }
+            items.push(...middle);
+            if ((middle[middle.length - 1] ?? 0) < props.pages - 1)
+            {
+                items.push('gap');
+            }
+            items.push(props.pages);
+        }
+        return items.map((value, position) => ({ position, value }));
+    })();
+
+    const stepClass = 'flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text disabled:pointer-events-none disabled:opacity-40';
+
+    <Show when={ props.pages > 1 }>
+        <nav class="flex items-center justify-center gap-1.5 border-t border-line px-3 py-3 sm:gap-2 sm:px-4" aria-label="Pagination">
+            <button
+                class={ stepClass }
+                type="button"
+                aria-label="First page"
+                disabled={ props.page <= 1 }
+                onClick={ () => props.onChange(1) }
+            >
+                <Icon name="chevrons-left" size={ 15 } />
+            </button>
+            <button
+                class={ stepClass }
+                type="button"
+                aria-label="Newer"
+                disabled={ props.page <= 1 }
+                onClick={ () => props.onChange(props.page - 1) }
+            >
+                <Icon name="chevron-left" size={ 15 } />
+            </button>
+
+            <For each={ window } key={ (item) => String(item.position) }>
+            { (item) =>
+                <Show
+                    when={ item.value === 'gap' }
+                    fallback={
+                        <button
+                            class={ item.value === props.page
+                                ? 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[13px] font-semibold text-nur'
+                                : 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[13px] text-muted transition-colors duration-150 hover:border-line hover:text-text' }
+                            type="button"
+                            aria-label={ `Page ${ item.value }` }
+                            aria-current={ item.value === props.page ? 'page' : undefined }
+                            onClick={ () => props.onChange(item.value as number) }
+                        >
+                            { item.value }
+                        </button>
+                    }
+                >
+                    <span class="flex h-9 w-5 shrink-0 items-center justify-center text-[13px] text-faint" aria-hidden="true">...</span>
+                </Show>
+            }
+            </For>
+
+            <button
+                class={ stepClass }
+                type="button"
+                aria-label="Older"
+                disabled={ props.page >= props.pages }
+                onClick={ () => props.onChange(props.page + 1) }
+            >
+                <Icon name="chevron-right" size={ 15 } />
+            </button>
+            <button
+                class={ stepClass }
+                type="button"
+                aria-label="Last page"
+                disabled={ props.page >= props.pages }
+                onClick={ () => props.onChange(props.pages) }
+            >
+                <Icon name="chevrons-right" size={ 15 } />
+            </button>
+        </nav>
+    </Show>
+}

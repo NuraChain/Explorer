@@ -1,0 +1,131 @@
+import { Link } from 'azerothjs';
+
+import type { Transaction } from '../../api.ts';
+import { formatAmount, formatDateTime, timeAgo } from '../../lib/format.ts';
+import Icon from '../../icons/icon.component.azeroth';
+import Tooltip from '../ui/tooltip.component.azeroth';
+
+// THE page's reason to exist: where did this address's money go.
+//
+// Not a transaction table with a from and a to column - reading direction out of two addresses
+// is work, and it is the one thing every visitor is here to do. So direction is the layout:
+// value that ARRIVED sits left in mint, value that LEFT sits right in coral, each bar sized
+// against the largest movement in view. Scanning the shape answers the question before any
+// number is read.
+export default component FlowLedger(props: {
+    address: string;
+    rows: Transaction[];
+    symbol: string;
+    decimals: number;
+})
+{
+    /** A transaction with no value moved is a call, not a payment - it gets no bar. */
+    const amountOf = (row: Transaction): bigint => BigInt(row.value);
+
+    derived peak = ((): bigint =>
+    {
+        let top = 0n;
+        for (const row of props.rows)
+        {
+            const value = amountOf(row);
+            if (value > top)
+            {
+                top = value;
+            }
+        }
+        return top;
+    })();
+
+    /** Bar width as a percentage of the largest movement on screen; 0 stays 0. */
+    const share = (value: bigint): number =>
+    {
+        if (peak === 0n || value === 0n)
+        {
+            return 0;
+        }
+        // Scaled through bigint before the double, so a uint256 never loses precision on the way
+        // to a CSS percentage. Floored at 2% so a real-but-tiny transfer is still visible.
+        return Math.max(2, Number((value * 1000n) / peak) / 10);
+    };
+
+    const inbound = (row: Transaction): boolean => row.to === props.address;
+
+    <div class="panel overflow-hidden">
+        <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
+            <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">Flow</h2>
+            <div class="flex items-center gap-4 text-[12px]">
+                <span class="flex items-center gap-1.5 text-inflow"><Icon name="inflow" size={ 13 } /> in</span>
+                <span class="flex items-center gap-1.5 text-outflow"><Icon name="outflow" size={ 13 } /> out</span>
+            </div>
+        </div>
+
+        <Show when={ props.rows.length === 0 }>
+            <p class="px-4 py-10 text-center text-[14px] text-muted">
+                No transactions here yet. When this address sends or receives, the movement appears here.
+            </p>
+        </Show>
+
+        <ul class="divide-y divide-line">
+            <For each={ props.rows } key={ (row) => row.hash }>
+            { (row) =>
+                <li class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
+                    {/* Left rail: value arriving. Bars grow toward the centre from both sides, so
+                        the two directions read as one movement rather than two columns. */}
+                    <div class="flex items-center justify-end gap-2">
+                        <Show when={ inbound(row) && amountOf(row) > 0n }>
+                            <span class="data text-[13px] font-semibold text-inflow">
+                                +{ formatAmount(row.value, props.decimals) }
+                            </span>
+                            <span
+                                class="h-2 rounded-l-full bg-inflow"
+                                style={ `width: ${ share(amountOf(row)) }%` }
+                                aria-hidden="true"
+                            ></span>
+                        </Show>
+                    </div>
+
+                    <Link
+                        to={ `/tx/${ row.hash }` }
+                        class="flex w-[128px] shrink-0 flex-col items-center gap-0.5 no-underline"
+                    >
+                        <span class="flex items-center gap-1">
+                            <Show when={ row.status === 'reverted' }>
+                                <Icon name="alert" size={ 12 } class="text-outflow" />
+                            </Show>
+                            <span class="data text-[12px] text-beam hover:underline">{ row.hash.slice(0, 10) }…</span>
+                        </span>
+                        <Tooltip label={ formatDateTime(row.at) }><span class="text-[11px] text-muted">{ timeAgo(row.at) }</span></Tooltip>
+                    </Link>
+
+                    {/* Right rail: value leaving. */}
+                    <div class="flex items-center gap-2">
+                        <Show when={ !inbound(row) && amountOf(row) > 0n }>
+                            <span
+                                class="h-2 rounded-r-full bg-outflow"
+                                style={ `width: ${ share(amountOf(row)) }%` }
+                                aria-hidden="true"
+                            ></span>
+                            <span class="data text-[13px] font-semibold text-outflow">
+                                &#8722;{ formatAmount(row.value, props.decimals) }
+                            </span>
+                        </Show>
+                        {/* A zero-value transaction still belongs in the ledger - it is a call,
+                            and saying so is more honest than leaving a blank row. */}
+                        <Show when={ amountOf(row) === 0n }>
+                            <span class="text-[12px] text-muted">
+                                { row.contractAddress === null ? 'call' : 'contract created' }
+                            </span>
+                        </Show>
+                    </div>
+                </li>
+            }
+            </For>
+        </ul>
+
+        <Show when={ props.rows.length > 0 }>
+            <p class="border-t border-line px-4 py-2.5 text-[11px] text-muted">
+                Bars are relative to the largest movement shown. Amounts in { props.symbol }.
+            </p>
+        </Show>
+    </div>
+}

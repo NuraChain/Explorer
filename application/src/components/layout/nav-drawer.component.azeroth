@@ -1,0 +1,113 @@
+import { Link, onMount, Portal } from 'azerothjs';
+
+import Icon from '../../icons/icon.component.azeroth';
+import ThemeSwitch from './theme-switch.component.azeroth';
+
+// Navigation on a phone. Below `sm` the header has room for the mark and the search field and
+// nothing else, so the sections move behind a control instead of wrapping onto a second row that
+// pushes the content down on every page.
+//
+// It is a sheet from the side rather than a dropdown: the targets end up under the thumb, and it
+// can hold the theme control too, which a dropdown of links cannot without looking like a mistake.
+export default component NavDrawer()
+{
+    state open = false;
+
+    // Escape closes, and the body cannot scroll behind the sheet - a scrolling page under an open
+    // overlay is the single most common way a drawer feels broken.
+    onMount(() =>
+    {
+        const onKey = (event: KeyboardEvent): void =>
+        {
+            if (event.key === 'Escape')
+            {
+                open = false;
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    });
+
+    effect (open)
+    {
+        if (typeof document !== 'undefined')
+        {
+            document.body.style.overflow = open ? 'hidden' : '';
+        }
+    }
+
+    const close = (): void =>
+    {
+        open = false;
+    };
+
+    <div class="sm:hidden">
+        <button
+            class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-line text-muted transition-colors duration-150 hover:text-text"
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded={ open }
+            onClick={ () => open = true }
+        >
+            <Icon name="menu" size={ 18 } />
+        </button>
+
+        <Show when={ open }>
+            {/* Portaled: the header carries a backdrop-filter, which makes it a containing block
+                for fixed positioning - rendered in place the sheet is trapped inside the header. */}
+            <Portal>
+            <div class="fixed inset-0 z-40 sm:hidden">
+                {/* The scrim is the dismiss target: tapping beside a sheet closes it everywhere
+                    else on a phone, so it must here. */}
+                <button
+                    class="absolute inset-0 h-full w-full cursor-default border-0 bg-void/70 p-0 backdrop-blur-sm motion-safe:animate-fade"
+                    type="button"
+                    aria-label="Close navigation"
+                    onClick={ close }
+                ></button>
+
+                <nav
+                    class="absolute inset-y-0 end-0 flex w-72 max-w-[85vw] flex-col gap-1 border-s border-line bg-void px-4 py-4 shadow-2xl motion-safe:animate-slide-in"
+                    aria-label="Sections"
+                >
+                    <div class="mb-2 flex items-center justify-between">
+                        <span class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">Menu</span>
+                        <button
+                            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:text-text"
+                            type="button"
+                            aria-label="Close navigation"
+                            onClick={ close }
+                        >
+                            <Icon name="x" size={ 18 } />
+                        </button>
+                    </div>
+
+                    <Link
+                        to="/"
+                        class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                        activeClass="active"
+                        onClick={ close }
+                    >Home</Link>
+                    <Link
+                        to="/blocks"
+                        class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                        activeClass="active"
+                        onClick={ close }
+                    >Blocks</Link>
+                    <Link
+                        to="/txs"
+                        class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                        activeClass="active"
+                        onClick={ close }
+                    >Transactions</Link>
+
+                    <div class="mt-auto border-t border-line pt-4">
+                        <h2 class="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">Theme</h2>
+                        <ThemeSwitch labelled />
+                    </div>
+                </nav>
+            </div>
+            </Portal>
+        </Show>
+    </div>
+}

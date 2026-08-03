@@ -1,0 +1,99 @@
+import { Portal, type Child } from 'azerothjs';
+
+// A tooltip for the things an explorer truncates: a shortened hash, a gas percentage, a relative
+// time. Pointer hover and KEYBOARD focus reveal it; a touch tap does not, because a hover-less
+// device gets nothing useful from a bubble it cannot dismiss - there the control's own accessible
+// name speaks instead.
+//
+// The bubble is PORTALED to the body and positioned `fixed` from the trigger's rect. A z-index
+// only orders siblings inside its own stacking context, so rendered in place it would sit under
+// the sticky header (which has its own z-index and a backdrop-filter) and be clipped outright
+// inside any scroller. Escaping to the body is what makes the layer order real.
+//
+// ONE horizontal centering only: a `-translate-x-1/2` utility sets the CSS `translate` property,
+// which COMPOSES with the inline `transform` rather than losing to it - together they shift a full
+// bubble width and push it off-screen. The transform below is the only one.
+//
+// aria-hidden: the trigger already carries this string as its accessible name or visible text,
+// so exposing it again would announce it twice. This is a visual affordance, not content.
+export default component Tooltip(props: {
+    label: string;
+
+    /** Display for the wrapper. Inline by default; pass `flex` where the trigger owns its own line. */
+    class?: string;
+
+    children?: Child;
+})
+{
+    state open = false;
+    state left = 0;
+    state top = 0;
+    state below = false;
+
+    let wrap: HTMLElement | null = null;
+
+    // Read per event, never captured once: matchMedia does not exist during SSR, and a value
+    // resolved at setup would pin the pre-hydration answer for this element's whole life.
+    const hoverable = (): boolean =>
+        typeof matchMedia !== 'undefined' && matchMedia('(hover: hover)').matches;
+
+    // A pointer press immediately before a focus is a click or a tap - the mouse already gets
+    // the tooltip from hover, and a touch should get nothing. Deciding from the interaction
+    // beats `:focus-visible`, which some engines report support for and never match.
+    let viaPointer = false;
+
+    /**
+     * Anchors the bubble in viewport coordinates: flipped below when there is no room above, and
+     * its centre clamped so a trigger near either edge cannot push it off-screen.
+     */
+    const place = (): void =>
+    {
+        if (wrap === null)
+        {
+            return;
+        }
+        const rect = wrap.getBoundingClientRect();
+        const flip = rect.top < 44;
+        below = flip;
+        top = flip ? rect.bottom + 8 : rect.top - 8;
+        // Clamp against the bubble's OWN half-width, not a fixed inset: a long label on a narrow
+        // screen is as wide as the viewport allows, so a constant margin would still overflow.
+        const half = Math.min(window.innerWidth - 24, 320) / 2;
+        left = Math.min(Math.max(rect.left + rect.width / 2, half + 12), window.innerWidth - half - 12);
+    };
+
+    const show = (): void =>
+    {
+        place();
+        open = true;
+    };
+
+    const hide = (): void =>
+    {
+        open = false;
+    };
+
+    <span
+        class={ props.class ?? 'inline-flex' }
+        ref={ (element) => wrap = element }
+        onPointerDown={ () => viaPointer = true }
+        onPointerEnter={ () => (hoverable() ? show() : undefined) }
+        onPointerLeave={ hide }
+        onFocusIn={ () => { if (viaPointer) { viaPointer = false; } else { show(); } } }
+        onFocusOut={ hide }
+        onKeyDown={ (event) => ((event as KeyboardEvent).key === 'Escape' ? hide() : undefined) }
+    >
+        { props.children }
+        <Show when={ open }>
+            <Portal>
+                <span
+                    class="pointer-events-none fixed z-50 max-w-[min(20rem,calc(100vw-1.5rem))] break-words rounded-md border border-line bg-raised px-2 py-1 text-center text-[11px] text-text shadow-lg"
+                    style={ `left: ${ left }px; top: ${ top }px; transform: translate(-50%, ${ below ? '0' : '-100%' })` }
+                    aria-hidden="true"
+                >
+                    { props.label }
+                </span>
+            </Portal>
+        </Show>
+    </span>
+}

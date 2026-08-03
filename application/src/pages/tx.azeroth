@@ -1,0 +1,155 @@
+import { Link, useParams } from 'azerothjs';
+
+import { client } from '../api.ts';
+import { formatAmount, formatBytes, formatCount, formatDateTime, formatGwei, formatValue, timeAgo } from '../lib/format.ts';
+import Icon from '../icons/icon.component.azeroth';
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import Badge from '../components/ui/badge.component.azeroth';
+import { useTitle } from '../lib/title.ts';
+
+export default component TransactionPage()
+{
+    const params = useParams();
+
+    resource stats = () => client.stats.summary();
+    resource detail = (hash: string) => client.txs.one({ params: { hash } })
+        with { source: params()['hash'] ?? false };
+
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+
+    useTitle(() => 'Transaction');
+
+    <div class="flex flex-col gap-5">
+        <Show when={ detail.error() }>
+            <div class="panel px-6 py-12 text-center">
+                <h1 class="text-[18px] font-bold">Transaction not in the index</h1>
+                <p class="mt-2 text-[14px] text-muted">It may still be pending, or newer than the indexer has reached.</p>
+            </div>
+        </Show>
+
+        <Show when={ detail.data() !== undefined }>
+        { () =>
+            <div class="flex flex-col gap-5">
+                <header class="flex flex-wrap items-center gap-3">
+                    <span class={ detail.data()!.transaction.status === 'reverted'
+                        ? 'flex h-10 w-10 items-center justify-center rounded-lg bg-raised text-outflow'
+                        : 'flex h-10 w-10 items-center justify-center rounded-lg bg-raised text-inflow' }
+                    >
+                        <Icon name={ detail.data()!.transaction.status === 'reverted' ? 'alert' : 'success' } size={ 19 } />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <h1 class="text-[20px] font-bold tracking-tight">Transaction</h1>
+                        <p class="text-[12px] text-muted">
+                            { formatDateTime(detail.data()!.transaction.at) } &middot; { timeAgo(detail.data()!.transaction.at) }
+                        </p>
+                    </div>
+                    <Badge
+                        tone={ detail.data()!.transaction.status === 'reverted' ? 'danger' : detail.data()!.transaction.status === 'unknown' ? 'neutral' : 'success' }
+                        icon={ detail.data()!.transaction.status === 'reverted' ? 'alert' : 'success' }
+                    >
+                        { detail.data()!.transaction.status }
+                    </Badge>
+                </header>
+
+                {/* The reverted case is said in words, not only in colour: a failed transfer that
+                    reads as a successful one is the worst mistake this page could make. */}
+                <Show when={ detail.data()!.transaction.status === 'reverted' }>
+                    <p class="flex items-start gap-2 rounded-lg border border-outflow bg-raised px-4 py-3 text-[13px] text-outflow">
+                        <Icon name="alert" size={ 15 } class="mt-0.5 shrink-0" />
+                        This transaction reverted. No value moved, but the sender still paid the gas below.
+                    </p>
+                </Show>
+
+                <dl class="panel divide-y divide-line">
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">Hash</dt>
+                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">Block</dt>
+                        <dd class="flex-1">
+                            <Link to={ `/block/${ detail.data()!.transaction.blockNumber }` } class="data text-[13px] text-beam no-underline hover:underline">
+                                #{ detail.data()!.transaction.blockNumber }
+                            </Link>
+                            <span class="ms-2 text-[12px] text-muted">position { detail.data()!.transaction.index }</span>
+                        </dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">From</dt>
+                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">To</dt>
+                        <dd class="min-w-0 flex-1">
+                            <Show
+                                when={ detail.data()!.transaction.to }
+                                fallback={
+                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[13px] text-muted">contract creation</span> }>
+                                    { (created) =>
+                                        <span class="flex flex-wrap items-center gap-2">
+                                            <span class="text-[12px] text-muted">created</span>
+                                            <HashLink value={ created() } to={ `/address/${ created() }` } lead={ 16 } tail={ 10 } copy />
+                                        </span>
+                                    }
+                                    </Show>
+                                }
+                            >
+                            { (to) => <HashLink value={ to() } to={ `/address/${ to() }` } lead={ 16 } tail={ 10 } copy /> }
+                            </Show>
+                        </dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">Value</dt>
+                        <dd class="data flex-1 text-[15px] font-bold">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">Fee</dt>
+                        <dd class="flex-1">
+                            <span class="data text-[13px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
+                            <span class="ms-2 text-[12px] text-muted">
+                                { formatCount(Number(detail.data()!.transaction.gasUsed)) } gas at { formatGwei(detail.data()!.transaction.gasPrice) }
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">Nonce</dt>
+                        <dd class="data flex-1 text-[13px]">
+                            { detail.data()!.transaction.nonce }
+                            <Show when={ detail.data()!.transaction.inputSize > 0 }>
+                                <span class="ms-3 text-[12px] text-muted">calldata { formatBytes(detail.data()!.transaction.inputSize) }</span>
+                            </Show>
+                        </dd>
+                    </div>
+                </dl>
+
+                <Show when={ detail.data()!.transfers.length > 0 }>
+                    <section class="panel overflow-hidden">
+                        <h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                            Token transfers
+                        </h2>
+                        <ul class="divide-y divide-line">
+                            <For each={ detail.data()!.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` }>
+                            { (row) =>
+                                <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                    <Icon name="token" size={ 15 } class="text-nur" />
+                                    <div class="min-w-0 flex-1 text-[12px] text-muted">
+                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } />
+                                        <span class="mx-1.5">&rarr;</span>
+                                        <HashLink value={ row.to } to={ `/address/${ row.to }` } tone="muted" lead={ 8 } tail={ 6 } />
+                                    </div>
+                                    <p class="data text-[13px] font-semibold">
+                                        { formatAmount(row.value, row.tokenDecimals) }
+                                        <span class="ms-1.5 text-muted">{ row.tokenSymbol === '' ? 'token' : row.tokenSymbol }</span>
+                                    </p>
+                                </li>
+                            }
+                            </For>
+                        </ul>
+                    </section>
+                </Show>
+            </div>
+        }
+        </Show>
+    </div>
+}

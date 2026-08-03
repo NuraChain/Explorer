@@ -1,0 +1,71 @@
+import { RouterProvider, Routes, Link, createRouter, createMemoryHistory } from 'azerothjs';
+import type { LoaderHandoff } from 'azerothjs';
+
+import { routes } from './routes.ts';
+import Icon from './icons/icon.component.azeroth';
+import SearchBar from './components/layout/search-bar.component.azeroth';
+import NavDrawer from './components/layout/nav-drawer.component.azeroth';
+import ThemeSwitch from './components/layout/theme-switch.component.azeroth';
+import SiteFooter from './components/layout/site-footer.component.azeroth';
+import Toasts from './components/ui/toasts.component.azeroth';
+
+export default component App(props: { url?: string; handoff?: LoaderHandoff })
+{
+    const router = createRouter({
+        routes,
+        history: props.url !== undefined ? createMemoryHistory(props.url) : undefined,
+        initialLoaderData: props.handoff
+    });
+
+    <RouterProvider router={ router }>
+        <div class="flex min-h-dvh flex-col bg-void">
+            <header class="sticky top-0 z-20 border-b border-line bg-void/90 backdrop-blur">
+                <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:gap-x-5 sm:px-6 sm:py-3">
+                    <Link to="/" class="flex shrink-0 items-center gap-2 no-underline">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-md bg-nur text-void">
+                            <Icon name="layers" size={ 16 } />
+                        </span>
+                        <span class="text-[15px] font-bold tracking-tight text-text">Nura<span class="text-nur">Explorer</span></span>
+                    </Link>
+
+                    <nav class="hidden items-center gap-4 text-[13px] sm:flex" aria-label="Sections">
+                        <Link
+                            to="/blocks"
+                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            activeClass="active"
+                        >Blocks</Link>
+                        <Link
+                            to="/txs"
+                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            activeClass="active"
+                        >Transactions</Link>
+                    </nav>
+
+                    {/* Search lives in the chrome on every page except home, where it is the hero
+                        instead - so it is never on screen twice. */}
+                    <div class="order-last w-full sm:order-none sm:ms-auto sm:w-auto sm:min-w-[280px] sm:max-w-md sm:flex-1">
+                        <SearchBar size="compact" />
+                    </div>
+
+                    <span class="hidden sm:block"><ThemeSwitch /></span>
+                    <span class="ms-auto sm:ms-0"><NavDrawer /></span>
+                </div>
+            </header>
+
+            <main class="mx-auto w-full max-w-5xl flex-1 px-3 py-5 sm:px-6 sm:py-8 motion-safe:animate-rise">
+                <Routes fallback={ () =>
+                    <div class="panel px-6 py-16 text-center">
+                        <h1 class="text-[19px] font-bold">Nothing here</h1>
+                        <p class="mt-2 text-[14px] text-muted">
+                            That page does not exist. Search above for an address, transaction, or block.
+                        </p>
+                    </div>
+                } />
+            </main>
+
+            <SiteFooter />
+
+            <Toasts />
+        </div>
+    </RouterProvider>
+}

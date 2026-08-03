@@ -1,0 +1,436 @@
+import { DatabaseSync } from 'node:sqlite';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+
+// The index. Everything here is DERIVED from the chain, so a schema change is a rebuild, not a
+// migration: bump SCHEMA_VERSION and the tables drop and replay from START_BLOCK.
+//
+// The whole point of this file is the pair of indexes on `transactions(from_addr)` and
+// `transactions(to_addr)`. Ethereum JSON-RPC cannot answer "every transaction touching this
+// address" - that is the question an explorer exists to answer, and it is answerable only
+// because these rows were written down as the chain was read.
+
+/** Bumped whenever a column changes; the index rebuilds itself from the chain. */
+const SCHEMA_VERSION = '1';
+
+/** The ERC-20 / ERC-721 `Transfer(address,address,uint256)` topic. */
+export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+/** `TransferSingle(address,address,address,uint256,uint256)` - ERC-1155. */
+export const TRANSFER_SINGLE_TOPIC = '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
+
+const DDL = `
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS blocks (
+    number INTEGER PRIMARY KEY,
+    hash TEXT NOT NULL,
+    parent_hash TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    miner TEXT NOT NULL,
+    gas_used TEXT NOT NULL,
+    gas_limit TEXT NOT NULL,
+    base_fee TEXT,
+    size INTEGER NOT NULL,
+    tx_count INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_blocks_ts ON blocks (timestamp DESC);
+CREATE TABLE IF NOT EXISTS transactions (
+    hash TEXT PRIMARY KEY,
+    block_number INTEGER NOT NULL,
+    tx_index INTEGER NOT NULL,
+    from_addr TEXT NOT NULL,
+    to_addr TEXT,
+    value TEXT NOT NULL,
+    nonce INTEGER NOT NULL,
+    input_size INTEGER NOT NULL,
+    gas_used TEXT NOT NULL,
+    effective_gas_price TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    contract_address TEXT,
+    timestamp INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tx_block ON transactions (block_number DESC, tx_index ASC);
+CREATE INDEX IF NOT EXISTS idx_tx_from ON transactions (from_addr, block_number DESC);
+CREATE INDEX IF NOT EXISTS idx_tx_to ON transactions (to_addr, block_number DESC);
+CREATE TABLE IF NOT EXISTS token_transfers (
+    tx_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    block_number INTEGER NOT NULL,
+    token TEXT NOT NULL,
+    from_addr TEXT NOT NULL,
+    to_addr TEXT NOT NULL,
+    value TEXT NOT NULL,
+    token_id TEXT,
+    kind TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    PRIMARY KEY (tx_hash, log_index)
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_from ON token_transfers (from_addr, block_number DESC);
+CREATE INDEX IF NOT EXISTS idx_transfer_to ON token_transfers (to_addr, block_number DESC);
+CREATE INDEX IF NOT EXISTS idx_transfer_token ON token_transfers (token, block_number DESC);
+CREATE TABLE IF NOT EXISTS tokens (
+    address TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    decimals INTEGER NOT NULL,
+    kind TEXT NOT NULL
+);
+`;
+
+export interface BlockRow
+{
+    number: number;
+    hash: string;
+    parent_hash: string;
+    timestamp: number;
+    miner: string;
+    gas_used: string;
+    gas_limit: string;
+    base_fee: string | null;
+    size: number;
+    tx_count: number;
+}
+
+export interface TransactionRow
+{
+    hash: string;
+    block_number: number;
+    tx_index: number;
+    from_addr: string;
+    to_addr: string | null;
+    value: string;
+    nonce: number;
+    input_size: number;
+    gas_used: string;
+    effective_gas_price: string;
+    status: number;
+    contract_address: string | null;
+    timestamp: number;
+}
+
+export interface TransferRow
+{
+    tx_hash: string;
+    log_index: number;
+    block_number: number;
+    token: string;
+    from_addr: string;
+    to_addr: string;
+    value: string;
+    token_id: string | null;
+    kind: string;
+    timestamp: number;
+}
+
+export interface TokenRow
+{
+    address: string;
+    name: string;
+    symbol: string;
+    decimals: number;
+    kind: string;
+}
+
+/** Addresses are stored and compared lower-cased; checksummed input must never miss a row. */
+export function normalize(address: string): string
+{
+    return address.toLowerCase();
+}
+
+export class IndexStore
+{
+    readonly #db: DatabaseSync;
+
+    constructor(path: string)
+    {
+        // sqlite creates the FILE but not the directory holding it, so a configured
+        // `.data/index.db` fails to open on a fresh clone until someone makes the folder.
+        // ':memory:' has no directory at all.
+        if (path !== ':memory:')
+        {
+            const parent = dirname(resolve(path));
+            if (!existsSync(parent))
+            {
+                mkdirSync(parent, { recursive: true });
+            }
+        }
+        this.#db = new DatabaseSync(path);
+        this.#db.exec('PRAGMA journal_mode = WAL;');
+        this.#db.exec(DDL);
+        this.#migrate();
+    }
+
+    /**
+     * Every table here is derived from the chain, so a schema change drops and replays rather
+     * than migrating. `CREATE TABLE IF NOT EXISTS` will not add a column to an existing file,
+     * which is exactly how a stale index starts serving rows that are missing one.
+     */
+    #migrate(): void
+    {
+        if (this.getMeta('schema') === SCHEMA_VERSION)
+        {
+            return;
+        }
+        this.#db.exec(
+            'DROP TABLE IF EXISTS blocks;'
+            + 'DROP TABLE IF EXISTS transactions;'
+            + 'DROP TABLE IF EXISTS token_transfers;'
+            + 'DROP TABLE IF EXISTS tokens;'
+            + 'DROP TABLE IF EXISTS meta;');
+        this.#db.exec(DDL);
+        this.setMeta('schema', SCHEMA_VERSION);
+    }
+
+    public close(): void
+    {
+        this.#db.close();
+    }
+
+    public getMeta(key: string): string | null
+    {
+        const row = this.#db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined;
+        return row?.value ?? null;
+    }
+
+    public setMeta(key: string, value: string): void
+    {
+        this.#db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value')
+            .run(key, value);
+    }
+
+    /** The highest block indexed, or startBlock-1 when the index is empty. */
+    public cursor(fallback: number): number
+    {
+        const value = this.getMeta('cursor');
+        return value === null ? fallback - 1 : Number(value);
+    }
+
+    public setCursor(block: number): void
+    {
+        this.setMeta('cursor', String(block));
+    }
+
+    /**
+     * The stale-index guard: if the chain behind the RPC is not the one this index was built
+     * from (a restarted local node), everything derived is wrong. Wipe and start over.
+     */
+    public ensureChain(genesisHash: string): boolean
+    {
+        const known = this.getMeta('genesis');
+        if (known === genesisHash)
+        {
+            return false;
+        }
+        if (known !== null)
+        {
+            this.#db.exec('DELETE FROM blocks; DELETE FROM transactions; DELETE FROM token_transfers; DELETE FROM tokens;');
+            this.#db.prepare('DELETE FROM meta WHERE key = ?').run('cursor');
+        }
+        this.setMeta('genesis', genesisHash);
+        return known !== null;
+    }
+
+    // ----------------------------------------------------------------------------------
+    // Ingest
+    // ----------------------------------------------------------------------------------
+
+    public blockHash(number: number): string | null
+    {
+        const row = this.#db.prepare('SELECT hash FROM blocks WHERE number = ?').get(number) as { hash: string } | undefined;
+        return row?.hash ?? null;
+    }
+
+    /** Drops everything at or above `number` - the rollback half of reorg handling. */
+    public rollbackFrom(number: number): void
+    {
+        this.#db.prepare('DELETE FROM token_transfers WHERE block_number >= ?').run(number);
+        this.#db.prepare('DELETE FROM transactions WHERE block_number >= ?').run(number);
+        this.#db.prepare('DELETE FROM blocks WHERE number >= ?').run(number);
+    }
+
+    public insertBlock(row: BlockRow, transactions: TransactionRow[], transfers: TransferRow[]): void
+    {
+        this.#db.prepare(`
+            INSERT INTO blocks (number, hash, parent_hash, timestamp, miner, gas_used, gas_limit, base_fee, size, tx_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (number) DO UPDATE SET hash = excluded.hash, parent_hash = excluded.parent_hash`)
+            .run(row.number, row.hash, row.parent_hash, row.timestamp, row.miner, row.gas_used,
+                row.gas_limit, row.base_fee, row.size, row.tx_count);
+
+        const tx = this.#db.prepare(`
+            INSERT INTO transactions (hash, block_number, tx_index, from_addr, to_addr, value, nonce,
+                input_size, gas_used, effective_gas_price, status, contract_address, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (hash) DO NOTHING`);
+        for (const row_ of transactions)
+        {
+            tx.run(row_.hash, row_.block_number, row_.tx_index, row_.from_addr, row_.to_addr, row_.value,
+                row_.nonce, row_.input_size, row_.gas_used, row_.effective_gas_price, row_.status,
+                row_.contract_address, row_.timestamp);
+        }
+
+        const transfer = this.#db.prepare(`
+            INSERT INTO token_transfers (tx_hash, log_index, block_number, token, from_addr, to_addr, value, token_id, kind, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (tx_hash, log_index) DO NOTHING`);
+        for (const row_ of transfers)
+        {
+            transfer.run(row_.tx_hash, row_.log_index, row_.block_number, row_.token, row_.from_addr,
+                row_.to_addr, row_.value, row_.token_id, row_.kind, row_.timestamp);
+        }
+    }
+
+    public upsertToken(row: TokenRow): void
+    {
+        this.#db.prepare(`
+            INSERT INTO tokens (address, name, symbol, decimals, kind) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (address) DO UPDATE SET name = excluded.name, symbol = excluded.symbol,
+                decimals = excluded.decimals, kind = excluded.kind`)
+            .run(row.address, row.name, row.symbol, row.decimals, row.kind);
+    }
+
+    public knownToken(address: string): boolean
+    {
+        return this.#db.prepare('SELECT 1 FROM tokens WHERE address = ?').get(normalize(address)) !== undefined;
+    }
+
+    // ----------------------------------------------------------------------------------
+    // Reads
+    // ----------------------------------------------------------------------------------
+
+    public stats(): { blocks: number; transactions: number; transfers: number; head: number; headTime: number }
+    {
+        const row = this.#db.prepare(`
+            SELECT (SELECT COUNT(*) FROM blocks) AS blocks,
+                   (SELECT COUNT(*) FROM transactions) AS transactions,
+                   (SELECT COUNT(*) FROM token_transfers) AS transfers,
+                   (SELECT COALESCE(MAX(number), 0) FROM blocks) AS head,
+                   (SELECT COALESCE(MAX(timestamp), 0) FROM blocks) AS headTime`)
+            .get() as { blocks: number; transactions: number; transfers: number; head: number; headTime: number };
+        return row;
+    }
+
+    /** Block times over the most recent window, for the average the summary reports. */
+    public recentBlocks(limit: number): BlockRow[]
+    {
+        return this.#db.prepare('SELECT * FROM blocks ORDER BY number DESC LIMIT ?').all(limit) as unknown as BlockRow[];
+    }
+
+    public blocksPage(limit: number, offset: number): { rows: BlockRow[]; total: number }
+    {
+        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM blocks').get() as { n: number }).n;
+        const rows = this.#db.prepare('SELECT * FROM blocks ORDER BY number DESC LIMIT ? OFFSET ?')
+            .all(limit, offset) as unknown as BlockRow[];
+        return { rows, total };
+    }
+
+    public blockByNumber(number: number): BlockRow | null
+    {
+        return (this.#db.prepare('SELECT * FROM blocks WHERE number = ?').get(number) as BlockRow | undefined) ?? null;
+    }
+
+    public blockByHash(hash: string): BlockRow | null
+    {
+        return (this.#db.prepare('SELECT * FROM blocks WHERE hash = ?').get(hash.toLowerCase()) as BlockRow | undefined) ?? null;
+    }
+
+    public transactionsPage(limit: number, offset: number): { rows: TransactionRow[]; total: number }
+    {
+        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM transactions').get() as { n: number }).n;
+        const rows = this.#db.prepare('SELECT * FROM transactions ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?')
+            .all(limit, offset) as unknown as TransactionRow[];
+        return { rows, total };
+    }
+
+    /**
+     * One page of a block's transactions, in the order the block executed them. A full block can
+     * carry hundreds, and shipping all of them turns a detail page into a download.
+     */
+    public transactionsOfBlock(number: number, limit: number, offset: number): { rows: TransactionRow[]; total: number }
+    {
+        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM transactions WHERE block_number = ?')
+            .get(number) as { n: number }).n;
+        const rows = this.#db.prepare('SELECT * FROM transactions WHERE block_number = ? ORDER BY tx_index ASC LIMIT ? OFFSET ?')
+            .all(number, limit, offset) as unknown as TransactionRow[];
+        return { rows, total };
+    }
+
+    public transactionByHash(hash: string): TransactionRow | null
+    {
+        return (this.#db.prepare('SELECT * FROM transactions WHERE hash = ?').get(hash.toLowerCase()) as TransactionRow | undefined) ?? null;
+    }
+
+    /**
+     * Every transaction touching an address, newest first - the query this whole index exists
+     * for. One statement over both directional indexes.
+     */
+    public transactionsOfAddress(address: string, limit: number, offset: number): { rows: TransactionRow[]; total: number }
+    {
+        const account = normalize(address);
+        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM transactions WHERE from_addr = ? OR to_addr = ?')
+            .get(account, account) as { n: number }).n;
+        const rows = this.#db.prepare(`
+            SELECT * FROM transactions WHERE from_addr = ? OR to_addr = ?
+            ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?`)
+            .all(account, account, limit, offset) as unknown as TransactionRow[];
+        return { rows, total };
+    }
+
+    public transfersOfAddress(address: string, limit: number, offset: number): { rows: TransferRow[]; total: number }
+    {
+        const account = normalize(address);
+        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM token_transfers WHERE from_addr = ? OR to_addr = ?')
+            .get(account, account) as { n: number }).n;
+        const rows = this.#db.prepare(`
+            SELECT * FROM token_transfers WHERE from_addr = ? OR to_addr = ?
+            ORDER BY block_number DESC, log_index DESC LIMIT ? OFFSET ?`)
+            .all(account, account, limit, offset) as unknown as TransferRow[];
+        return { rows, total };
+    }
+
+    public transfersOfTransaction(hash: string): TransferRow[]
+    {
+        return this.#db.prepare('SELECT * FROM token_transfers WHERE tx_hash = ? ORDER BY log_index ASC')
+            .all(hash.toLowerCase()) as unknown as TransferRow[];
+    }
+
+    /** Native value in and out of an address, in wei - the flow ledger's totals. */
+    public flowOfAddress(address: string): { in: string; out: string; fees: string }
+    {
+        const account = normalize(address);
+        const rows = this.#db.prepare(
+            'SELECT to_addr, value, gas_used, effective_gas_price, from_addr FROM transactions WHERE (from_addr = ? OR to_addr = ?) AND status = 1')
+            .all(account, account) as unknown as Array<Pick<TransactionRow, 'to_addr' | 'value' | 'gas_used' | 'effective_gas_price' | 'from_addr'>>;
+
+        let inbound = 0n;
+        let outbound = 0n;
+        let fees = 0n;
+        for (const row of rows)
+        {
+            const value = BigInt(row.value);
+            if (row.to_addr === account)
+            {
+                inbound += value;
+            }
+            if (row.from_addr === account)
+            {
+                outbound += value;
+                fees += BigInt(row.gas_used) * BigInt(row.effective_gas_price);
+            }
+        }
+        return { in: inbound.toString(), out: outbound.toString(), fees: fees.toString() };
+    }
+
+    public token(address: string): TokenRow | null
+    {
+        return (this.#db.prepare('SELECT * FROM tokens WHERE address = ?').get(normalize(address)) as TokenRow | undefined) ?? null;
+    }
+
+    public tokens(): TokenRow[]
+    {
+        return this.#db.prepare('SELECT * FROM tokens ORDER BY symbol ASC').all() as unknown as TokenRow[];
+    }
+}

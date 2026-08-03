@@ -1,0 +1,74 @@
+/* Element-level rules and the utilities built on the token scale. */
+
+@layer base
+{
+    html
+    {
+        background: var(--void);
+        color: var(--text);
+        font-family: var(--font-display);
+        /* Hashes and addresses are the content; they must never be ambiguous. */
+        font-variant-ligatures: none;
+    }
+
+    :focus-visible
+    {
+        outline: 2px solid var(--nur);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+
+}
+
+@utility panel
+{
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+}
+
+/*
+ * Chain data: monospace, tabular figures, and ALWAYS left-to-right. A hash rendered in an RTL
+ * context without this reorders visually while reading identically to a screen reader, which is
+ * the worst kind of wrong - it looks like a different hash.
+ */
+@utility data
+{
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* A hash or address that may wrap, but only between characters - never off the page. */
+@utility hash
+{
+    font-family: var(--font-mono);
+    direction: ltr;
+    unicode-bidi: isolate;
+    overflow-wrap: anywhere;
+}
+
+/* The drawer's entrance. Both are motion-safe at the call site, so a reduced-motion reader gets
+   the sheet without the travel. */
+@keyframes az-slide-in
+{
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+@keyframes az-fade
+{
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@utility animate-slide-in
+{
+    animation: az-slide-in 180ms ease-out;
+}
+
+@utility animate-fade
+{
+    animation: az-fade 140ms ease-out;
+}

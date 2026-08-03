@@ -1,0 +1,66 @@
+import { Link } from 'azerothjs';
+
+import { shortHash } from '../../lib/format.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import Icon from '../../icons/icon.component.azeroth';
+import Tooltip from '../ui/tooltip.component.azeroth';
+
+// A hash or address, everywhere it appears: shortened, monospace, and copyable. The full value is
+// one hover away, so following a link to read a string is never necessary.
+//
+// Copy is ON by default. A truncated hash a reader cannot retrieve is worse than no hash, and
+// every place one appears is a place someone wants to paste it somewhere else.
+export default component HashLink(props: {
+    value: string;
+    to?: string;
+    lead?: number;
+    tail?: number;
+    tone?: 'beam' | 'muted' | 'text';
+    copy?: boolean;
+})
+{
+    const toasts = useToasts();
+
+    derived tone = props.tone ?? 'beam';
+    derived short = shortHash(props.value, props.lead ?? 10, props.tail ?? 8);
+    derived colour = tone === 'beam' ? 'text-beam' : tone === 'muted' ? 'text-muted' : 'text-text';
+
+    // The confirmation is the toast, not a glyph swap on the button: a check that appears where
+    // the cursor already is says nothing a reader will notice, and the toast is where every other
+    // confirmation in the app already speaks.
+    const write = async (): Promise<void> =>
+    {
+        try
+        {
+            await navigator.clipboard.writeText(props.value);
+            toasts.push('success', 'Copied to clipboard', 'check');
+        }
+        catch
+        {
+            toasts.push('error', 'Your browser blocked clipboard access', 'alert');
+        }
+    };
+
+    <span class="inline-flex items-center gap-1.5">
+        <Tooltip label={ props.value }>
+            <Show
+                when={ props.to !== undefined }
+                fallback={ <span class={ `data text-[13px] ${ colour }` }>{ short }</span> }
+            >
+                <Link to={ props.to ?? '/' } class={ `data text-[13px] no-underline hover:underline ${ colour }` }>
+                    { short }
+                </Link>
+            </Show>
+        </Tooltip>
+        <Show when={ props.copy !== false }>
+            <button
+                class="cursor-pointer text-muted transition-colors duration-150 hover:text-nur"
+                type="button"
+                aria-label={ `Copy ${ props.value }` }
+                onClick={ () => void write() }
+            >
+                <Icon name="copy" size={ 13 } />
+            </button>
+        </Show>
+    </span>
+}

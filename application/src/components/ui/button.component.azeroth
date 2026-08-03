@@ -1,0 +1,45 @@
+import type { Child } from 'azerothjs';
+
+import { BUTTON_SIZE, BUTTON_VARIANT, type ButtonSize, type ButtonVariant } from './variants.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+import type { IconName } from '../../icons/registry.ts';
+
+// The one button. `busy` implies disabled: a control that is working must not also be clickable,
+// and having one prop mean both removes the case where a caller sets only one of them.
+export default component Button(props: {
+    variant?: ButtonVariant;
+    size?: ButtonSize;
+    icon?: IconName;
+    type?: 'button' | 'submit';
+    disabled?: boolean;
+    busy?: boolean;
+    block?: boolean;
+    onClick?: () => void;
+    children?: Child;
+})
+{
+    derived inert = props.busy === true || props.disabled === true;
+
+    <button
+        class={ [
+            'inline-flex cursor-pointer items-center justify-center rounded-lg font-semibold transition duration-150',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            BUTTON_VARIANT[props.variant ?? 'outline'],
+            BUTTON_SIZE[props.size ?? 'sm'],
+            props.block === true ? 'w-full' : ''
+        ].filter(Boolean).join(' ') }
+        type={ props.type ?? 'button' }
+        disabled={ inert }
+        aria-busy={ props.busy === true ? 'true' : 'false' }
+        onClick={ () => (inert ? undefined : props.onClick?.()) }
+    >
+        <Show when={ props.busy === true }>
+            <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+        </Show>
+        <Show when={ props.busy !== true && props.icon !== undefined }>
+            <Icon name={ props.icon ?? 'help' } size={ 15 } />
+        </Show>
+        { props.children }
+    </button>
+}

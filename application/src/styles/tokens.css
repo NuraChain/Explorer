@@ -1,0 +1,97 @@
+/*
+ * NURA - the explorer's design tokens. Every colour, radius and motion value the UI uses is
+ * named here and consumed through Tailwind's @theme mapping; components never invent values.
+ */
+
+/*
+ * Nura means light. This explorer is the instrument that measures it, so the three themes are
+ * three qualities of light rather than a bare dark/light switch, and the accent is a warm
+ * luminance instead of the electric blue every other explorer reaches for.
+ *
+ * Two colours here are FUNCTIONAL, not decorative: inflow and outflow. They answer the only
+ * question this product exists to answer, so they are never spent on anything else.
+ */
+
+@theme
+{
+    --font-display: Archivo, ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+
+    --animate-rise: rise 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+    --animate-land: land 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+    @keyframes rise
+    {
+        from
+        {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+    }
+
+    @keyframes land
+    {
+        from
+        {
+            opacity: 0;
+            transform: scaleY(0.35);
+        }
+    }
+}
+
+/*
+ * Three themes, each a COMPLETE scale rather than a tint of another. Accents stay saturated in
+ * all three - a muted accent on a light ground is what makes an interface look dated, and the
+ * two flow colours have to survive being the only thing a reader looks at.
+ */
+
+/* Midnight - the default. Near-black with a cool cast so warm amber has something to sit on. */
+:root,
+:root[data-theme='dark']
+{
+    color-scheme: dark;
+    --void: #080B12;
+    --field: #0F131E;
+    --raised: #171D2C;
+    --line: #232B3D;
+    --text: #E8ECF5;
+    --muted: #929BB0;
+    --faint: #626B80;
+    --nur: #FFB224;
+    --beam: #38BDF8;
+    --inflow: #22D3A0;
+    --outflow: #FB6E52;
+}
+
+/* Dawn - clean white, not cream. Accents darken only as far as contrast demands. */
+:root[data-theme='light']
+{
+    color-scheme: light;
+    --void: #F7F8FA;
+    --field: #FFFFFF;
+    --raised: #F0F2F6;
+    --line: #DFE3EB;
+    --text: #0D1117;
+    --muted: #58616F;
+    --faint: #858D9B;
+    --nur: #B26A00;
+    --beam: #0369A1;
+    --inflow: #047857;
+    --outflow: #C2410C;
+}
+
+@theme inline
+{
+    --color-void: var(--void);
+    --color-field: var(--field);
+    --color-raised: var(--raised);
+    --color-line: var(--line);
+    --color-text: var(--text);
+    --color-muted: var(--muted);
+    --color-faint: var(--faint);
+    --color-nur: var(--nur);
+    --color-beam: var(--beam);
+    --color-inflow: var(--inflow);
+    --color-outflow: var(--outflow);
+}
+

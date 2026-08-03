@@ -1,0 +1,196 @@
+import { useParams } from 'azerothjs';
+
+import { client } from '../api.ts';
+import { formatAmount, formatCount, formatDateTime, formatValue, timeAgo } from '../lib/format.ts';
+import Icon from '../icons/icon.component.azeroth';
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import FlowLedger from '../components/chain/flow-ledger.component.azeroth';
+import Pagination from '../components/ui/pagination.component.azeroth';
+import EmptyState from '../components/ui/empty-state.component.azeroth';
+import { useTitle } from '../lib/title.ts';
+import Tooltip from '../components/ui/tooltip.component.azeroth';
+
+// The page this whole explorer exists for. The identity header answers "what is this", the three
+// flow figures answer "what happened to the money", and the ledger below answers "when, and with
+// whom". Token transfers are a second tab because they are a different asset - mixing them into
+// one list would make neither total mean anything.
+export default component AddressPage()
+{
+    const params = useParams();
+
+    state page = 1;
+    state tab: 'flow' | 'transfers' = 'flow';
+
+    derived address = params()['address'] ?? '';
+
+    resource stats = () => client.stats.summary();
+    resource account = (value: string) => client.address.summary({ params: { address: value } })
+        with { source: address };
+    resource txs = (key: string) =>
+    {
+        const [value = '', at = '1'] = key.split('|');
+        return client.address.transactions({ params: { address: value }, query: { page: Number(at), limit: 25 } });
+    } with { source: `${ address }|${ page }` };
+    resource transfers = (key: string) =>
+    {
+        const [value = '', at = '1'] = key.split('|');
+        return client.address.transfers({ params: { address: value }, query: { page: Number(at), limit: 25 } });
+    } with { source: tab === 'transfers' ? `${ address }|${ page }` : false };
+
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+
+    const pick = (next: 'flow' | 'transfers'): void =>
+    {
+        tab = next;
+        page = 1;
+    };
+
+    useTitle(() => `Address ${ address.slice(0, 10) }`);
+
+    <div class="flex flex-col gap-4 sm:gap-5">
+        <header class="panel px-4 py-4 sm:px-5">
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-raised text-nur">
+                    <Show
+                        when={ account.data()?.isContract === true }
+                        fallback={ <Icon name="wallet" size={ 19 } /> }
+                    >
+                        <Icon name="contract" size={ 19 } />
+                    </Show>
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[12px] uppercase tracking-[0.14em] text-muted">
+                        <Show when={ account.data()?.token } fallback={ <span>{ account.data()?.isContract === true ? 'Contract' : 'Address' }</span> }>
+                        { (token) => <span>Token &middot; { token().name } ({ token().symbol })</span> }
+                        </Show>
+                    </p>
+                    <p class="hash mt-0.5 text-[14px] font-semibold sm:text-[15px]">{ address }</p>
+                </div>
+                <HashLink value={ address } tone="muted" lead={ 6 } tail={ 4 } copy />
+            </div>
+        </header>
+
+        <Show when={ account.data() !== undefined }>
+        { () =>
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+                <div class="panel px-4 py-3">
+                    <dt class="text-[12px] text-muted">Balance</dt>
+                    <dd class="data mt-0.5 text-[16px] font-bold">{ formatValue(account.data()!.balance, symbol, decimals) }</dd>
+                </div>
+                {/* The two numbers the page is FOR, in the two colours that mean them. */}
+                <div class="panel px-4 py-3">
+                    <dt class="flex items-center gap-1.5 text-[12px] text-muted">
+                        <Icon name="inflow" size={ 12 } class="text-inflow" /> Received
+                    </dt>
+                    <dd class="data mt-0.5 text-[16px] font-bold text-inflow">{ formatAmount(account.data()!.flow.in, decimals) }</dd>
+                </div>
+                <div class="panel px-4 py-3">
+                    <dt class="flex items-center gap-1.5 text-[12px] text-muted">
+                        <Icon name="outflow" size={ 12 } class="text-outflow" /> Sent
+                    </dt>
+                    <dd class="data mt-0.5 text-[16px] font-bold text-outflow">{ formatAmount(account.data()!.flow.out, decimals) }</dd>
+                </div>
+                <div class="panel px-4 py-3">
+                    <dt class="flex items-center gap-1.5 text-[12px] text-muted">
+                        <Icon name="gas" size={ 12 } /> Fees paid
+                    </dt>
+                    <dd class="data mt-0.5 text-[16px] font-bold">{ formatAmount(account.data()!.flow.fees, decimals) }</dd>
+                </div>
+            </div>
+        }
+        </Show>
+
+        <div class="flex items-center gap-2" role="tablist" aria-label="Activity">
+            <button
+                class={ tab === 'flow'
+                    ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
+                    : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
+                type="button"
+                role="tab"
+                aria-selected={ tab === 'flow' }
+                onClick={ () => pick('flow') }
+            >
+                Transactions
+                <Show when={ account.data() !== undefined }>
+                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ formatCount(account.data()!.txCount) }</span> }
+                </Show>
+            </button>
+            <button
+                class={ tab === 'transfers'
+                    ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
+                    : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
+                type="button"
+                role="tab"
+                aria-selected={ tab === 'transfers' }
+                onClick={ () => pick('transfers') }
+            >
+                Token transfers
+                <Show when={ account.data() !== undefined }>
+                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ formatCount(account.data()!.transferCount) }</span> }
+                </Show>
+            </button>
+        </div>
+
+        <Show when={ tab === 'flow' }>
+            <div>
+                <FlowLedger
+                    address={ address }
+                    rows={ txs.data()?.rows ?? [] }
+                    symbol={ symbol }
+                    decimals={ decimals }
+                />
+                <Show when={ txs.data() !== undefined }>
+                { () =>
+                    <div class="panel mt-3">
+                        <Pagination page={ txs.data()!.page } pages={ txs.data()!.pages } onChange={ (next) => page = next } />
+                    </div>
+                }
+                </Show>
+            </div>
+        </Show>
+
+        <Show when={ tab === 'transfers' }>
+            <section class="panel overflow-hidden">
+                <ul class="divide-y divide-line">
+                    <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` }>
+                    { (row) =>
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                            <span class={ row.to === address
+                                ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-inflow'
+                                : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-outflow' }
+                            >
+                                <Icon name={ row.to === address ? 'inflow' : 'outflow' } size={ 14 } />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[13px] font-semibold">
+                                    { row.tokenSymbol === '' ? 'Token' : row.tokenSymbol }
+                                    <Show when={ row.tokenId !== null }>
+                                        <span class="data ms-1.5 text-[12px] text-muted">#{ row.tokenId }</span>
+                                    </Show>
+                                </p>
+                                <Tooltip label={ formatDateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(row.at) }</p></Tooltip>
+                            </div>
+                            <div class="text-end">
+                                <p class={ row.to === address
+                                    ? 'data text-[13px] font-semibold text-inflow'
+                                    : 'data text-[13px] font-semibold text-outflow' }
+                                >
+                                    { row.to === address ? '+' : '−' }{ formatAmount(row.value, row.tokenDecimals) }
+                                </p>
+                                <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 8 } tail={ 4 } />
+                            </div>
+                        </li>
+                    }
+                    </For>
+                </ul>
+                <Show when={ transfers.data()?.rows.length === 0 }>
+                    <EmptyState icon="token" title="No token transfers" hint="ERC-20, 721 and 1155 movements for this address appear here." />
+                </Show>
+                <Show when={ transfers.data() !== undefined }>
+                { () => <Pagination page={ transfers.data()!.page } pages={ transfers.data()!.pages } onChange={ (next) => page = next } /> }
+                </Show>
+            </section>
+        </Show>
+    </div>
+}

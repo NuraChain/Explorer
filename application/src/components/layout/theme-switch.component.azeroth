@@ -1,0 +1,36 @@
+import { useTheme, THEMES, THEME_LABEL, type Theme } from '../../stores/theme.store.ts';
+import Icon from '../../icons/icon.component.azeroth';
+import type { IconName } from '../../icons/registry.ts';
+
+// Both choices stay visible as a segmented control rather than one button that swaps meaning:
+// a toggle whose icon changes has to be read before it can be used.
+export default component ThemeSwitch(props: { labelled?: boolean })
+{
+    const theme = useTheme();
+
+    const iconFor = (name: Theme): IconName => `theme-${ name }` as IconName;
+
+    <div class={ `flex items-center gap-0.5 rounded-lg border border-line bg-field p-0.5 ${ props.labelled === true ? 'w-full' : '' }` } role="group" aria-label="Theme">
+        <For each={ THEMES } key={ (name) => name }>
+        { (name) =>
+            <button
+                class={ [
+                    'flex cursor-pointer items-center justify-center gap-2 rounded-md transition-colors duration-150',
+                    props.labelled === true ? 'h-9 flex-1 text-[14px]' : 'h-7 w-7',
+                    theme.theme() === name ? 'bg-raised text-nur' : 'text-muted hover:text-text'
+                ].join(' ') }
+                type="button"
+                title={ THEME_LABEL[name] }
+                aria-label={ THEME_LABEL[name] }
+                aria-pressed={ theme.theme() === name }
+                onClick={ () => theme.setTheme(name) }
+            >
+                <Icon name={ iconFor(name) } size={ 15 } />
+                <Show when={ props.labelled === true }>
+                    <span>{ THEME_LABEL[name] }</span>
+                </Show>
+            </button>
+        }
+        </For>
+    </div>
+}

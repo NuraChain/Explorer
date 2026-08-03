@@ -1,0 +1,80 @@
+import { Link } from 'azerothjs';
+
+import { client } from '../../api.ts';
+import { formatCount } from '../../lib/format.ts';
+import Icon from '../../icons/icon.component.azeroth';
+
+// The footer says what this explorer IS and what chain it is pointed at - the two questions a
+// visitor who arrived from a shared link cannot answer from the page they landed on. The chain
+// row is live rather than hardcoded, so repointing the deployment at another network does not
+// leave the footer lying about which chain these numbers came from.
+export default component SiteFooter()
+{
+    resource stats = () => client.stats.summary();
+
+    <footer class="mt-12 border-t border-line">
+        <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-3 sm:px-6">
+            <div>
+                <span class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
+                        <Icon name="layers" size={ 14 } />
+                    </span>
+                    <span class="text-[14px] font-bold tracking-tight">Nura<span class="text-nur">Explorer</span></span>
+                </span>
+                <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">
+                    An open block explorer. Every block, transaction and transfer is indexed locally,
+                    so you can follow value across the chain.
+                </p>
+            </div>
+
+            <nav aria-label="Explore">
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">Explore</h2>
+                <ul class="mt-3 flex flex-col gap-2 text-[13px]">
+                    <li><Link to="/" class="text-muted no-underline hover:text-text">Home</Link></li>
+                    <li><Link to="/blocks" class="text-muted no-underline hover:text-text">Blocks</Link></li>
+                    <li><Link to="/txs" class="text-muted no-underline hover:text-text">Transactions</Link></li>
+                </ul>
+            </nav>
+
+            <div>
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">Network</h2>
+                <Show
+                    when={ stats.data() }
+                    fallback={ <p class="mt-3 text-[13px] text-muted">Connecting...</p> }
+                >
+                { (summary) =>
+                    <dl class="mt-3 flex flex-col gap-1.5 text-[13px]">
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-muted">Chain</dt>
+                            <dd class="font-semibold">{ summary().chain.name }</dd>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-muted">Chain ID</dt>
+                            <dd class="data">{ summary().chain.chainId }</dd>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-muted">Indexed</dt>
+                            <dd class="data">{ formatCount(summary().head) }</dd>
+                        </div>
+                    </dl>
+                }
+                </Show>
+            </div>
+        </div>
+
+        <div class="border-t border-line">
+            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-[12px] text-faint sm:px-6">
+                <p>Reads come from a local index of the chain. Balances are read live from the node.</p>
+                <p class="shrink-0">
+                    Built with
+                    <a
+                        class="text-muted no-underline transition-colors duration-150 hover:text-nur"
+                        href="https://github.com/AzerothJS/AzerothJS"
+                        target="_blank"
+                        rel="noreferrer"
+                    >AzerothJS</a>
+                </p>
+            </div>
+        </div>
+    </footer>
+}
