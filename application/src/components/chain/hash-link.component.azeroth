@@ -1,8 +1,11 @@
 import { Link } from 'azerothjs';
 
 import { shortHash } from '../../lib/format.ts';
+
 import { useToasts } from '../../stores/toasts.store.ts';
+
 import Icon from '../../icons/icon.component.azeroth';
+
 import Tooltip from '../ui/tooltip.component.azeroth';
 
 // A hash or address, everywhere it appears: shortened, monospace, and copyable. The full value is
@@ -54,7 +57,7 @@ export default component HashLink(props: {
         </Tooltip>
         <Show when={ props.copy !== false }>
             <button
-                class="cursor-pointer text-muted transition-colors duration-150 hover:text-nur"
+                class="-m-2 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:text-nur sm:-m-1 sm:h-7 sm:w-7"
                 type="button"
                 aria-label={ `Copy ${ props.value }` }
                 onClick={ () => void write() }

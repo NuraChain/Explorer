@@ -2,7 +2,9 @@ import { Link } from 'azerothjs';
 
 import type { Transaction } from '../../api.ts';
 import { formatAmount, formatDateTime, timeAgo } from '../../lib/format.ts';
+
 import Icon from '../../icons/icon.component.azeroth';
+
 import Tooltip from '../ui/tooltip.component.azeroth';
 
 // THE page's reason to exist: where did this address's money go.

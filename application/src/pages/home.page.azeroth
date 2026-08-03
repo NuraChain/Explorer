@@ -2,13 +2,15 @@ import { Link } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatCount, formatDateTime, formatGwei, formatValue, gasShare, shortHash, timeAgo } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+
 import Icon from '../icons/icon.component.azeroth';
+
 import SearchBar from '../components/layout/search-bar.component.azeroth';
 import CadenceStrip from '../components/chain/cadence-strip.component.azeroth';
 import Badge from '../components/ui/badge.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
-import { useTitle } from '../lib/title.ts';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
 
 // The hero is the chain's pulse and the search - the two things a visitor came for. Counters sit

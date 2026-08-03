@@ -1,7 +1,9 @@
 import { onMount, useNavigate } from 'azerothjs';
 
 import { client } from '../../api.ts';
+
 import { useToasts } from '../../stores/toasts.store.ts';
+
 import Button from '../ui/button.component.azeroth';
 import Input from '../ui/input.component.azeroth';
 

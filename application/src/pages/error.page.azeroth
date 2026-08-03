@@ -1,0 +1,31 @@
+import { Link } from 'azerothjs';
+
+import Icon from '../icons/icon.component.azeroth';
+
+import Button from '../components/ui/button.component.azeroth';
+
+// The last line of defence: a render that threw. Without this the whole tree unmounts and the
+// reader gets a blank page, which is indistinguishable from the site being down.
+//
+// `reset` re-runs the subtree rather than reloading, so a transient failure - an index restart
+// mid-request - costs a click instead of a page load. The message stays generic on purpose: the
+// actual error text is for the console, not for someone trying to look up a transaction.
+export default component ErrorPage(props: { reset: () => void })
+{
+    <div class="panel px-4 py-14 text-center sm:px-6">
+        <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-raised text-outflow">
+            <Icon name="alert" size={ 22 } />
+        </span>
+
+        <h1 class="mt-4 text-[20px] font-bold tracking-tight">This page stopped working</h1>
+        <p class="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-muted">
+            Something failed while rendering. The chain and the index are unaffected - retrying
+            usually clears it.
+        </p>
+
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button variant="primary" onClick={ () => props.reset() }>Try again</Button>
+            <Link to="/" class="text-[13px] text-muted no-underline hover:text-text">Back to the overview</Link>
+        </div>
+    </div>
+}

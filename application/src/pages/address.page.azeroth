@@ -2,12 +2,14 @@ import { useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatAmount, formatCount, formatDateTime, formatValue, timeAgo } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+
 import Icon from '../icons/icon.component.azeroth';
+
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import FlowLedger from '../components/chain/flow-ledger.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
-import { useTitle } from '../lib/title.ts';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
 
 // The page this whole explorer exists for. The identity header answers "what is this", the three

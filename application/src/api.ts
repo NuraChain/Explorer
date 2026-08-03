@@ -3,7 +3,9 @@
 // or server dependency can reach the browser bundle. The client's runtime half is the served
 // manifest: method + path per route, projected from the SAME declaration the server registered,
 // fetched once at boot. '/api' matches the dev proxy and the production mount.
+
 import { createClient, type Manifest } from '@azerothjs/http/api/shared';
+
 import type { Api } from '../../server/src/app.ts';
 
 export type {

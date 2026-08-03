@@ -1,4 +1,5 @@
 import { useTheme, THEMES, THEME_LABEL, type Theme } from '../../stores/theme.store.ts';
+
 import Icon from '../../icons/icon.component.azeroth';
 import type { IconName } from '../../icons/registry.ts';
 

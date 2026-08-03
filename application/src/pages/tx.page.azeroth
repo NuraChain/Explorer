@@ -2,10 +2,12 @@ import { Link, useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatAmount, formatBytes, formatCount, formatDateTime, formatGwei, formatValue, timeAgo } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+
 import Icon from '../icons/icon.component.azeroth';
+
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import Badge from '../components/ui/badge.component.azeroth';
-import { useTitle } from '../lib/title.ts';
 
 export default component TransactionPage()
 {

@@ -1,9 +1,9 @@
 import type { Child } from 'azerothjs';
 
-import { TONE_CLASS, type Tone } from './variants.ts';
-
 import Icon from '../../icons/icon.component.azeroth';
 import type { IconName } from '../../icons/registry.ts';
+
+import { TONE_CLASS, type Tone } from './variants.ts';
 
 // A small status mark. Colour NEVER carries the meaning alone - a badge always shows its label,
 // and takes an icon when the state is one a reader scans for (a reverted transaction).

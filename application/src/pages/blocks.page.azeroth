@@ -2,10 +2,11 @@ import { Link } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatCount, formatDateTime, gasShare, timeAgo } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
-import { useTitle } from '../lib/title.ts';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
 import Skeleton from '../components/ui/skeleton.component.azeroth';
 

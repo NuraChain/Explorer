@@ -1,6 +1,7 @@
 import { Link, onMount, Portal } from 'azerothjs';
 
 import Icon from '../../icons/icon.component.azeroth';
+
 import ThemeSwitch from './theme-switch.component.azeroth';
 
 // Navigation on a phone. Below `sm` the header has room for the mark and the search field and

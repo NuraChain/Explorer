@@ -1,9 +1,9 @@
 import type { Child } from 'azerothjs';
 
-import { BUTTON_SIZE, BUTTON_VARIANT, type ButtonSize, type ButtonVariant } from './variants.ts';
-
 import Icon from '../../icons/icon.component.azeroth';
 import type { IconName } from '../../icons/registry.ts';
+
+import { BUTTON_SIZE, BUTTON_VARIANT, type ButtonSize, type ButtonVariant } from './variants.ts';
 
 // The one button. `busy` implies disabled: a control that is working must not also be clickable,
 // and having one prop mean both removes the case where a caller sets only one of them.

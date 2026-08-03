@@ -2,6 +2,7 @@ import { Link } from 'azerothjs';
 
 import { client } from '../../api.ts';
 import { formatCount } from '../../lib/format.ts';
+
 import Icon from '../../icons/icon.component.azeroth';
 
 // The footer says what this explorer IS and what chain it is pointed at - the two questions a

@@ -2,10 +2,12 @@ import { Link, useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatBytes, formatCount, formatDateTime, formatGwei, formatValue, gasShare, shortHash, timeAgo } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+
 import Icon from '../icons/icon.component.azeroth';
+
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
-import { useTitle } from '../lib/title.ts';
 import Pagination from '../components/ui/pagination.component.azeroth';
 
 const formatBaseFee = (value: string | null): string => (value === null ? 'n/a' : formatGwei(value));

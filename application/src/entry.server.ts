@@ -2,6 +2,7 @@
 // self-contained file. These two exports are the contract with both consumers - the server
 // SSRs `render: 'server'` pages per request, and azeroth-kit-prerender writes the static ones
 // at build time. Renaming either breaks both.
+
 import { createPageRenderer } from '@azerothjs/kit/ssr';
 
 import App from './App.azeroth';
