@@ -11,4 +11,5 @@ coverage/
 Thumbs.db
 .idea
 .vscode
+.claude
 .data

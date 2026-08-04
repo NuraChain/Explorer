@@ -1,4 +1,4 @@
-import { createPublicClient, defineChain, http, type Chain, type PublicClient } from 'viem';
+import { createPublicClient, defineChain, erc20Abi, http, type Chain, type PublicClient } from 'viem';
 import { loadConfig, num, str } from '@azerothjs/http';
 
 // The chain this explorer indexes, described ONCE from the environment. Nothing downstream
@@ -19,8 +19,14 @@ export interface ChainEnv
     /** How often the follower asks for a new head. Set below the chain's block time. */
     pollMs: number;
 
-    /** Blocks fetched per batched RPC round. */
+    /** Blocks fetched per batched RPC round, and written to the index in one transaction. */
     batchSize: number;
+
+    /** How many block reads may be in flight at once. The node's patience, not ours, sets this. */
+    concurrency: number;
+
+    /** How many JSON-RPC calls ride in one HTTP request. Providers cap this; 100 is common. */
+    rpcBatchSize: number;
 
     /** Where the sqlite index lives; ':memory:' in tests. */
     dbPath: string;
@@ -37,7 +43,13 @@ export function loadChainEnv(): ChainEnv
         decimals: num('CURRENCY_DECIMALS', { default: 18 }),
         startBlock: num('START_BLOCK', { default: 0 }),
         pollMs: num('POLL_MS', { default: 2000 }),
-        batchSize: num('BATCH_SIZE', { default: 40 }),
+        batchSize: num('BATCH_SIZE', { default: 1000 }),
+        // Measured against a remote endpoint, not guessed: a window of 1000 block reads coalesced
+        // into HTTP batches of 100 ran ~3x a window of 64 into batches of 50, because the cost out
+        // there is the ROUND TRIP, and a small window leaves the link idle waiting for it. Batches
+        // larger than 100 lose again - providers cap the batch and the retry costs the trip twice.
+        concurrency: num('RPC_CONCURRENCY', { default: 1000 }),
+        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 }),
         dbPath: str('DB_PATH', { default: '.data/index.db' })
     });
     return config;
@@ -70,6 +82,15 @@ export interface ChainGateway
 
     /** The hash of the genesis block - the identity of the chain behind the RPC. */
     genesisHash(): Promise<string>;
+
+    /**
+     * One block's hash, header only. The reorg check runs every poll and asks nothing else, so it
+     * must not drag the block's transactions and receipts across the wire to compare 32 bytes.
+     */
+    blockHashAt(number: number): Promise<string | null>;
+
+    /** A token contract's name/symbol/decimals, or null when it answers none of them. */
+    tokenMetadata(address: string): Promise<{ name: string; symbol: string; decimals: number } | null>;
 
     /** An address's current native balance, in wei. */
     balance(address: string): Promise<bigint>;
@@ -145,7 +166,14 @@ export class ChainReader implements ChainGateway
             // The node accepts JSON-RPC batches, so a range of blocks costs a handful of HTTP
             // round trips rather than one per call. `wait` lets calls issued in the same tick
             // coalesce; the cap stays under typical provider batch limits.
-            transport: http(env.rpcUrl, { batch: { batchSize: 20, wait: 8 } })
+            transport: http(env.rpcUrl, {
+                batch: { batchSize: env.rpcBatchSize, wait: 8 },
+                // A backfill that dies on one flaky response has to be restarted by hand; a
+                // retried one just runs slightly longer.
+                retryCount: 3,
+                retryDelay: 200,
+                timeout: 30_000
+            })
         }) as PublicClient;
     }
 
@@ -158,6 +186,32 @@ export class ChainReader implements ChainGateway
     {
         const block = await this.#client.getBlock({ blockNumber: 0n, includeTransactions: false });
         return block.hash;
+    }
+
+    public async blockHashAt(number: number): Promise<string | null>
+    {
+        // Deliberately NOT caught. A node that fails to answer must not read as "this block is
+        // gone": the caller is the reorg check, and its answer to a missing block is to roll the
+        // index back. A dropped connection would then delete history that is perfectly fine.
+        const block = await this.#client.getBlock({ blockNumber: BigInt(number), includeTransactions: false });
+        return block.hash;
+    }
+
+    public async tokenMetadata(address: string): Promise<{ name: string; symbol: string; decimals: number } | null>
+    {
+        // On the SHARED client, so the three calls join the batch the surrounding backfill is
+        // already filling instead of opening a connection of their own per token.
+        const contract = { address: address as `0x${ string }`, abi: erc20Abi } as const;
+        const [name, symbol, decimals] = await Promise.all([
+            this.#client.readContract({ ...contract, functionName: 'name' }).catch(() => null),
+            this.#client.readContract({ ...contract, functionName: 'symbol' }).catch(() => null),
+            this.#client.readContract({ ...contract, functionName: 'decimals' }).catch(() => null)
+        ]);
+        if (name === null && symbol === null && decimals === null)
+        {
+            return null;
+        }
+        return { name: String(name ?? ''), symbol: String(symbol ?? ''), decimals: Number(decimals ?? 0) };
     }
 
     public async balance(address: string): Promise<bigint>
@@ -178,30 +232,93 @@ export class ChainReader implements ChainGateway
      */
     #blockReceipts: boolean | undefined = undefined;
 
+    /** Settles the `eth_getBlockReceipts` question once, on a block we have to read anyway. */
+    async #probeBlockReceipts(number: number): Promise<void>
+    {
+        if (this.#blockReceipts !== undefined)
+        {
+            return;
+        }
+        try
+        {
+            await this.#client.getBlockReceipts({ blockNumber: BigInt(number) });
+            this.#blockReceipts = true;
+        }
+        catch
+        {
+            // The node refused it - take the per-transaction path for the rest of this process
+            // rather than paying the failure once per block.
+            this.#blockReceipts = false;
+        }
+    }
+
     /** Receipts for one block, by whichever method the node actually supports. */
     async #receiptsOf(number: number, hashes: readonly string[]): Promise<ReceiptLike[]>
     {
-        if (this.#blockReceipts !== false)
+        if (this.#blockReceipts === true)
         {
-            try
-            {
-                const receipts = await this.#client.getBlockReceipts({ blockNumber: BigInt(number) });
-                this.#blockReceipts = true;
-                return receipts as unknown as ReceiptLike[];
-            }
-            catch (error)
-            {
-                if (this.#blockReceipts === true)
-                {
-                    throw error;
-                }
-                // First call, and the node refused it - fall through to the per-transaction
-                // path for the rest of this process rather than paying the failure per block.
-                this.#blockReceipts = false;
-            }
+            return await this.#client.getBlockReceipts({ blockNumber: BigInt(number) }) as unknown as ReceiptLike[];
         }
         return Promise.all(hashes.map(hash =>
             this.#client.getTransactionReceipt({ hash: hash as `0x${ string }` }))) as unknown as Promise<ReceiptLike[]>;
+    }
+
+    /** One block plus its receipts, in a single wave where the node supports block receipts. */
+    async #blockWithReceipts(number: number): Promise<BlockWithReceipts>
+    {
+        // With `eth_getBlockReceipts` the receipts are addressed by HEIGHT, so they do not have to
+        // wait on the block to learn the transaction hashes: both calls go out together and the
+        // block costs one round trip instead of two. That halving is per block, across the whole
+        // backfill.
+        const [block, receiptList] = this.#blockReceipts === true
+            ? await Promise.all([
+                this.#client.getBlock({ blockNumber: BigInt(number), includeTransactions: true }),
+                this.#receiptsOf(number, [])
+            ])
+            : await (async () =>
+            {
+                const one = await this.#client.getBlock({ blockNumber: BigInt(number), includeTransactions: true });
+                return [one, await this.#receiptsOf(number, one.transactions.map(transaction => transaction.hash))] as const;
+            })();
+
+        const receipts = new Map(receiptList.map(receipt => [receipt.transactionHash, receipt]));
+        return {
+            number: Number(block.number),
+            hash: block.hash,
+            parentHash: block.parentHash,
+            timestamp: Number(block.timestamp),
+            miner: block.miner,
+            gasUsed: block.gasUsed,
+            gasLimit: block.gasLimit,
+            baseFeePerGas: block.baseFeePerGas ?? null,
+            size: Number(block.size),
+            transactions: block.transactions.map((transaction, index) =>
+            {
+                const receipt = receipts.get(transaction.hash);
+                return {
+                    hash: transaction.hash,
+                    index,
+                    from: transaction.from,
+                    to: transaction.to,
+                    value: transaction.value,
+                    nonce: transaction.nonce,
+                    inputSize: (transaction.input.length - 2) / 2,
+                    gasUsed: receipt?.gasUsed ?? 0n,
+                    effectiveGasPrice: receipt?.effectiveGasPrice ?? 0n,
+                    // A receipt the node did not return leaves the transaction UNKNOWN
+                    // rather than silently "succeeded" - a failed transfer that reads as a
+                    // successful one is the worst thing this explorer could say.
+                    status: receipt === undefined ? -1 : (receipt.status === 'success' ? 1 : 0),
+                    contractAddress: receipt?.contractAddress ?? null,
+                    logs: (receipt?.logs ?? []).map(log => ({
+                        index: Number(log.logIndex),
+                        address: log.address,
+                        topics: log.topics as readonly string[],
+                        data: log.data
+                    }))
+                };
+            })
+        };
     }
 
     public async range(from: number, to: number): Promise<BlockWithReceipts[]>
@@ -211,56 +328,29 @@ export class ChainReader implements ChainGateway
         {
             numbers.push(n);
         }
+        await this.#probeBlockReceipts(from);
 
-        // Blocks and receipts are requested for the WHOLE range at once and coalesced by the
-        // transport's batching, so a range costs a handful of round trips rather than one per
-        // call. Where the node offers `eth_getBlockReceipts` that is one call per block instead
-        // of one per transaction - the difference between a fast backfill and an overnight one.
-        const blocks = await Promise.all(numbers.map(n =>
-            this.#client.getBlock({ blockNumber: BigInt(n), includeTransactions: true })));
-        const receiptSets = await Promise.all(blocks.map(block =>
-            this.#receiptsOf(Number(block.number), block.transactions.map(transaction => transaction.hash))));
-
-        return blocks.map((block, at) =>
-        {
-            const receipts = new Map(receiptSets[at]!.map(receipt => [receipt.transactionHash, receipt]));
-            return {
-                number: Number(block.number),
-                hash: block.hash,
-                parentHash: block.parentHash,
-                timestamp: Number(block.timestamp),
-                miner: block.miner,
-                gasUsed: block.gasUsed,
-                gasLimit: block.gasLimit,
-                baseFeePerGas: block.baseFeePerGas ?? null,
-                size: Number(block.size),
-                transactions: block.transactions.map((transaction, index) =>
-                {
-                    const receipt = receipts.get(transaction.hash);
-                    return {
-                        hash: transaction.hash,
-                        index,
-                        from: transaction.from,
-                        to: transaction.to,
-                        value: transaction.value,
-                        nonce: transaction.nonce,
-                        inputSize: (transaction.input.length - 2) / 2,
-                        gasUsed: receipt?.gasUsed ?? 0n,
-                        effectiveGasPrice: receipt?.effectiveGasPrice ?? 0n,
-                        // A receipt the node did not return leaves the transaction UNKNOWN
-                        // rather than silently "succeeded" - a failed transfer that reads as a
-                        // successful one is the worst thing this explorer could say.
-                        status: receipt === undefined ? -1 : (receipt.status === 'success' ? 1 : 0),
-                        contractAddress: receipt?.contractAddress ?? null,
-                        logs: (receipt?.logs ?? []).map(log => ({
-                            index: Number(log.logIndex),
-                            address: log.address,
-                            topics: log.topics as readonly string[],
-                            data: log.data
-                        }))
-                    };
-                })
-            };
-        });
+        // Bounded, not "all at once". A batch of thousands of blocks issued in one tick puts
+        // thousands of calls in the transport's queue: a public endpoint answers that with rate
+        // limits and timeouts, which read as a slow index. A steady window of in-flight reads
+        // keeps every HTTP batch full without ever asking for more than the node will give.
+        return mapWithLimit(numbers, this.env.concurrency, n => this.#blockWithReceipts(n));
     }
+}
+
+/** `Promise.all` with a ceiling on how many run at once; results keep the input's order. */
+async function mapWithLimit<T, R>(items: readonly T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]>
+{
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async (): Promise<void> =>
+    {
+        while (next < items.length)
+        {
+            const at = next++;
+            results[at] = await work(items[at]!);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+    return results;
 }

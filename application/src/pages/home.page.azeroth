@@ -6,16 +6,16 @@ import { useTitle } from '../lib/title.ts';
 
 import Icon from '../icons/icon.component.azeroth';
 
-import SearchBar from '../components/layout/search-bar.component.azeroth';
+import AddChainButton from '../components/chain/add-chain-button.component.azeroth';
 import CadenceStrip from '../components/chain/cadence-strip.component.azeroth';
 import Badge from '../components/ui/badge.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
 
-// The hero is the chain's pulse and the search - the two things a visitor came for. Counters sit
-// UNDER them as a quiet strip rather than being the headline: an explorer's job is to find one
-// thing, not to display totals.
+// The hero is the chain's pulse. Search is NOT repeated here - the header carries it on every
+// page, including this one. Counters sit under the hero as a quiet strip rather than being the
+// headline: an explorer's job is to find one thing, not to display totals.
 export default component Home()
 {
     resource stats = () => client.stats.summary();
@@ -55,12 +55,18 @@ export default component Home()
                 { () => <span> { stats.data()!.chain.name }</span> }
                 </Show>
             </h1>
-            <p class="mb-5 mt-2 max-w-xl text-[14px] leading-relaxed text-muted">
+            <p class="mt-2 max-w-xl text-[14px] leading-relaxed text-muted">
                 Every block, transaction and transfer, indexed so you can see exactly where value moved.
             </p>
-            <div class="max-w-2xl">
-                <SearchBar />
-            </div>
+            {/* Offered once, on the overview: the visitor who wants the chain in their wallet
+                wants it before they start reading, not on a transaction page. */}
+            <Show when={ stats.data() !== undefined }>
+            { () =>
+                <div class="mt-4">
+                    <AddChainButton chain={ stats.data()!.chain } />
+                </div>
+            }
+            </Show>
         </section>
 
         <Show when={ cadence.data() !== undefined }>

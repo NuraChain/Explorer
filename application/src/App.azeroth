@@ -45,8 +45,8 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                         >Transactions</Link>
                     </nav>
 
-                    {/* Search lives in the chrome on every page except home, where it is the hero
-                        instead - so it is never on screen twice. */}
+                    {/* Search lives in the chrome, on every page. It is the one place it appears,
+                        so no page repeats it under its own title. */}
                     <div class="order-last w-full sm:order-none sm:ms-auto sm:w-auto sm:min-w-[280px] sm:max-w-md sm:flex-1">
                         <SearchBar size="compact" />
                     </div>
