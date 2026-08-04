@@ -25,19 +25,24 @@ export default component AddressPage()
 
     derived address = params()['address'] ?? '';
 
+    // Every source below is gated on the address being PRESENT, and `?? ''` above is why it has
+    // to be: navigating away clears the param, and an empty string is a perfectly good-looking
+    // source value, so the resources re-ran and fetched `/api/address/` on the way out - two
+    // guaranteed 404s and two red console errors per departure. `false` means "do not fetch",
+    // the same guard block.page.azeroth puts on its own param.
     resource stats = () => client.stats.summary();
     resource account = (value: string) => client.address.summary({ params: { address: value } })
-        with { source: address };
+        with { source: address === '' ? false : address };
     resource txs = (key: string) =>
     {
         const [value = '', at = '1'] = key.split('|');
         return client.address.transactions({ params: { address: value }, query: { page: Number(at), limit: 25 } });
-    } with { source: `${ address }|${ page }` };
+    } with { source: address === '' ? false : `${ address }|${ page }` };
     resource transfers = (key: string) =>
     {
         const [value = '', at = '1'] = key.split('|');
         return client.address.transfers({ params: { address: value }, query: { page: Number(at), limit: 25 } });
-    } with { source: tab === 'transfers' ? `${ address }|${ page }` : false };
+    } with { source: tab === 'transfers' && address !== '' ? `${ address }|${ page }` : false };
 
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;

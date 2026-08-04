@@ -5,8 +5,11 @@
 **An open block explorer for EVM chains. Every block, transaction and transfer is indexed
 locally, so you can follow where value actually moved.**
 
+[![CI](https://github.com/NuraChain/Explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/NuraChain/Explorer/actions/workflows/ci.yml)
 [![Built with AzerothJS](https://img.shields.io/badge/built%20with-AzerothJS-5fb3e8)](https://github.com/AzerothJS/AzerothJS)
 [![Node >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
+
+<img src="docs/screenshots/home-desktop-dark.png" alt="NuraExplorer overview" width="840" />
 
 </div>
 
@@ -36,6 +39,16 @@ The index is a **cache, not a source of truth**. Delete `.data/index.db` and it 
 `START_BLOCK`.
 
 ---
+
+<div align="center">
+
+| | |
+| --- | --- |
+| <img src="docs/screenshots/address-desktop-dark.png" alt="Address page with the flow ledger" /> | <img src="docs/screenshots/blocks-desktop-light.png" alt="Blocks list in the light theme" /> |
+
+<img src="docs/screenshots/blocks-mobile-dark.png" alt="Mobile navigation drawer" width="390" />
+
+</div>
 
 ## Requirements
 
@@ -179,6 +192,41 @@ The API is declared once in `server/src/app.ts`, and the browser gets a typed cl
 same declaration - `client.blocks.one(...)` is checked against the handler's own schema.
 
 ---
+
+## Contributing
+
+Issues and pull requests are welcome. For anything larger than a fix, open an issue first so the
+approach can be agreed before you spend the time.
+
+Before opening a pull request, both gates must pass:
+
+```sh
+npm run check
+npm test
+```
+
+House style is enforced by the linter and visible in any neighbouring file: Allman braces, one
+import per module, and comments that state a constraint the code cannot show rather than narrating
+what changed.
+
+- **Adding a page:** one row in `application/src/routes.ts` plus its `*.page.azeroth` component.
+- **Adding a chain field:** it starts in `server/src/schemas.ts`. The browser's client is inferred
+  from the server's declaration, so the wire shape is decided in exactly one place.
+- **Anything touching amounts** belongs in `application/src/lib/format.ts` and needs a test. A
+  uint256 does not survive a double, and an explorer that misreports a balance has failed at its
+  only job.
+
+## Security
+
+**Do not open a public issue for a security bug.** Report it privately so a fix can ship before
+the details are public.
+
+Two things worth knowing before you deploy this:
+
+- **The index is a cache, never a source of truth.** Every figure the UI shows can be re-derived
+  from the chain by deleting `DB_PATH` and replaying. Nothing irreplaceable lives in it.
+- **`RPC_URL` may carry a provider key.** It is read server-side and never reaches the browser -
+  the client only ever talks to this server's own API. Keep it that way when adding endpoints.
 
 ## License
 

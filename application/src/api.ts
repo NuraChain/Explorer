@@ -23,11 +23,31 @@ export type {
     TransferPage
 } from '../../server/src/schemas.ts';
 
-// During SSR the module loads with an empty manifest: pages fetch data in `mount { }`, which
-// runs only in the browser, so no call ever happens server-side. The browser fetches the real
-// manifest before the first paint's interactions need it.
-const manifest: Manifest = typeof document === 'undefined'
-    ? {}
-    : await fetch('/api/_manifest').then((response) => response.json() as Promise<Manifest>);
+/**
+ * The manifest, or an empty one.
+ *
+ * This is a TOP-LEVEL await, so a throw here would take the whole module graph down and paint
+ * nothing at all - a blank page for one failed request at boot. An empty manifest instead lets
+ * every page render and fail at its own call, where each one already has a designed error state.
+ *
+ * During SSR there is no document: pages fetch in `mount { }`, which runs only in the browser,
+ * so no call ever happens server-side.
+ */
+async function loadManifest(): Promise<Manifest>
+{
+    if (typeof document === 'undefined')
+    {
+        return {};
+    }
+    try
+    {
+        const response = await fetch('/api/_manifest');
+        return response.ok ? await response.json() as Manifest : {};
+    }
+    catch
+    {
+        return {};
+    }
+}
 
-export const client = createClient<Api>(manifest, { baseUrl: '/api' });
+export const client = createClient<Api>(await loadManifest(), { baseUrl: '/api' });
