@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
@@ -144,6 +144,18 @@ export class IndexStore
 {
     readonly #db: DatabaseSync;
 
+    /**
+     * Prepared statements, keyed by their SQL. Ingest runs the same handful of INSERTs once per
+     * block; re-preparing them each time re-parses and re-plans the statement, which during a
+     * backfill costs more than the writes themselves.
+     */
+    readonly #statements = new Map<string, StatementSync>();
+
+    /** Addresses already in `tokens`, so ingest does not query per transfer to ask. */
+    readonly #knownTokens = new Set<string>();
+
+    #inTransaction = false;
+
     constructor(path: string)
     {
         // sqlite creates the FILE but not the directory holding it, so a configured
@@ -158,9 +170,61 @@ export class IndexStore
             }
         }
         this.#db = new DatabaseSync(path);
-        this.#db.exec('PRAGMA journal_mode = WAL;');
+        // Every row here is derived from the chain, so durability of the LAST few commits buys
+        // nothing: a power cut costs a few blocks that the indexer re-reads from its cursor on the
+        // next boot. `synchronous = NORMAL` under WAL drops the fsync per commit, which is the
+        // single largest cost of a backfill; the rest give the page cache room to work.
+        this.#db.exec(`
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA cache_size = -65536;
+            PRAGMA busy_timeout = 5000;`);
         this.#db.exec(DDL);
         this.#migrate();
+    }
+
+    /** A prepared statement, prepared once per distinct SQL string and reused thereafter. */
+    #stmt(sql: string): StatementSync
+    {
+        let statement = this.#statements.get(sql);
+        if (statement === undefined)
+        {
+            statement = this.#db.prepare(sql);
+            this.#statements.set(sql, statement);
+        }
+        return statement;
+    }
+
+    /**
+     * Runs `work` inside ONE transaction. Without this every insert commits on its own, so a
+     * batch of a thousand blocks pays a thousand commits - the difference between a backfill that
+     * runs at the speed of the RPC and one that runs at the speed of the disk. Nested calls join
+     * the outer transaction rather than opening a second one, which sqlite does not allow.
+     */
+    public transaction<T>(work: () => T): T
+    {
+        if (this.#inTransaction)
+        {
+            return work();
+        }
+        this.#db.exec('BEGIN IMMEDIATE');
+        this.#inTransaction = true;
+        try
+        {
+            const result = work();
+            this.#db.exec('COMMIT');
+            return result;
+        }
+        catch (error)
+        {
+            this.#db.exec('ROLLBACK');
+            throw error;
+        }
+        finally
+        {
+            this.#inTransaction = false;
+        }
     }
 
     /**
@@ -191,13 +255,13 @@ export class IndexStore
 
     public getMeta(key: string): string | null
     {
-        const row = this.#db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined;
+        const row = this.#stmt('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined;
         return row?.value ?? null;
     }
 
     public setMeta(key: string, value: string): void
     {
-        this.#db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value')
+        this.#stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value')
             .run(key, value);
     }
 
@@ -227,7 +291,8 @@ export class IndexStore
         if (known !== null)
         {
             this.#db.exec('DELETE FROM blocks; DELETE FROM transactions; DELETE FROM token_transfers; DELETE FROM tokens;');
-            this.#db.prepare('DELETE FROM meta WHERE key = ?').run('cursor');
+            this.#stmt('DELETE FROM meta WHERE key = ?').run('cursor');
+            this.#knownTokens.clear();
         }
         this.setMeta('genesis', genesisHash);
         return known !== null;
@@ -239,28 +304,28 @@ export class IndexStore
 
     public blockHash(number: number): string | null
     {
-        const row = this.#db.prepare('SELECT hash FROM blocks WHERE number = ?').get(number) as { hash: string } | undefined;
+        const row = this.#stmt('SELECT hash FROM blocks WHERE number = ?').get(number) as { hash: string } | undefined;
         return row?.hash ?? null;
     }
 
     /** Drops everything at or above `number` - the rollback half of reorg handling. */
     public rollbackFrom(number: number): void
     {
-        this.#db.prepare('DELETE FROM token_transfers WHERE block_number >= ?').run(number);
-        this.#db.prepare('DELETE FROM transactions WHERE block_number >= ?').run(number);
-        this.#db.prepare('DELETE FROM blocks WHERE number >= ?').run(number);
+        this.#stmt('DELETE FROM token_transfers WHERE block_number >= ?').run(number);
+        this.#stmt('DELETE FROM transactions WHERE block_number >= ?').run(number);
+        this.#stmt('DELETE FROM blocks WHERE number >= ?').run(number);
     }
 
     public insertBlock(row: BlockRow, transactions: TransactionRow[], transfers: TransferRow[]): void
     {
-        this.#db.prepare(`
+        this.#stmt(`
             INSERT INTO blocks (number, hash, parent_hash, timestamp, miner, gas_used, gas_limit, base_fee, size, tx_count)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (number) DO UPDATE SET hash = excluded.hash, parent_hash = excluded.parent_hash`)
             .run(row.number, row.hash, row.parent_hash, row.timestamp, row.miner, row.gas_used,
                 row.gas_limit, row.base_fee, row.size, row.tx_count);
 
-        const tx = this.#db.prepare(`
+        const tx = this.#stmt(`
             INSERT INTO transactions (hash, block_number, tx_index, from_addr, to_addr, value, nonce,
                 input_size, gas_used, effective_gas_price, status, contract_address, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -272,7 +337,7 @@ export class IndexStore
                 row_.contract_address, row_.timestamp);
         }
 
-        const transfer = this.#db.prepare(`
+        const transfer = this.#stmt(`
             INSERT INTO token_transfers (tx_hash, log_index, block_number, token, from_addr, to_addr, value, token_id, kind, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (tx_hash, log_index) DO NOTHING`);
@@ -285,16 +350,31 @@ export class IndexStore
 
     public upsertToken(row: TokenRow): void
     {
-        this.#db.prepare(`
+        this.#stmt(`
             INSERT INTO tokens (address, name, symbol, decimals, kind) VALUES (?, ?, ?, ?, ?)
             ON CONFLICT (address) DO UPDATE SET name = excluded.name, symbol = excluded.symbol,
                 decimals = excluded.decimals, kind = excluded.kind`)
             .run(row.address, row.name, row.symbol, row.decimals, row.kind);
+        this.#knownTokens.add(normalize(row.address));
     }
 
+    /**
+     * Whether this token has already been described. Answered from memory after the first miss:
+     * ingest asks once per transfer, and on a busy token that is thousands of identical queries.
+     */
     public knownToken(address: string): boolean
     {
-        return this.#db.prepare('SELECT 1 FROM tokens WHERE address = ?').get(normalize(address)) !== undefined;
+        const account = normalize(address);
+        if (this.#knownTokens.has(account))
+        {
+            return true;
+        }
+        if (this.#stmt('SELECT 1 FROM tokens WHERE address = ?').get(account) === undefined)
+        {
+            return false;
+        }
+        this.#knownTokens.add(account);
+        return true;
     }
 
     // ----------------------------------------------------------------------------------
@@ -303,7 +383,7 @@ export class IndexStore
 
     public stats(): { blocks: number; transactions: number; transfers: number; head: number; headTime: number }
     {
-        const row = this.#db.prepare(`
+        const row = this.#stmt(`
             SELECT (SELECT COUNT(*) FROM blocks) AS blocks,
                    (SELECT COUNT(*) FROM transactions) AS transactions,
                    (SELECT COUNT(*) FROM token_transfers) AS transfers,
@@ -316,31 +396,31 @@ export class IndexStore
     /** Block times over the most recent window, for the average the summary reports. */
     public recentBlocks(limit: number): BlockRow[]
     {
-        return this.#db.prepare('SELECT * FROM blocks ORDER BY number DESC LIMIT ?').all(limit) as unknown as BlockRow[];
+        return this.#stmt('SELECT * FROM blocks ORDER BY number DESC LIMIT ?').all(limit) as unknown as BlockRow[];
     }
 
     public blocksPage(limit: number, offset: number): { rows: BlockRow[]; total: number }
     {
-        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM blocks').get() as { n: number }).n;
-        const rows = this.#db.prepare('SELECT * FROM blocks ORDER BY number DESC LIMIT ? OFFSET ?')
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM blocks').get() as { n: number }).n;
+        const rows = this.#stmt('SELECT * FROM blocks ORDER BY number DESC LIMIT ? OFFSET ?')
             .all(limit, offset) as unknown as BlockRow[];
         return { rows, total };
     }
 
     public blockByNumber(number: number): BlockRow | null
     {
-        return (this.#db.prepare('SELECT * FROM blocks WHERE number = ?').get(number) as BlockRow | undefined) ?? null;
+        return (this.#stmt('SELECT * FROM blocks WHERE number = ?').get(number) as BlockRow | undefined) ?? null;
     }
 
     public blockByHash(hash: string): BlockRow | null
     {
-        return (this.#db.prepare('SELECT * FROM blocks WHERE hash = ?').get(hash.toLowerCase()) as BlockRow | undefined) ?? null;
+        return (this.#stmt('SELECT * FROM blocks WHERE hash = ?').get(hash.toLowerCase()) as BlockRow | undefined) ?? null;
     }
 
     public transactionsPage(limit: number, offset: number): { rows: TransactionRow[]; total: number }
     {
-        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM transactions').get() as { n: number }).n;
-        const rows = this.#db.prepare('SELECT * FROM transactions ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?')
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM transactions').get() as { n: number }).n;
+        const rows = this.#stmt('SELECT * FROM transactions ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?')
             .all(limit, offset) as unknown as TransactionRow[];
         return { rows, total };
     }
@@ -351,16 +431,16 @@ export class IndexStore
      */
     public transactionsOfBlock(number: number, limit: number, offset: number): { rows: TransactionRow[]; total: number }
     {
-        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM transactions WHERE block_number = ?')
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM transactions WHERE block_number = ?')
             .get(number) as { n: number }).n;
-        const rows = this.#db.prepare('SELECT * FROM transactions WHERE block_number = ? ORDER BY tx_index ASC LIMIT ? OFFSET ?')
+        const rows = this.#stmt('SELECT * FROM transactions WHERE block_number = ? ORDER BY tx_index ASC LIMIT ? OFFSET ?')
             .all(number, limit, offset) as unknown as TransactionRow[];
         return { rows, total };
     }
 
     public transactionByHash(hash: string): TransactionRow | null
     {
-        return (this.#db.prepare('SELECT * FROM transactions WHERE hash = ?').get(hash.toLowerCase()) as TransactionRow | undefined) ?? null;
+        return (this.#stmt('SELECT * FROM transactions WHERE hash = ?').get(hash.toLowerCase()) as TransactionRow | undefined) ?? null;
     }
 
     /**
@@ -370,9 +450,9 @@ export class IndexStore
     public transactionsOfAddress(address: string, limit: number, offset: number): { rows: TransactionRow[]; total: number }
     {
         const account = normalize(address);
-        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM transactions WHERE from_addr = ? OR to_addr = ?')
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM transactions WHERE from_addr = ? OR to_addr = ?')
             .get(account, account) as { n: number }).n;
-        const rows = this.#db.prepare(`
+        const rows = this.#stmt(`
             SELECT * FROM transactions WHERE from_addr = ? OR to_addr = ?
             ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?`)
             .all(account, account, limit, offset) as unknown as TransactionRow[];
@@ -382,9 +462,9 @@ export class IndexStore
     public transfersOfAddress(address: string, limit: number, offset: number): { rows: TransferRow[]; total: number }
     {
         const account = normalize(address);
-        const total = (this.#db.prepare('SELECT COUNT(*) AS n FROM token_transfers WHERE from_addr = ? OR to_addr = ?')
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM token_transfers WHERE from_addr = ? OR to_addr = ?')
             .get(account, account) as { n: number }).n;
-        const rows = this.#db.prepare(`
+        const rows = this.#stmt(`
             SELECT * FROM token_transfers WHERE from_addr = ? OR to_addr = ?
             ORDER BY block_number DESC, log_index DESC LIMIT ? OFFSET ?`)
             .all(account, account, limit, offset) as unknown as TransferRow[];
@@ -393,7 +473,7 @@ export class IndexStore
 
     public transfersOfTransaction(hash: string): TransferRow[]
     {
-        return this.#db.prepare('SELECT * FROM token_transfers WHERE tx_hash = ? ORDER BY log_index ASC')
+        return this.#stmt('SELECT * FROM token_transfers WHERE tx_hash = ? ORDER BY log_index ASC')
             .all(hash.toLowerCase()) as unknown as TransferRow[];
     }
 
@@ -401,7 +481,7 @@ export class IndexStore
     public flowOfAddress(address: string): { in: string; out: string; fees: string }
     {
         const account = normalize(address);
-        const rows = this.#db.prepare(
+        const rows = this.#stmt(
             'SELECT to_addr, value, gas_used, effective_gas_price, from_addr FROM transactions WHERE (from_addr = ? OR to_addr = ?) AND status = 1')
             .all(account, account) as unknown as Array<Pick<TransactionRow, 'to_addr' | 'value' | 'gas_used' | 'effective_gas_price' | 'from_addr'>>;
 
@@ -426,11 +506,11 @@ export class IndexStore
 
     public token(address: string): TokenRow | null
     {
-        return (this.#db.prepare('SELECT * FROM tokens WHERE address = ?').get(normalize(address)) as TokenRow | undefined) ?? null;
+        return (this.#stmt('SELECT * FROM tokens WHERE address = ?').get(normalize(address)) as TokenRow | undefined) ?? null;
     }
 
     public tokens(): TokenRow[]
     {
-        return this.#db.prepare('SELECT * FROM tokens ORDER BY symbol ASC').all() as unknown as TokenRow[];
+        return this.#stmt('SELECT * FROM tokens ORDER BY symbol ASC').all() as unknown as TokenRow[];
     }
 }

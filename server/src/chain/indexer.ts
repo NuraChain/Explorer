@@ -1,8 +1,16 @@
-import { erc20Abi, createPublicClient, http } from 'viem';
 import type { Logger } from '@azerothjs/logger';
 
-import { describeChain, type BlockWithReceipts, type ChainGateway, type IndexedLog } from './client.ts';
-import { normalize, TRANSFER_SINGLE_TOPIC, TRANSFER_TOPIC, type IndexStore, type TransferRow } from './store.ts';
+import type { BlockWithReceipts, ChainGateway, IndexedLog } from './client.ts';
+import {
+    normalize,
+    TRANSFER_SINGLE_TOPIC,
+    TRANSFER_TOPIC,
+    type BlockRow,
+    type IndexStore,
+    type TokenRow,
+    type TransactionRow,
+    type TransferRow
+} from './store.ts';
 
 // The sync loop: catch up from the cursor to the head in batches, then follow. Blocks are the
 // unit of work rather than logs, because native value moves leave no log - and native value is
@@ -69,24 +77,81 @@ export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logg
     const head = await chain.head();
     await rewindIfReorged(store, chain, log);
 
-    let from = store.cursor(chain.env.startBlock) + 1;
-    from = Math.max(from, chain.env.startBlock);
-
-    while (from <= head)
+    let from = Math.max(store.cursor(chain.env.startBlock) + 1, chain.env.startBlock);
+    if (from > head)
     {
-        const to = Math.min(from + chain.env.batchSize - 1, head);
-        const blocks = await chain.range(from, to);
-        for (const block of blocks)
-        {
-            await ingest(store, chain, block, log);
-        }
-        store.setCursor(to);
-        if (blocks.some(block => block.transactions.length > 0))
-        {
-            log.info('indexed', { from, to, txs: blocks.reduce((sum, b) => sum + b.transactions.length, 0) });
-        }
-        from = to + 1;
+        return;
     }
+
+    const lastOf = (start: number): number => Math.min(start + chain.env.batchSize - 1, head);
+    const backlog = head - from + 1;
+    const startedAt = Date.now();
+    let indexed = 0;
+
+    // The NEXT range is asked for before the current one is written, so the node is answering
+    // while the disk is writing instead of the two taking turns. On a remote RPC the fetch
+    // dominates, and this is most of the difference between the two.
+    let pending: Promise<BlockWithReceipts[]> | null = chain.range(from, lastOf(from));
+
+    try
+    {
+        while (from <= head)
+        {
+            const to = lastOf(from);
+            const blocks = await pending!;
+            const ahead = to + 1;
+            pending = ahead <= head ? chain.range(ahead, lastOf(ahead)) : null;
+
+            // Decode first, describe unknown tokens second, write last. Nothing awaits inside the
+            // transaction: a write transaction held open across a network call blocks every
+            // reader on this database for as long as the node takes to answer.
+            const prepared = blocks.map(block => prepare(block));
+            const unknown = new Set(prepared.flatMap(entry => [...entry.tokens]).filter(token => !store.knownToken(token)));
+            const described = await describeTokens(chain, unknown, log);
+
+            store.transaction(() =>
+            {
+                for (const token of described)
+                {
+                    store.upsertToken(token);
+                }
+                for (const entry of prepared)
+                {
+                    store.insertBlock(entry.block, entry.transactions, entry.transfers);
+                }
+                store.setCursor(to);
+            });
+
+            indexed += blocks.length;
+            report(log, { from, to, head, indexed, backlog, startedAt, prepared });
+            from = to + 1;
+        }
+    }
+    finally
+    {
+        // A batch that failed mid-flight leaves the prefetch in the air; nobody will await it.
+        void pending?.catch(() => undefined);
+    }
+}
+
+/** One progress line per batch, with the rate and what is left - a silent backfill looks hung. */
+function report(log: Logger, at: {
+    from: number; to: number; head: number; indexed: number; backlog: number; startedAt: number;
+    prepared: PreparedBlock[];
+}): void
+{
+    const seconds = Math.max(0.001, (Date.now() - at.startedAt) / 1000);
+    const rate = at.indexed / seconds;
+    const left = at.backlog - at.indexed;
+    log.info('indexed', {
+        from: at.from,
+        to: at.to,
+        head: at.head,
+        txs: at.prepared.reduce((sum, entry) => sum + entry.transactions.length, 0),
+        blocksPerSecond: Math.round(rate),
+        remaining: left,
+        etaSeconds: rate > 0 ? Math.round(left / rate) : null
+    });
 }
 
 /**
@@ -114,8 +179,8 @@ async function rewindIfReorged(store: IndexStore, chain: ChainGateway, log: Logg
         {
             return;
         }
-        const [live] = await chain.range(height, height);
-        if (live !== undefined && live.hash === stored)
+        const live = await chain.blockHashAt(height);
+        if (live !== null && live === stored)
         {
             if (depth > 0)
             {
@@ -133,11 +198,20 @@ async function rewindIfReorged(store: IndexStore, chain: ChainGateway, log: Logg
     store.setCursor(chain.env.startBlock - 1);
 }
 
-/** Folds one block - its header, transactions and decoded token transfers - into the store. */
-async function ingest(store: IndexStore, chain: ChainGateway, block: BlockWithReceipts, log: Logger): Promise<void>
+/** One block turned into rows, ready to write. Pure: no database, no network. */
+interface PreparedBlock
+{
+    block: BlockRow;
+    transactions: TransactionRow[];
+    transfers: TransferRow[];
+    tokens: Set<string>;
+}
+
+/** Decodes one block - its header, transactions and token transfers - into the rows it becomes. */
+function prepare(block: BlockWithReceipts): PreparedBlock
 {
     const transfers: TransferRow[] = [];
-    const tokenAddresses = new Set<string>();
+    const tokens = new Set<string>();
 
     for (const transaction of block.transactions)
     {
@@ -147,13 +221,13 @@ async function ingest(store: IndexStore, chain: ChainGateway, block: BlockWithRe
             if (decoded !== null)
             {
                 transfers.push(decoded);
-                tokenAddresses.add(decoded.token);
+                tokens.add(decoded.token);
             }
         }
     }
 
-    store.insertBlock(
-        {
+    return {
+        block: {
             number: block.number,
             hash: block.hash,
             parent_hash: block.parentHash,
@@ -165,7 +239,7 @@ async function ingest(store: IndexStore, chain: ChainGateway, block: BlockWithRe
             size: block.size,
             tx_count: block.transactions.length
         },
-        block.transactions.map(transaction => ({
+        transactions: block.transactions.map(transaction => ({
             hash: transaction.hash.toLowerCase(),
             block_number: block.number,
             tx_index: transaction.index,
@@ -180,15 +254,9 @@ async function ingest(store: IndexStore, chain: ChainGateway, block: BlockWithRe
             contract_address: transaction.contractAddress === null ? null : normalize(transaction.contractAddress),
             timestamp: block.timestamp
         })),
-        transfers);
-
-    for (const token of tokenAddresses)
-    {
-        if (!store.knownToken(token))
-        {
-            await describeToken(store, chain, token, log);
-        }
-    }
+        transfers,
+        tokens
+    };
 }
 
 /** A `Transfer` log turned into a row, or null when the log is something else. */
@@ -260,26 +328,30 @@ function topicToAddress(topic: string): string
 }
 
 /**
- * Reads a token's name/symbol/decimals once, the first time it appears. A contract that does not
- * answer is still recorded - it moved value, so it belongs in the index under its address.
+ * Reads name/symbol/decimals for every token the batch met for the first time - all of them at
+ * once, on the gateway's batching client, so a block full of new tokens costs one round of calls
+ * rather than one round per token. A contract that does not answer is still recorded: it moved
+ * value, so it belongs in the index under its address.
  */
-async function describeToken(store: IndexStore, chain: ChainGateway, address: string, log: Logger): Promise<void>
+async function describeTokens(chain: ChainGateway, addresses: ReadonlySet<string>, log: Logger): Promise<TokenRow[]>
 {
-    const fallback = { address, name: '', symbol: '', decimals: 0, kind: 'erc20' };
-    try
+    if (addresses.size === 0)
     {
-        const client = createPublicClient({ chain: describeChain(chain.env), transport: http(chain.env.rpcUrl) });
-        const contract = { address: address as `0x${ string }`, abi: erc20Abi } as const;
-        const [name, symbol, decimals] = await Promise.all([
-            client.readContract({ ...contract, functionName: 'name' }).catch(() => ''),
-            client.readContract({ ...contract, functionName: 'symbol' }).catch(() => ''),
-            client.readContract({ ...contract, functionName: 'decimals' }).catch(() => 0)
-        ]);
-        store.upsertToken({ address, name: String(name), symbol: String(symbol), decimals: Number(decimals), kind: 'erc20' });
+        return [];
     }
-    catch (error)
+    return Promise.all([...addresses].map(async (address): Promise<TokenRow> =>
     {
-        log.warn('token metadata unavailable', { address, error: String(error) });
-        store.upsertToken(fallback);
-    }
+        try
+        {
+            const meta = await chain.tokenMetadata(address);
+            return meta === null
+                ? { address, name: '', symbol: '', decimals: 0, kind: 'erc20' }
+                : { address, name: meta.name, symbol: meta.symbol, decimals: meta.decimals, kind: 'erc20' };
+        }
+        catch (error)
+        {
+            log.warn('token metadata unavailable', { address, error: String(error) });
+            return { address, name: '', symbol: '', decimals: 0, kind: 'erc20' };
+        }
+    }));
 }

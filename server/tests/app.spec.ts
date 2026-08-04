@@ -12,7 +12,7 @@ import type { Account, BlockPage, SearchResult, Summary, TransactionPage } from 
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1010, name: 'NuraChain', symbol: 'NURA', decimals: 18,
-    startBlock: 0, pollMs: 1000, batchSize: 10, dbPath: ':memory:'
+    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
 };
 
 const ALICE = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -44,6 +44,8 @@ function stubChain(blocks: BlockWithReceipts[]): ChainGateway
         head: async () => blocks[blocks.length - 1]?.number ?? 0,
         range: async (from, to) => blocks.filter(entry => entry.number >= from && entry.number <= to),
         genesisHash: async () => blocks[0]?.hash ?? '0xgenesis',
+        blockHashAt: async number => blocks.find(entry => entry.number === number)?.hash ?? null,
+        tokenMetadata: async () => null,
         balance: async () => 5n * 10n ** 18n,
         isContract: async () => false
     };
