@@ -78,7 +78,8 @@ function build({ store, chain }: ApiDeps)
                         chainId: chain.env.chainId,
                         name: chain.env.name,
                         symbol: chain.env.symbol,
-                        decimals: chain.env.decimals
+                        decimals: chain.env.decimals,
+                        rpcUrl: chain.env.rpcUrl
                     },
                     head: indexed.head,
                     headTime: iso(indexed.headTime),

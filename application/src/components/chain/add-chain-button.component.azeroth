@@ -1,0 +1,83 @@
+import type { ChainInfo } from '../../api.ts';
+
+import { useToasts } from '../../stores/toasts.store.ts';
+
+import Button from '../ui/button.component.azeroth';
+
+// "Put this chain in my wallet." The values come from the SAME /stats payload the header reads,
+// so the network a visitor adds is by construction the one this explorer is indexing - a
+// hard-coded RPC URL here would quietly send wallets to a different node than the pages describe.
+//
+// EIP-3085 (`wallet_addEthereumChain`) is what every injected wallet implements, so this needs no
+// wallet SDK: the button talks to whatever is at `window.ethereum`, MetaMask or otherwise.
+
+/** The slice of EIP-1193 this needs. Injected wallets are ambient, so the type is declared here. */
+interface InjectedProvider
+{
+    request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+}
+
+/** A rejected request carries a code; 4001 is "the person said no", which is not an error. */
+function codeOf(error: unknown): number | null
+{
+    return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'number'
+        ? error.code
+        : null;
+}
+
+export default component AddChainButton(props: { chain: ChainInfo })
+{
+    const toasts = useToasts();
+
+    state busy = false;
+
+    const add = async (): Promise<void> =>
+    {
+        const provider = (globalThis as { ethereum?: InjectedProvider }).ethereum;
+        if (provider === undefined)
+        {
+            toasts.push('info', 'No wallet found - install MetaMask, then try again', 'wallet');
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            await provider.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                    // Wallets take the id as a HEX quantity, not a decimal number.
+                    chainId: `0x${ props.chain.chainId.toString(16) }`,
+                    chainName: props.chain.name,
+                    nativeCurrency: {
+                        name: props.chain.symbol,
+                        symbol: props.chain.symbol,
+                        decimals: props.chain.decimals
+                    },
+                    rpcUrls: [props.chain.rpcUrl],
+                    // This explorer, offered as the chain's explorer: a wallet that knows it can
+                    // link straight from a transaction someone just signed to the page for it.
+                    blockExplorerUrls: [globalThis.location.origin]
+                }]
+            });
+            toasts.push('success', `${ props.chain.name } added to your wallet`, 'check');
+        }
+        catch (error)
+        {
+            if (codeOf(error) === 4001)
+            {
+                toasts.push('info', 'Request dismissed', 'x');
+                return;
+            }
+            toasts.push('error', 'Your wallet refused to add the network', 'alert');
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    <Button variant="outline" size="md" icon="wallet" busy={ busy } onClick={ () => void add() }>
+        Add { props.chain.name }
+    </Button>
+}
