@@ -2,8 +2,7 @@
 
 # NuraExplorer
 
-**An open block explorer for EVM chains. Every block, transaction and transfer is indexed
-locally, so you can follow where value actually moved.**
+**An open source block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved.**
 
 [![Built with AzerothJS](https://img.shields.io/badge/built%20with-AzerothJS-5fb3e8)](https://github.com/AzerothJS/AzerothJS)
 [![Node >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
