@@ -25,6 +25,6 @@
         "service:deploy": "npm run build && npm run service:restart"
     },
     "devDependencies": {
-        "@azerothjs/cli": "^2.0.0-beta.1"
+        "@azerothjs/cli": "2.0.0-beta.1"
     }
 }
