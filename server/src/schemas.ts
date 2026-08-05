@@ -12,7 +12,9 @@ export const chainInfo = object({
     symbol: string(),
     decimals: number({ int: true }),
     /** The PUBLIC endpoint a wallet should talk to - what "add this network" hands MetaMask. */
-    rpcUrl: string()
+    rpcUrl: string(),
+    /** The chain's own website. Empty when the deployment did not name one. */
+    siteUrl: string()
 });
 export type ChainInfo = Infer<typeof chainInfo>;
 

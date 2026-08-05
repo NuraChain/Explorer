@@ -47,7 +47,21 @@ export default component SiteFooter()
                     <dl class="mt-3 flex flex-col gap-1.5 text-[13px]">
                         <div class="flex justify-between gap-3">
                             <dt class="text-muted">Chain</dt>
-                            <dd class="font-semibold">{ summary().chain.name }</dd>
+                            {/* Linked only when the deployment named a site. Without the guard a
+                                repointed explorer would send readers to the wrong chain's page. */}
+                            <dd class="font-semibold">
+                                <Show
+                                    when={ summary().chain.siteUrl !== '' }
+                                    fallback={ <span>{ summary().chain.name }</span> }
+                                >
+                                    <a
+                                        class="no-underline transition-colors duration-150 hover:text-nur"
+                                        href={ summary().chain.siteUrl }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >{ summary().chain.name }</a>
+                                </Show>
+                            </dd>
                         </div>
                         <div class="flex justify-between gap-3">
                             <dt class="text-muted">Chain ID</dt>

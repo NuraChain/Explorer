@@ -11,7 +11,7 @@ import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/cli
 import type { Account, BlockPage, SearchResult, Summary, TransactionPage } from '../src/schemas.ts';
 
 const ENV: ChainEnv = {
-    rpcUrl: 'stub', chainId: 1010, name: 'NuraChain', symbol: 'NURA', decimals: 18,
+    rpcUrl: 'stub', chainId: 1010, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '',
     startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
 };
 
