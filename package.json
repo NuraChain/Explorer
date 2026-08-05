@@ -15,13 +15,9 @@
         "check": "azeroth check",
         "build": "azeroth build",
         "test": "azeroth test",
-        "start": "npm start --workspace server",
-        "chain": "hardhat node",
-        "seed": "node scripts/seed.mjs"
+        "start": "npm start --workspace server"
     },
     "devDependencies": {
-        "@azerothjs/cli": "^2.0.0-beta.1",
-        "hardhat": "^3.12.0",
-        "solc": "^0.8.36"
+        "@azerothjs/cli": "^2.0.0-beta.1"
     }
 }

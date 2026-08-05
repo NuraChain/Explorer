@@ -4,8 +4,7 @@
 
 **An open source block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved.**
 
-[![Built with AzerothJS](https://img.shields.io/badge/built%20with-AzerothJS-5fb3e8)](https://github.com/AzerothJS/AzerothJS)
-[![Node >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
+[![Built with AzerothJS](https://img.shields.io/badge/built%20with-AzerothJS-5fb3e8)](https://github.com/AzerothJS/AzerothJS) [![Node >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
 
 </div>
 
@@ -56,16 +55,6 @@ Open **http://localhost:5173**. The API runs on **:3000**, with `/api` proxied t
 The indexer starts with the server, catches up from `START_BLOCK` to the head, then follows new
 blocks every `POLL_MS`. The first sync of a long chain takes a while; the UI works while it runs
 and fills in as blocks land.
-
-### Against a local chain
-
-```sh
-npx hardhat node     # a chain on :8545
-npm run seed         # deploy an ERC-20, send transfers, revert one tx
-npm run dev
-```
-
-The defaults in `.env.example` already point at `http://127.0.0.1:8545`.
 
 ### Against NuraChain
 
@@ -139,8 +128,7 @@ docker run -p 3000:3000 --env-file server/.env nura-explorer
 What to know before running it for real:
 
 - **The index is a file.** Back up `DB_PATH`, or accept a replay on loss. Deleting it is safe.
-- **Reorgs are handled.** On a parent-hash mismatch the indexer walks back and rolls the orphaned
-  blocks out, rather than serving transactions that were un-mined.
+- **Reorgs are handled.** On a parent-hash mismatch the indexer walks back and rolls the orphaned blocks out, rather than serving transactions that were un-mined.
 - **`eth_getBlockReceipts` is probed once** and falls back to per-transaction receipts on nodes
   that lack it - slower, still correct.
 - **Rate limiting is on.** A burst of requests answers `429`.
@@ -156,7 +144,6 @@ What to know before running it for real:
 | `npm start` | Run the built app (set `NODE_ENV=production`) |
 | `npm run check` | Typecheck and lint every workspace |
 | `npm test` | Server and unit suites |
-| `npm run seed` | Populate a local chain with real activity |
 
 ---
 
