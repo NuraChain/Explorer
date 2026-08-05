@@ -15,7 +15,14 @@
         "check": "azeroth check",
         "build": "azeroth build",
         "test": "azeroth test",
-        "start": "npm start --workspace server"
+        "start": "npm start --workspace server",
+        "service:stop": "bash scripts/service-stop.sh",
+        "service:start": "bash scripts/service-start.sh",
+        "service:status": "bash scripts/service-status.sh",
+        "service:restart": "bash scripts/service-restart.sh",
+        "service:install": "bash scripts/service-install.sh",
+        "service:uninstall": "bash scripts/service-uninstall.sh",
+        "service:deploy": "npm run build && npm run service:restart"
     },
     "devDependencies": {
         "@azerothjs/cli": "^2.0.0-beta.1"

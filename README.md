@@ -125,6 +125,21 @@ docker run -p 3000:3000 --env-file server/.env nura-explorer
 
 `/api/healthz` answers orchestrator probes.
 
+### As a systemd service
+
+On a bare host, from a fresh clone - the unit runs the server directly from source, with the
+client built ahead of it:
+
+```sh
+npm ci
+cp server/.env.example server/.env    # then set RPC_URL and CHAIN_ID
+npm run build
+sudo npm run service:install
+sudo npm run service:start
+```
+
+`sudo npm run service:deploy` rebuilds and restarts after a `git pull`.
+
 What to know before running it for real:
 
 - **The index is a file.** Back up `DB_PATH`, or accept a replay on loss. Deleting it is safe.
@@ -144,6 +159,11 @@ What to know before running it for real:
 | `npm start` | Run the built app (set `NODE_ENV=production`) |
 | `npm run check` | Typecheck and lint every workspace |
 | `npm test` | Server and unit suites |
+| `npm run service:deploy` | Rebuild and restart (root) |
+| `npm run service:install` | Write and load the systemd unit (root) |
+| `npm run service:uninstall` | Stop, disable and remove the unit (root) |
+| `npm run service:start` / `:stop` / `:restart` | Control the service (root) |
+| `npm run service:status` | What systemd thinks of it |
 
 ---
 
