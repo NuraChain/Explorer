@@ -46,7 +46,7 @@ echo "> Installing systemd service (${SERVICE_FILE})..."
 
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=NuraExplorer
+Description=Nura Explorer
 After=network.target
 
 [Service]

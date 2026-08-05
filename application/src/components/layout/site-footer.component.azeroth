@@ -20,7 +20,7 @@ export default component SiteFooter()
                     <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
                         <Icon name="layers" size={ 14 } />
                     </span>
-                    <span class="text-[14px] font-bold tracking-tight">Nura<span class="text-nur">Explorer</span></span>
+                    <span class="text-[14px] font-bold tracking-tight">Nura <span class="text-nur">Explorer</span></span>
                 </span>
                 <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">
                     An open block explorer. Every block, transaction and transfer is indexed locally,

@@ -1,6 +1,6 @@
 <div align="center">
 
-# NuraExplorer
+# Nura Explorer
 
 **An open source block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved.**
 
@@ -8,7 +8,7 @@
 [![Built with AzerothJS](https://img.shields.io/badge/built%20with-AzerothJS-5fb3e8)](https://github.com/AzerothJS/AzerothJS)
 [![Node >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
 
-<img src="docs/screenshots/home-desktop-dark.png" alt="NuraExplorer overview" width="840" />
+<img src="docs/screenshots/home-desktop-dark.png" alt="Nura Explorer overview" width="840" />
 
 </div>
 
