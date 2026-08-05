@@ -50,7 +50,7 @@ cp server/.env.example server/.env    # then set RPC_URL and CHAIN_ID
 npm run dev
 ```
 
-Open **http://localhost:5173**. The API runs on **:3000**, with `/api` proxied to it.
+Open **http://localhost:3001**. The API runs on **:3000**, with `/api` proxied to it.
 
 The indexer starts with the server, catches up from `START_BLOCK` to the head, then follows new
 blocks every `POLL_MS`. The first sync of a long chain takes a while; the UI works while it runs
