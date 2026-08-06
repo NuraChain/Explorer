@@ -183,10 +183,8 @@ export const en = {
     // --- Footer -------------------------------------------------------------------------------
     'footer.tagline': 'An open block explorer. Every block, transaction and transfer is indexed locally, so you can follow value across the chain.',
     'footer.explore': 'Explore',
-    'footer.network': 'Network',
-    'footer.chain': 'Chain',
-    'footer.chainId': 'Chain ID',
-    'footer.connecting': 'Connecting...',
+    /** The group name only; GitHub, Discord and Telegram are proper nouns and stay as they are. */
+    'footer.community': 'Community',
     'footer.note': 'Reads come from a local index of the chain. Balances are read live from the node.',
     'footer.builtWith': 'Built with',
 

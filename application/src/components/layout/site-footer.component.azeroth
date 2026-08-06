@@ -1,20 +1,26 @@
 import { Link } from 'azerothjs';
 
-import { client } from '../../api.ts';
-
 import { useLocale } from '../../stores/locale.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
+import type { IconName } from '../../icons/registry.ts';
 
-// The footer says what this explorer IS and what chain it is pointed at - the two questions a
-// visitor who arrived from a shared link cannot answer from the page they landed on. The chain
-// row is live rather than hardcoded, so repointing the deployment at another network does not
-// leave the footer lying about which chain these numbers came from.
+// Where the PROJECT lives, which is why these are hardcoded: they belong to the explorer itself,
+// not to whichever network a deployment is pointed at, so they do not move when RPC_URL does.
+// Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
+const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
+    { name: 'GitHub', href: 'https://github.com/NuraChain/Explorer', icon: 'social-github' },
+    { name: 'Discord', href: 'https://discord.gg/ykW3PU64h9', icon: 'social-discord' },
+    { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' }
+];
+
+// The footer says what this explorer IS and where its project can be reached - the questions a
+// visitor who arrived from a shared link cannot answer from the page they landed on. It reads
+// nothing from the chain: the header already carries the live state, and a second copy down here
+// only added a request per page.
 export default component SiteFooter()
 {
     const locale = useLocale();
-
-    resource stats = () => client.stats.summary();
 
     <footer class="mt-12 border-t border-line">
         <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-3 sm:px-6">
@@ -37,40 +43,28 @@ export default component SiteFooter()
                 </ul>
             </nav>
 
-            <div>
-                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.network') }</h2>
-                <Show
-                    when={ stats.data() }
-                    fallback={ <p class="mt-3 text-[13px] text-muted">{ locale.t('footer.connecting') }</p> }
-                >
-                { (summary) =>
-                    <dl class="mt-3 flex flex-col gap-1.5 text-[13px]">
-                        <div class="flex justify-between gap-3">
-                            <dt class="text-muted">{ locale.t('footer.chain') }</dt>
-                            {/* Linked only when the deployment named a site. Without the guard a
-                                repointed explorer would send readers to the wrong chain's page. */}
-                            <dd class="font-semibold">
-                                <Show
-                                    when={ summary().chain.siteUrl !== '' }
-                                    fallback={ <span>{ summary().chain.name }</span> }
-                                >
-                                    <a
-                                        class="no-underline transition-colors duration-150 hover:text-nur"
-                                        href={ summary().chain.siteUrl }
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >{ summary().chain.name }</a>
-                                </Show>
-                            </dd>
-                        </div>
-                        <div class="flex justify-between gap-3">
-                            <dt class="text-muted">{ locale.t('footer.chainId') }</dt>
-                            <dd class="data">{ summary().chain.chainId }</dd>
-                        </div>
-                    </dl>
-                }
-                </Show>
-            </div>
+            {/* Named in text, not by logo alone: the icon set carries no brand marks, and a
+                generic glyph beside a name still reads correctly in either direction. */}
+            <nav aria-label={ locale.t('footer.community') }>
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
+                <ul class="mt-3 flex flex-col gap-2 text-[13px]">
+                    <For each={ SOCIALS } key={ (link) => link.name }>
+                    { (link) =>
+                        <li>
+                            <a
+                                class="flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
+                                href={ link.href }
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                <Icon name={ link.icon } size={ 18 } />
+                                { link.name }
+                            </a>
+                        </li>
+                    }
+                    </For>
+                </ul>
+            </nav>
         </div>
 
         <div class="border-t border-line">
