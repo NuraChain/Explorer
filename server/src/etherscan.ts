@@ -26,23 +26,42 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 
 /**
+ * The headers that make this surface readable from somewhere else, which is the entire point of
+ * it: the callers are a wallet's webview, a script, a dashboard - never this explorer's own pages.
+ *
+ * `securityHeaders()` defaults Cross-Origin-Resource-Policy to `same-origin` for the whole app,
+ * and that alone discards the response in the browser even when Access-Control-Allow-Origin is
+ * present - the request goes out, the server answers, the reply never reaches the caller. Those
+ * defaults apply only where a response does not already carry the header, so setting it here is
+ * what overrides it; no proxy rule can, because nginx cannot strip a header it did not add.
+ *
+ * `*` is the right value and not a loosening: every answer below is public, read-only chain data
+ * that anyone can also get from the node. Nothing here reads a cookie, a session or an
+ * Authorization header, so there is no credentialed request for a wildcard to expose.
+ */
+const CROSS_ORIGIN: HeadersInit = {
+    'access-control-allow-origin': '*',
+    'cross-origin-resource-policy': 'cross-origin'
+};
+
+/**
  * The three envelopes Etherscan answers with. A client tells them apart by `status`, so the
  * distinction between "nothing found" and "your request was wrong" has to survive: a wallet that
  * reads an error as an empty history will happily show an account as having never transacted.
  */
 function ok(result: unknown): Response
 {
-    return json({ status: '1', message: 'OK', result });
+    return json({ status: '1', message: 'OK', result }, { headers: CROSS_ORIGIN });
 }
 
 function none(message: string): Response
 {
-    return json({ status: '0', message, result: [] });
+    return json({ status: '0', message, result: [] }, { headers: CROSS_ORIGIN });
 }
 
 function fail(reason: string): Response
 {
-    return json({ status: '0', message: 'NOTOK', result: reason });
+    return json({ status: '0', message: 'NOTOK', result: reason }, { headers: CROSS_ORIGIN });
 }
 
 interface Paging
