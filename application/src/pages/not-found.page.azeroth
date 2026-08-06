@@ -1,6 +1,7 @@
 import { Link } from 'azerothjs';
 
 import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
 
@@ -11,27 +12,26 @@ import SearchBar from '../components/layout/search-bar.component.azeroth';
 // things that are actually wrong - the value, or the index not having reached it yet.
 export default component NotFoundPage()
 {
-    useTitle(() => 'Not found');
+    const locale = useLocale();
+
+    useTitle(() => locale.t('notFound.title'));
 
     <div class="panel px-4 py-14 text-center sm:px-6">
         <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-raised text-faint">
             <Icon name="search" size={ 22 } />
         </span>
 
-        <h1 class="mt-4 text-[20px] font-bold tracking-tight">Nothing at this address</h1>
-        <p class="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-muted">
-            This page does not exist. If you were following a block, transaction or account, check
-            the value below - or try again shortly, if the indexer has not reached it yet.
-        </p>
+        <h1 class="mt-4 text-[20px] font-bold tracking-tight">{ locale.t('notFound.heading') }</h1>
+        <p class="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-muted">{ locale.t('notFound.hint') }</p>
 
         <div class="mx-auto mt-6 max-w-lg">
             <SearchBar />
         </div>
 
-        <nav class="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px]" aria-label="Elsewhere">
-            <Link to="/" class="inline-flex min-h-11 items-center px-2 text-nur no-underline hover:underline">Overview</Link>
-            <Link to="/blocks" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">Blocks</Link>
-            <Link to="/txs" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">Transactions</Link>
+        <nav class="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px]" aria-label={ locale.t('nav.elsewhere') }>
+            <Link to="/" class="inline-flex min-h-11 items-center px-2 text-nur no-underline hover:underline">{ locale.t('nav.overview') }</Link>
+            <Link to="/blocks" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link>
+            <Link to="/txs" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link>
         </nav>
     </div>
 }

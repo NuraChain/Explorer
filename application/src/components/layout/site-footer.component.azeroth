@@ -1,17 +1,26 @@
 import { Link } from 'azerothjs';
 
-import { client } from '../../api.ts';
-import { formatCount } from '../../lib/format.ts';
+import { useLocale } from '../../stores/locale.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
+import type { IconName } from '../../icons/registry.ts';
 
-// The footer says what this explorer IS and what chain it is pointed at - the two questions a
-// visitor who arrived from a shared link cannot answer from the page they landed on. The chain
-// row is live rather than hardcoded, so repointing the deployment at another network does not
-// leave the footer lying about which chain these numbers came from.
+// Where the PROJECT lives, which is why these are hardcoded: they belong to the explorer itself,
+// not to whichever network a deployment is pointed at, so they do not move when RPC_URL does.
+// Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
+const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
+    { name: 'GitHub', href: 'https://github.com/NuraChain/Explorer', icon: 'social-github' },
+    { name: 'Discord', href: 'https://discord.gg/ykW3PU64h9', icon: 'social-discord' },
+    { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' }
+];
+
+// The footer says what this explorer IS and where its project can be reached - the questions a
+// visitor who arrived from a shared link cannot answer from the page they landed on. It reads
+// nothing from the chain: the header already carries the live state, and a second copy down here
+// only added a request per page.
 export default component SiteFooter()
 {
-    resource stats = () => client.stats.summary();
+    const locale = useLocale();
 
     <footer class="mt-12 border-t border-line">
         <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-3 sm:px-6">
@@ -20,52 +29,51 @@ export default component SiteFooter()
                     <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
                         <Icon name="layers" size={ 14 } />
                     </span>
-                    <span class="text-[14px] font-bold tracking-tight">Nura<span class="text-nur">Explorer</span></span>
+                    <span class="text-[14px] font-bold tracking-tight">Nura <span class="text-nur">Explorer</span></span>
                 </span>
-                <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">
-                    An open block explorer. Every block, transaction and transfer is indexed locally,
-                    so you can follow value across the chain.
-                </p>
+                <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
             </div>
 
-            <nav aria-label="Explore">
-                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">Explore</h2>
+            <nav aria-label={ locale.t('footer.explore') }>
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
                 <ul class="mt-3 flex flex-col gap-2 text-[13px]">
-                    <li><Link to="/" class="text-muted no-underline hover:text-text">Home</Link></li>
-                    <li><Link to="/blocks" class="text-muted no-underline hover:text-text">Blocks</Link></li>
-                    <li><Link to="/txs" class="text-muted no-underline hover:text-text">Transactions</Link></li>
+                    <li><Link to="/" class="text-muted no-underline hover:text-text">{ locale.t('nav.home') }</Link></li>
+                    <li><Link to="/blocks" class="text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link></li>
+                    <li><Link to="/txs" class="text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link></li>
                 </ul>
             </nav>
 
-            <div>
-                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">Network</h2>
-                <Show
-                    when={ stats.data() }
-                    fallback={ <p class="mt-3 text-[13px] text-muted">Connecting...</p> }
-                    let={ summary }>
-                    <dl class="mt-3 flex flex-col gap-1.5 text-[13px]">
-                        <div class="flex justify-between gap-3">
-                            <dt class="text-muted">Chain</dt>
-                            <dd class="font-semibold">{ summary.chain.name }</dd>
-                        </div>
-                        <div class="flex justify-between gap-3">
-                            <dt class="text-muted">Chain ID</dt>
-                            <dd class="data">{ summary.chain.chainId }</dd>
-                        </div>
-                        <div class="flex justify-between gap-3">
-                            <dt class="text-muted">Indexed</dt>
-                            <dd class="data">{ formatCount(summary.head) }</dd>
-                        </div>
-                    </dl>
-                </Show>
-            </div>
+            {/* Named in text, not by logo alone: the icon set carries no brand marks, and a
+                generic glyph beside a name still reads correctly in either direction. */}
+            <nav aria-label={ locale.t('footer.community') }>
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
+                <ul class="mt-3 flex flex-col gap-2 text-[13px]">
+                    <For each={ SOCIALS } key={ (link) => link.name }>
+                    { (link) =>
+                        <li>
+                            <a
+                                class="flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
+                                href={ link.href }
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                <Icon name={ link.icon } size={ 18 } />
+                                { link.name }
+                            </a>
+                        </li>
+                    }
+                    </For>
+                </ul>
+            </nav>
         </div>
 
         <div class="border-t border-line">
             <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-[12px] text-faint sm:px-6">
-                <p>Reads come from a local index of the chain. Balances are read live from the node.</p>
+                <p>{ locale.t('footer.note') }</p>
                 <p class="shrink-0">
-                    Built with
+                    {/* Explicit: a literal text line before an element line collapses to a single
+                        space, but an expression container does not, so the words would run together. */}
+                    { locale.t('footer.builtWith') }{ ' ' }
                     <a
                         class="text-muted no-underline transition-colors duration-150 hover:text-nur"
                         href="https://github.com/AzerothJS/AzerothJS"

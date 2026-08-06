@@ -3,6 +3,7 @@ import { Link } from 'azerothjs';
 import { shortHash } from '../../lib/format.ts';
 
 import { useToasts } from '../../stores/toasts.store.ts';
+import { useLocale } from '../../stores/locale.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
 
@@ -23,6 +24,7 @@ export default component HashLink(props: {
 })
 {
     const toasts = useToasts();
+    const locale = useLocale();
 
     derived tone = props.tone ?? 'beam';
     derived short = shortHash(props.value, props.lead ?? 10, props.tail ?? 8);
@@ -36,11 +38,11 @@ export default component HashLink(props: {
         try
         {
             await navigator.clipboard.writeText(props.value);
-            toasts.push('success', 'Copied to clipboard', 'check');
+            toasts.push('success', locale.t('copy.done'), 'check');
         }
         catch
         {
-            toasts.push('error', 'Your browser blocked clipboard access', 'alert');
+            toasts.push('error', locale.t('copy.blocked'), 'alert');
         }
     };
 
@@ -59,7 +61,7 @@ export default component HashLink(props: {
             <button
                 class="-m-2 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:text-nur sm:-m-1 sm:h-7 sm:w-7"
                 type="button"
-                aria-label={ `Copy ${ props.value }` }
+                aria-label={ locale.t('copy.action', { value: props.value }) }
                 onClick={ () => void write() }
             >
                 <Icon name="copy" size={ 13 } />

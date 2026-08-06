@@ -13,6 +13,18 @@ export interface ChainEnv
     symbol: string;
     decimals: number;
 
+    /** The chain's own website, linked from its name in the footer. Empty means do not link. */
+    siteUrl: string;
+
+    /**
+     * This explorer's PUBLIC url, handed to a wallet as the chain's block explorer.
+     *
+     * Not the request's own origin: the page offering the button may be reached over localhost,
+     * a preview host or an internal name, and a wallet that stores one of those has a dead
+     * "view on explorer" link forever. Empty falls back to the origin, which is right in dev.
+     */
+    explorerUrl: string;
+
     /** First block the backfill reads. 0 means genesis; set it forward on a long chain. */
     startBlock: number;
 
@@ -41,6 +53,10 @@ export function loadChainEnv(): ChainEnv
         name: str('CHAIN_NAME', { default: 'Local EVM' }),
         symbol: str('CURRENCY_SYMBOL', { default: 'ETH' }),
         decimals: num('CURRENCY_DECIMALS', { default: 18 }),
+        // No default: a deployment pointed at another network must not link its chain name to
+        // somebody else's site, so an unset key renders the name as plain text.
+        siteUrl: str('CHAIN_SITE_URL', { default: '' }),
+        explorerUrl: str('EXPLORER_URL', { default: '' }),
         startBlock: num('START_BLOCK', { default: 0 }),
         pollMs: num('POLL_MS', { default: 2000 }),
         batchSize: num('BATCH_SIZE', { default: 1000 }),

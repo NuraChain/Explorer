@@ -60,13 +60,21 @@ export function shortHash(value: string, lead = 10, tail = 8): string
     return value.length <= lead + tail ? value : `${ value.slice(0, lead) }…${ value.slice(-tail) }`;
 }
 
-/** Whole numbers with thousands separators. */
-export function formatCount(value: number): string
+/**
+ * Whole numbers with thousands separators, in the reader's digits.
+ *
+ * This is for PROSE numbers - a count of blocks, a page number. Chain amounts go through
+ * formatAmount and stay in Latin digits: they sit inside `.data`, which is forced to LTR, and a
+ * balance a reader cannot paste back into another tool is not doing its job.
+ */
+export function formatCount(value: number, tag = 'en-US'): string
 {
-    return value.toLocaleString('en-US');
+    return value.toLocaleString(tag);
 }
 
-const UNITS: ReadonlyArray<[limit: number, seconds: number, name: string]> = [
+export type ElapsedUnit = 'justNow' | 'second' | 'minute' | 'hour' | 'day';
+
+const UNITS: ReadonlyArray<[limit: number, seconds: number, unit: ElapsedUnit]> = [
     [60, 1, 'second'],
     [3600, 60, 'minute'],
     [86_400, 3600, 'hour'],
@@ -74,45 +82,42 @@ const UNITS: ReadonlyArray<[limit: number, seconds: number, name: string]> = [
 ];
 
 /**
- * How long ago, in words. Blocks arrive every few seconds, so "12 seconds ago" is the common
- * case and the one that must read naturally.
+ * How long ago, as a unit and a count. The WORDING lives in the message catalog - blocks arrive
+ * every few seconds, so this is the most-read string in the explorer and it has to read naturally
+ * in each language rather than being assembled from an English template.
  */
-export function timeAgo(iso: string, now = Date.now()): string
+export function elapsed(iso: string, now = Date.now()): { unit: ElapsedUnit; count: number }
 {
-    const elapsed = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
-    if (elapsed < 5)
+    const seconds = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+    if (seconds < 5)
     {
-        return 'just now';
+        return { unit: 'justNow', count: 0 };
     }
-    for (const [limit, seconds, name] of UNITS)
+    for (const [limit, size, unit] of UNITS)
     {
-        if (elapsed < limit)
+        if (seconds < limit)
         {
-            const count = Math.floor(elapsed / seconds);
-            return `${ count } ${ name }${ count === 1 ? '' : 's' } ago`;
+            return { unit, count: Math.floor(seconds / size) };
         }
     }
-    const days = Math.floor(elapsed / 86_400);
-    return `${ days } days ago`;
+    return { unit: 'day', count: Math.floor(seconds / 86_400) };
 }
 
 /** An absolute timestamp, for detail pages where the exact moment matters. */
-export function formatDateTime(iso: string): string
+export function formatDateTime(iso: string, tag = 'en-US'): string
 {
-    return new Date(iso).toLocaleString('en-US', {
+    return new Date(iso).toLocaleString(tag, {
         year: 'numeric', month: 'short', day: 'numeric',
         hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
 }
 
-/** Bytes, for calldata and block sizes. */
-export function formatBytes(bytes: number): string
+/** Bytes scaled to the unit they should be shown in; the unit's name is in the catalog. */
+export function scaleBytes(bytes: number): { unit: 'bytes' | 'kilobytes'; count: number }
 {
-    if (bytes < 1024)
-    {
-        return `${ bytes } B`;
-    }
-    return `${ (bytes / 1024).toFixed(1) } KB`;
+    return bytes < 1024
+        ? { unit: 'bytes', count: bytes }
+        : { unit: 'kilobytes', count: bytes / 1024 };
 }
 
 /** Gas used as a share of the limit, for the fill bar on a block. */

@@ -1,6 +1,6 @@
 import { createEffect } from 'azerothjs';
 
-const SUFFIX = 'NuraExplorer';
+const SUFFIX = 'Nura Explorer';
 
 /**
  * Names the page in the browser tab and in whatever a shared link renders as. Every page read the

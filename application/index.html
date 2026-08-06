@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
     <head>
         <meta charset="UTF-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <!-- The pre-hydration values. Each page sets its own title once it knows what it is
              showing; this is what a crawler, a social preview and a reader without JS get, so
              it names the product rather than the chain (which is configuration). -->
-        <title>NuraExplorer</title>
+        <title>Nura Explorer</title>
         <meta name="description" content="An open block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved."/>
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f8fa"/>
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1118"/>
@@ -14,6 +14,37 @@
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
         <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
         <link rel="stylesheet" href="/src/styles.css"/>
+        <!-- Applies the stored language BEFORE first paint. The locale store would do it too, but
+             only once the bundle has run, and a page that renders left-to-right and then flips is
+             worse than one that starts correct. Kept in sync with locale.store.ts by hand: it is
+             four lines, and importing the module here would defeat the point. -->
+        <script>
+            try
+            {
+                var saved = localStorage.getItem('nura.locale');
+                var lang = saved === 'fa' || saved === 'en' ? saved : 'en';
+                if (saved !== 'fa' && saved !== 'en')
+                {
+                    // First match in PREFERENCE ORDER, matching initial() in locale.store.ts.
+                    var wanted = navigator.languages || [];
+                    for (var i = 0; i < wanted.length; i++)
+                    {
+                        var subtag = wanted[i].toLowerCase().split('-')[0];
+                        if (subtag === 'fa' || subtag === 'en')
+                        {
+                            lang = subtag;
+                            break;
+                        }
+                    }
+                }
+                document.documentElement.lang = lang;
+                document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+            }
+            catch (error)
+            {
+                // A blocked localStorage leaves the document's own lang and dir in place.
+            }
+        </script>
     </head>
     <body>
         <div id="root"></div>

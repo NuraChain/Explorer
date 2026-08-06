@@ -1,7 +1,9 @@
 import { Link } from 'azerothjs';
 
 import type { Transaction } from '../../api.ts';
-import { formatAmount, formatDateTime, timeAgo } from '../../lib/format.ts';
+import { formatAmount } from '../../lib/format.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
 
@@ -21,6 +23,8 @@ export default component FlowLedger(props: {
     decimals: number;
 })
 {
+    const locale = useLocale();
+
     /** A transaction with no value moved is a call, not a payment - it gets no bar. */
     const amountOf = (row: Transaction): bigint => BigInt(row.value);
 
@@ -54,17 +58,15 @@ export default component FlowLedger(props: {
 
     <div class="panel overflow-hidden">
         <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
-            <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">Flow</h2>
+            <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('flow.title') }</h2>
             <div class="flex items-center gap-4 text-[12px]">
-                <span class="flex items-center gap-1.5 text-inflow"><Icon name="inflow" size={ 13 } /> in</span>
-                <span class="flex items-center gap-1.5 text-outflow"><Icon name="outflow" size={ 13 } /> out</span>
+                <span class="flex items-center gap-1.5 text-inflow"><Icon name="inflow" size={ 13 } /> { locale.t('flow.in') }</span>
+                <span class="flex items-center gap-1.5 text-outflow"><Icon name="outflow" size={ 13 } /> { locale.t('flow.out') }</span>
             </div>
         </div>
 
         <Show when={ props.rows.length === 0 }>
-            <p class="px-4 py-10 text-center text-[14px] text-muted">
-                No transactions here yet. When this address sends or receives, the movement appears here.
-            </p>
+            <p class="px-4 py-10 text-center text-[14px] text-muted">{ locale.t('flow.empty') }</p>
         </Show>
 
         <ul class="divide-y divide-line">
@@ -78,7 +80,7 @@ export default component FlowLedger(props: {
                                 +{ formatAmount(row.value, props.decimals) }
                             </span>
                             <span
-                                class="h-2 rounded-l-full bg-inflow"
+                                class="h-2 rounded-s-full bg-inflow"
                                 style={ `width: ${ share(amountOf(row)) }%` }
                                 aria-hidden="true"
                             ></span>
@@ -95,14 +97,14 @@ export default component FlowLedger(props: {
                             </Show>
                             <span class="data text-[12px] text-beam hover:underline">{ row.hash.slice(0, 10) }…</span>
                         </span>
-                        <Tooltip label={ formatDateTime(row.at) }><span class="text-[11px] text-muted">{ timeAgo(row.at) }</span></Tooltip>
+                        <Tooltip label={ locale.dateTime(row.at) }><span class="text-[11px] text-muted">{ locale.ago(row.at) }</span></Tooltip>
                     </Link>
 
                     {/* Right rail: value leaving. */}
                     <div class="flex items-center gap-2">
                         <Show when={ !inbound(row) && amountOf(row) > 0n }>
                             <span
-                                class="h-2 rounded-r-full bg-outflow"
+                                class="h-2 rounded-e-full bg-outflow"
                                 style={ `width: ${ share(amountOf(row)) }%` }
                                 aria-hidden="true"
                             ></span>
@@ -114,7 +116,7 @@ export default component FlowLedger(props: {
                             and saying so is more honest than leaving a blank row. */}
                         <Show when={ amountOf(row) === 0n }>
                             <span class="text-[12px] text-muted">
-                                { row.contractAddress === null ? 'call' : 'contract created' }
+                                { row.contractAddress === null ? locale.t('flow.call') : locale.t('flow.contractCreated') }
                             </span>
                         </Show>
                     </div>
@@ -123,9 +125,7 @@ export default component FlowLedger(props: {
         </ul>
 
         <Show when={ props.rows.length > 0 }>
-            <p class="border-t border-line px-4 py-2.5 text-[11px] text-muted">
-                Bars are relative to the largest movement shown. Amounts in { props.symbol }.
-            </p>
+            <p class="border-t border-line px-4 py-2.5 text-[11px] text-muted">{ locale.t('flow.legend', { symbol: props.symbol }) }</p>
         </Show>
     </div>
 }

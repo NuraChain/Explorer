@@ -3,6 +3,7 @@ import { onMount, useNavigate } from 'azerothjs';
 import { client } from '../../api.ts';
 
 import { useToasts } from '../../stores/toasts.store.ts';
+import { useLocale } from '../../stores/locale.store.ts';
 
 import Button from '../ui/button.component.azeroth';
 import Input from '../ui/input.component.azeroth';
@@ -14,6 +15,7 @@ export default component SearchBar(props: { size?: 'hero' | 'compact' })
 {
     const { navigate } = useNavigate();
     const toasts = useToasts();
+    const locale = useLocale();
 
     state term = '';
     state busy = false;
@@ -64,7 +66,7 @@ export default component SearchBar(props: { size?: 'hero' | 'compact' })
             {
                 // An unindexed value and an unreachable index are different problems, and
                 // telling them apart is the difference between waiting and retyping.
-                toasts.push('error', 'Nothing indexed under that value. Check it, or wait if the block is very recent.', 'alert');
+                toasts.push('error', locale.t('search.missing'), 'alert');
                 return;
             }
             navigate(found.path);
@@ -72,7 +74,7 @@ export default component SearchBar(props: { size?: 'hero' | 'compact' })
         }
         catch
         {
-            toasts.push('error', 'Search failed - the explorer could not reach its index.', 'alert');
+            toasts.push('error', locale.t('search.failed'), 'alert');
         }
         finally
         {
@@ -87,15 +89,15 @@ export default component SearchBar(props: { size?: 'hero' | 'compact' })
                     icon="search"
                     size={ hero ? 'md' : 'sm' }
                     type="search"
-                    label="Search by address, transaction hash, or block number"
-                    placeholder={ hero ? 'Address, transaction hash, or block number' : 'Search' }
+                    label={ locale.t('search.label') }
+                    placeholder={ hero ? locale.t('search.placeholder') : locale.t('search.placeholder.compact') }
                     value={ term }
                     onInput={ (next) => term = next }
                     ref={ (element) => field = element }
                 />
             </div>
             <Show when={ term.trim() !== '' }>
-                <Button variant="primary" size={ hero ? 'md' : 'sm' } type="submit" busy={ busy }>Go</Button>
+                <Button variant="primary" size={ hero ? 'md' : 'sm' } type="submit" busy={ busy }>{ locale.t('search.go') }</Button>
             </Show>
         </div>
     </form>

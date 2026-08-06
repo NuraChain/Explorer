@@ -1,8 +1,9 @@
 import { Link } from 'azerothjs';
 
 import { client } from '../api.ts';
-import { formatCount, formatDateTime, gasShare, timeAgo } from '../lib/format.ts';
+import { gasShare } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
@@ -12,15 +13,17 @@ import Skeleton from '../components/ui/skeleton.component.azeroth';
 
 export default component BlocksPage()
 {
+    const locale = useLocale();
+
     state page = 1;
 
     resource blocks = (at: string) => client.blocks.list({ query: { page: Number(at), limit: 25 } })
         with { source: String(page) };
 
-    useTitle(() => 'Blocks');
+    useTitle(() => locale.t('blocks.title'));
 
     <div class="flex flex-col gap-4">
-        <h1 class="text-[22px] font-bold tracking-tight">Blocks</h1>
+        <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('blocks.title') }</h1>
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
@@ -31,11 +34,11 @@ export default component BlocksPage()
                         </Link>
                         <div class="min-w-0 flex-1">
                             <HashLink value={ block.hash } to={ `/block/${ block.number }` } tone="muted" lead={ 14 } tail={ 8 } />
-                            <Tooltip label={ formatDateTime(block.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(block.at) }</p></Tooltip>
+                            <Tooltip label={ locale.dateTime(block.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(block.at) }</p></Tooltip>
                         </div>
                         <div class="text-end">
-                            <p class="data text-[13px]">{ block.txCount } tx</p>
-                            <Tooltip label={ `${ formatCount(Number(block.gasUsed)) } of ${ formatCount(Number(block.gasLimit)) } gas used` } class="flex justify-end"><p class="text-[11px] text-muted">{ (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }% gas</p></Tooltip>
+                            <p class="data text-[13px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
+                            <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[11px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
                         </div>
                     </li>
                 </For>
@@ -44,7 +47,7 @@ export default component BlocksPage()
                 <div class="flex flex-col gap-2 px-4 py-4"><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /></div>
             </Show>
             <Show when={ blocks.data()?.rows.length === 0 }>
-                <EmptyState icon="block" title="No blocks indexed yet" hint="Blocks appear here as the indexer reads them from the chain." />
+                <EmptyState icon="block" title={ locale.t('blocks.empty.title') } hint={ locale.t('blocks.empty.hint') } />
             </Show>
             <Show when={ blocks.data() !== undefined }>
             { () => <Pagination page={ blocks.data()!.page } pages={ blocks.data()!.pages } onChange={ (next) => page = next } /> }
@@ -52,7 +55,7 @@ export default component BlocksPage()
         </section>
 
         <Show when={ blocks.data() !== undefined }>
-        { () => <p class="text-[12px] text-muted">{ formatCount(blocks.data()!.total) } blocks indexed.</p> }
+        { () => <p class="text-[12px] text-muted">{ locale.t('blocks.total', { count: locale.n(blocks.data()!.total) }) }</p> }
         </Show>
     </div>
 }

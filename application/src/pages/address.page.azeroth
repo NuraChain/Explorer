@@ -1,8 +1,9 @@
 import { useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
-import { formatAmount, formatCount, formatDateTime, formatValue, timeAgo } from '../lib/format.ts';
+import { formatAmount, formatValue } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
 
@@ -19,6 +20,7 @@ import Tooltip from '../components/ui/tooltip.component.azeroth';
 export default component AddressPage()
 {
     const params = useParams();
+    const locale = useLocale();
 
     state page = 1;
     state tab: 'flow' | 'transfers' = 'flow';
@@ -53,7 +55,7 @@ export default component AddressPage()
         page = 1;
     };
 
-    useTitle(() => `Address ${ address.slice(0, 10) }`);
+    useTitle(() => locale.t('address.title', { short: address.slice(0, 10) }));
 
     <div class="flex flex-col gap-4 sm:gap-5">
         <header class="panel px-4 py-4 sm:px-5">
@@ -68,8 +70,8 @@ export default component AddressPage()
                 </span>
                 <div class="min-w-0 flex-1">
                     <p class="text-[12px] uppercase tracking-[0.14em] text-muted">
-                        <Show when={ account.data()?.token } fallback={ <span>{ account.data()?.isContract === true ? 'Contract' : 'Address' }</span> } let={ token }>
-                            <span>Token &middot; { token.name } ({ token.symbol })</span>
+                        <Show when={ account.data()?.token } fallback={ <span>{ account.data()?.isContract === true ? locale.t('address.kind.contract') : locale.t('address.kind.address') }</span> }>
+                        { (token) => <span>{ locale.t('address.kind.token') } &middot; { token().name } ({ token().symbol })</span> }
                         </Show>
                     </p>
                     <p class="hash mt-0.5 text-[14px] font-semibold sm:text-[15px]">{ address }</p>
@@ -82,25 +84,25 @@ export default component AddressPage()
         { () =>
             <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
                 <div class="panel px-4 py-3">
-                    <dt class="text-[12px] text-muted">Balance</dt>
+                    <dt class="text-[12px] text-muted">{ locale.t('address.balance') }</dt>
                     <dd class="data mt-0.5 text-[16px] font-bold">{ formatValue(account.data()!.balance, symbol, decimals) }</dd>
                 </div>
                 {/* The two numbers the page is FOR, in the two colours that mean them. */}
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
-                        <Icon name="inflow" size={ 12 } class="text-inflow" /> Received
+                        <Icon name="inflow" size={ 12 } class="text-inflow" /> { locale.t('address.received') }
                     </dt>
                     <dd class="data mt-0.5 text-[16px] font-bold text-inflow">{ formatAmount(account.data()!.flow.in, decimals) }</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
-                        <Icon name="outflow" size={ 12 } class="text-outflow" /> Sent
+                        <Icon name="outflow" size={ 12 } class="text-outflow" /> { locale.t('address.sent') }
                     </dt>
                     <dd class="data mt-0.5 text-[16px] font-bold text-outflow">{ formatAmount(account.data()!.flow.out, decimals) }</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
-                        <Icon name="gas" size={ 12 } /> Fees paid
+                        <Icon name="gas" size={ 12 } /> { locale.t('address.fees') }
                     </dt>
                     <dd class="data mt-0.5 text-[16px] font-bold">{ formatAmount(account.data()!.flow.fees, decimals) }</dd>
                 </div>
@@ -108,7 +110,7 @@ export default component AddressPage()
         }
         </Show>
 
-        <div class="flex items-center gap-2" role="tablist" aria-label="Activity">
+        <div class="flex items-center gap-2" role="tablist" aria-label={ locale.t('address.activity') }>
             <button
                 class={ tab === 'flow'
                     ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
@@ -118,9 +120,9 @@ export default component AddressPage()
                 aria-selected={ tab === 'flow' }
                 onClick={ () => pick('flow') }
             >
-                Transactions
+                { locale.t('address.tab.transactions') }
                 <Show when={ account.data() !== undefined }>
-                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ formatCount(account.data()!.txCount) }</span> }
+                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ locale.n(account.data()!.txCount) }</span> }
                 </Show>
             </button>
             <button
@@ -132,9 +134,9 @@ export default component AddressPage()
                 aria-selected={ tab === 'transfers' }
                 onClick={ () => pick('transfers') }
             >
-                Token transfers
+                { locale.t('address.tab.transfers') }
                 <Show when={ account.data() !== undefined }>
-                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ formatCount(account.data()!.transferCount) }</span> }
+                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
                 </Show>
             </button>
         </div>
@@ -163,7 +165,8 @@ export default component AddressPage()
         <Show when={ tab === 'transfers' }>
             <section class="panel overflow-hidden">
                 <ul class="divide-y divide-line">
-                    <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
+                    <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` }>
+                    { (row) =>
                         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                             <span class={ row.to === address
                                 ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-inflow'
@@ -173,12 +176,12 @@ export default component AddressPage()
                             </span>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[13px] font-semibold">
-                                    { row.tokenSymbol === '' ? 'Token' : row.tokenSymbol }
+                                    { row.tokenSymbol === '' ? locale.t('address.transfers.token') : row.tokenSymbol }
                                     <Show when={ row.tokenId !== null }>
                                         <span class="data ms-1.5 text-[12px] text-muted">#{ row.tokenId }</span>
                                     </Show>
                                 </p>
-                                <Tooltip label={ formatDateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(row.at) }</p></Tooltip>
+                                <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                             </div>
                             <div class="text-end">
                                 <p class={ row.to === address
@@ -190,10 +193,11 @@ export default component AddressPage()
                                 <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 8 } tail={ 4 } />
                             </div>
                         </li>
+                    }
                     </For>
                 </ul>
                 <Show when={ transfers.data()?.rows.length === 0 }>
-                    <EmptyState icon="token" title="No token transfers" hint="ERC-20, 721 and 1155 movements for this address appear here." />
+                    <EmptyState icon="token" title={ locale.t('address.transfers.empty.title') } hint={ locale.t('address.transfers.empty.hint') } />
                 </Show>
                 <Show when={ transfers.data() !== undefined }>
                 { () => <Pagination page={ transfers.data()!.page } pages={ transfers.data()!.pages } onChange={ (next) => page = next } /> }

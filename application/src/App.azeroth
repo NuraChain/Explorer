@@ -4,9 +4,11 @@ import type { LoaderHandoff } from 'azerothjs';
 import Icon from './icons/icon.component.azeroth';
 
 import { routes } from './routes.ts';
+import { useLocale } from './stores/locale.store.ts';
 import SearchBar from './components/layout/search-bar.component.azeroth';
 import NavDrawer from './components/layout/nav-drawer.component.azeroth';
 import ThemeSwitch from './components/layout/theme-switch.component.azeroth';
+import LanguageSwitch from './components/layout/language-switch.component.azeroth';
 import ErrorPage from './pages/error.page.azeroth';
 import NotFoundPage from './pages/not-found.page.azeroth';
 
@@ -21,6 +23,8 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
         initialLoaderData: props.handoff
     });
 
+    const locale = useLocale();
+
     <RouterProvider router={ router }>
         <div class="flex min-h-dvh flex-col bg-void">
             <header class="sticky top-0 z-20 border-b border-line bg-void/90 backdrop-blur">
@@ -29,20 +33,20 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                         <span class="flex h-7 w-7 items-center justify-center rounded-md bg-nur text-void">
                             <Icon name="layers" size={ 16 } />
                         </span>
-                        <span class="text-[15px] font-bold tracking-tight text-text">Nura<span class="text-nur">Explorer</span></span>
+                        <span class="text-[15px] font-bold tracking-tight text-text">Nura <span class="text-nur">Explorer</span></span>
                     </Link>
 
-                    <nav class="hidden items-center gap-4 text-[13px] sm:flex" aria-label="Sections">
+                    <nav class="hidden items-center gap-4 text-[13px] sm:flex" aria-label={ locale.t('nav.sections') }>
                         <Link
                             to="/blocks"
                             class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
                             activeClass="active"
-                        >Blocks</Link>
+                        >{ locale.t('nav.blocks') }</Link>
                         <Link
                             to="/txs"
                             class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
                             activeClass="active"
-                        >Transactions</Link>
+                        >{ locale.t('nav.transactions') }</Link>
                     </nav>
 
                     {/* Search lives in the chrome, on every page. It is the one place it appears,
@@ -51,6 +55,7 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                         <SearchBar size="compact" />
                     </div>
 
+                    <span class="hidden sm:block"><LanguageSwitch /></span>
                     <span class="hidden sm:block"><ThemeSwitch /></span>
                     <span class="ms-auto sm:hidden"><NavDrawer /></span>
                 </div>

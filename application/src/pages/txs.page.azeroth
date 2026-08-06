@@ -1,6 +1,7 @@
 import { client } from '../api.ts';
-import { formatCount, formatDateTime, formatValue, shortHash, timeAgo } from '../lib/format.ts';
+import { formatValue, shortHash } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
 
 import Badge from '../components/ui/badge.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
@@ -11,6 +12,8 @@ import Skeleton from '../components/ui/skeleton.component.azeroth';
 
 export default component TransactionsPage()
 {
+    const locale = useLocale();
+
     state page = 1;
 
     resource stats = () => client.stats.summary();
@@ -20,10 +23,10 @@ export default component TransactionsPage()
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
 
-    useTitle(() => 'Transactions');
+    useTitle(() => locale.t('txs.title'));
 
     <div class="flex flex-col gap-4">
-        <h1 class="text-[22px] font-bold tracking-tight">Transactions</h1>
+        <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('txs.title') }</h1>
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
@@ -33,17 +36,17 @@ export default component TransactionsPage()
                             tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
                             icon={ row.status === 'reverted' ? 'alert' : 'success' }
                         >
-                            { row.status }
+                            { locale.t(`chain.status.${ row.status }`) }
                         </Badge>
                         <div class="min-w-0 flex-1">
                             <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
                             <p class="text-[11px] text-muted">
-                                { shortHash(row.from, 8, 6) } &rarr; { row.to === null ? 'contract creation' : shortHash(row.to, 8, 6) }
+                                { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
                             </p>
                         </div>
                         <div class="text-end">
                             <p class="data text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
-                            <Tooltip label={ formatDateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(row.at) }</p></Tooltip>
+                            <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                         </div>
                     </li>
                 </For>
@@ -52,7 +55,7 @@ export default component TransactionsPage()
                 <div class="flex flex-col gap-2 px-4 py-4"><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /></div>
             </Show>
             <Show when={ txs.data()?.rows.length === 0 }>
-                <EmptyState icon="activity" title="No transactions indexed yet" hint="Every transaction the chain mines lands here." />
+                <EmptyState icon="activity" title={ locale.t('txs.empty.title') } hint={ locale.t('txs.empty.hint') } />
             </Show>
             <Show when={ txs.data() !== undefined }>
             { () => <Pagination page={ txs.data()!.page } pages={ txs.data()!.pages } onChange={ (next) => page = next } /> }
@@ -60,7 +63,7 @@ export default component TransactionsPage()
         </section>
 
         <Show when={ txs.data() !== undefined }>
-        { () => <p class="text-[12px] text-muted">{ formatCount(txs.data()!.total) } transactions indexed.</p> }
+        { () => <p class="text-[12px] text-muted">{ locale.t('txs.total', { count: locale.n(txs.data()!.total) }) }</p> }
         </Show>
     </div>
 }

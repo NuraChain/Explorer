@@ -1,6 +1,6 @@
 <div align="center">
 
-# NuraExplorer
+# Nura Explorer
 
 **An open source block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved.**
 
@@ -8,7 +8,7 @@
 [![Built with AzerothJS](https://img.shields.io/badge/built%20with-AzerothJS-5fb3e8)](https://github.com/AzerothJS/AzerothJS)
 [![Node >= 24](https://img.shields.io/badge/node-%3E%3D24-brightgreen)](https://nodejs.org)
 
-<img src="docs/screenshots/home-desktop-dark.png" alt="NuraExplorer overview" width="840" />
+<img src="docs/screenshots/home-desktop-dark.png" alt="Nura Explorer overview" width="840" />
 
 </div>
 
@@ -64,29 +64,20 @@ cp server/.env.example server/.env    # then set RPC_URL and CHAIN_ID
 npm run dev
 ```
 
-Open **http://localhost:5173**. The API runs on **:3000**, with `/api` proxied to it.
+Open **http://localhost:3001**. The API runs on **:3000**, with `/api` proxied to it.
 
 The indexer starts with the server, catches up from `START_BLOCK` to the head, then follows new
 blocks every `POLL_MS`. The first sync of a long chain takes a while; the UI works while it runs
 and fills in as blocks land.
-
-### Against a local chain
-
-```sh
-npx hardhat node     # a chain on :8545
-npm run seed         # deploy an ERC-20, send transfers, revert one tx
-npm run dev
-```
-
-The defaults in `.env.example` already point at `http://127.0.0.1:8545`.
 
 ### Against NuraChain
 
 ```ini
 RPC_URL=https://rpc.nurachain.net
 CHAIN_ID=1010
-CHAIN_NAME=NuraChain
+CHAIN_NAME=Nura Chain
 CURRENCY_SYMBOL=NURA
+CHAIN_SITE_URL=https://nurachain.net
 START_BLOCK=0
 ```
 
@@ -123,6 +114,8 @@ the two files in step: a key added there belongs in `.env` too.
 | `CHAIN_NAME` | `Local EVM` | Shown in the header and footer |
 | `CURRENCY_SYMBOL` | `ETH` | Suffixes every amount |
 | `CURRENCY_DECIMALS` | `18` | Native token decimals |
+| `CHAIN_SITE_URL` | *(unset)* | The chain's website, linked from its name in the footer |
+| `EXPLORER_URL` | *(unset)* | This explorer's public URL, given to wallets as the block explorer |
 | `START_BLOCK` | `0` | Height to index from |
 | `POLL_MS` | `2000` | How often to check for a new head |
 | `BATCH_SIZE` | `25` | Blocks per catch-up batch |
@@ -149,11 +142,25 @@ docker run -p 3000:3000 --env-file server/.env nura-explorer
 
 `/api/healthz` answers orchestrator probes.
 
+### As a systemd service
+
+On a bare host, from a fresh clone - the unit runs the server directly from source, with the
+client built ahead of it:
+
+```sh
+npm ci
+cp server/.env.example server/.env    # then set RPC_URL and CHAIN_ID
+npm run build
+sudo npm run service:install
+sudo npm run service:start
+```
+
+`sudo npm run service:deploy` rebuilds and restarts after a `git pull`.
+
 What to know before running it for real:
 
 - **The index is a file.** Back up `DB_PATH`, or accept a replay on loss. Deleting it is safe.
-- **Reorgs are handled.** On a parent-hash mismatch the indexer walks back and rolls the orphaned
-  blocks out, rather than serving transactions that were un-mined.
+- **Reorgs are handled.** On a parent-hash mismatch the indexer walks back and rolls the orphaned blocks out, rather than serving transactions that were un-mined.
 - **`eth_getBlockReceipts` is probed once** and falls back to per-transaction receipts on nodes
   that lack it - slower, still correct.
 - **Rate limiting is on.** A burst of requests answers `429`.
@@ -169,7 +176,11 @@ What to know before running it for real:
 | `npm start` | Run the built app (set `NODE_ENV=production`) |
 | `npm run check` | Typecheck and lint every workspace |
 | `npm test` | Server and unit suites |
-| `npm run seed` | Populate a local chain with real activity |
+| `npm run service:deploy` | Rebuild and restart (root) |
+| `npm run service:install` | Write and load the systemd unit (root) |
+| `npm run service:uninstall` | Stop, disable and remove the unit (root) |
+| `npm run service:start` / `:stop` / `:restart` | Control the service (root) |
+| `npm run service:status` | What systemd thinks of it |
 
 ---
 
