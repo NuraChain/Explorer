@@ -14,8 +14,7 @@ export default component LanguageSwitch(props: { labelled?: boolean })
         role="group"
         aria-label={ locale.t('language.label') }
     >
-        <For each={ LOCALES } key={ (name) => name }>
-        { (name) =>
+        <For each={ LOCALES } key={ (name) => name } let={ name }>
             <button
                 class={ [
                     'flex cursor-pointer items-center justify-center rounded-md px-2 transition-colors duration-150',
@@ -31,7 +30,6 @@ export default component LanguageSwitch(props: { labelled?: boolean })
             >
                 { LOCALE_LABEL[name] }
             </button>
-        }
         </For>
     </div>
 }

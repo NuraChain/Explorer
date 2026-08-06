@@ -62,59 +62,59 @@ export default component NavDrawer()
             {/* Portaled: the header carries a backdrop-filter, which makes it a containing block
                 for fixed positioning - rendered in place the sheet is trapped inside the header. */}
             <Portal>
-            <div class="fixed inset-0 z-40 sm:hidden">
-                {/* The scrim is the dismiss target: tapping beside a sheet closes it everywhere
-                    else on a phone, so it must here. */}
-                <button
-                    class="absolute inset-0 h-full w-full cursor-default border-0 bg-void/70 p-0 backdrop-blur-sm motion-safe:animate-fade"
-                    type="button"
-                    aria-label={ locale.t('nav.close') }
-                    onClick={ close }
-                ></button>
+                <div class="fixed inset-0 z-40 sm:hidden">
+                    {/* The scrim is the dismiss target: tapping beside a sheet closes it everywhere
+                        else on a phone, so it must here. */}
+                    <button
+                        class="absolute inset-0 h-full w-full cursor-default border-0 bg-void/70 p-0 backdrop-blur-sm motion-safe:animate-fade"
+                        type="button"
+                        aria-label={ locale.t('nav.close') }
+                        onClick={ close }
+                    ></button>
 
-                <nav
-                    class="absolute inset-y-0 end-0 flex w-72 max-w-[85vw] flex-col gap-1 border-s border-line bg-void px-4 py-4 shadow-2xl motion-safe:animate-slide-in"
-                    aria-label={ locale.t('nav.sections') }
-                >
-                    <div class="mb-2 flex items-center justify-between">
-                        <span class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('nav.menu') }</span>
-                        <button
-                            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:text-text"
-                            type="button"
-                            aria-label={ locale.t('nav.close') }
+                    <nav
+                        class="absolute inset-y-0 end-0 flex w-72 max-w-[85vw] flex-col gap-1 border-s border-line bg-void px-4 py-4 shadow-2xl motion-safe:animate-slide-in"
+                        aria-label={ locale.t('nav.sections') }
+                    >
+                        <div class="mb-2 flex items-center justify-between">
+                            <span class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('nav.menu') }</span>
+                            <button
+                                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:text-text"
+                                type="button"
+                                aria-label={ locale.t('nav.close') }
+                                onClick={ close }
+                            >
+                                <Icon name="x" size={ 18 } />
+                            </button>
+                        </div>
+
+                        <Link
+                            to="/"
+                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            activeClass="active"
                             onClick={ close }
-                        >
-                            <Icon name="x" size={ 18 } />
-                        </button>
-                    </div>
+                        >{ locale.t('nav.home') }</Link>
+                        <Link
+                            to="/blocks"
+                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            activeClass="active"
+                            onClick={ close }
+                        >{ locale.t('nav.blocks') }</Link>
+                        <Link
+                            to="/txs"
+                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            activeClass="active"
+                            onClick={ close }
+                        >{ locale.t('nav.transactions') }</Link>
 
-                    <Link
-                        to="/"
-                        class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
-                        activeClass="active"
-                        onClick={ close }
-                    >{ locale.t('nav.home') }</Link>
-                    <Link
-                        to="/blocks"
-                        class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
-                        activeClass="active"
-                        onClick={ close }
-                    >{ locale.t('nav.blocks') }</Link>
-                    <Link
-                        to="/txs"
-                        class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
-                        activeClass="active"
-                        onClick={ close }
-                    >{ locale.t('nav.transactions') }</Link>
-
-                    <div class="mt-auto border-t border-line pt-4">
-                        <h2 class="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('language.label') }</h2>
-                        <LanguageSwitch labelled />
-                        <h2 class="mt-4 mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('theme.label') }</h2>
-                        <ThemeSwitch labelled />
-                    </div>
-                </nav>
-            </div>
+                        <div class="mt-auto border-t border-line pt-4">
+                            <h2 class="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('language.label') }</h2>
+                            <LanguageSwitch labelled />
+                            <h2 class="mt-4 mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('theme.label') }</h2>
+                            <ThemeSwitch labelled />
+                        </div>
+                    </nav>
+                </div>
             </Portal>
         </Show>
     </div>

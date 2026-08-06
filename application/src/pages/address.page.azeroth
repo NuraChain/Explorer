@@ -70,8 +70,8 @@ export default component AddressPage()
                 </span>
                 <div class="min-w-0 flex-1">
                     <p class="text-[12px] uppercase tracking-[0.14em] text-muted">
-                        <Show when={ account.data()?.token } fallback={ <span>{ account.data()?.isContract === true ? locale.t('address.kind.contract') : locale.t('address.kind.address') }</span> }>
-                        { (token) => <span>{ locale.t('address.kind.token') } &middot; { token().name } ({ token().symbol })</span> }
+                        <Show when={ account.data()?.token } fallback={ <span>{ account.data()?.isContract === true ? locale.t('address.kind.contract') : locale.t('address.kind.address') }</span> } let={ token }>
+                            <span>{ locale.t('address.kind.token') } &middot; { token.name } ({ token.symbol })</span>
                         </Show>
                     </p>
                     <p class="hash mt-0.5 text-[14px] font-semibold sm:text-[15px]">{ address }</p>
@@ -165,8 +165,7 @@ export default component AddressPage()
         <Show when={ tab === 'transfers' }>
             <section class="panel overflow-hidden">
                 <ul class="divide-y divide-line">
-                    <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` }>
-                    { (row) =>
+                    <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
                         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                             <span class={ row.to === address
                                 ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-inflow'
@@ -193,7 +192,6 @@ export default component AddressPage()
                                 <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 8 } tail={ 4 } />
                             </div>
                         </li>
-                    }
                     </For>
                 </ul>
                 <Show when={ transfers.data()?.rows.length === 0 }>

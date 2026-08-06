@@ -66,27 +66,27 @@ export default component Pagination(props: {
                 <Icon name="chevron-left" size={ 15 } class="icon-flip" />
             </button>
 
-            <For each={ window } key={ (item) => String(item.position) }>
-            { (item) =>
-                <Show
-                    when={ item.value === 'gap' }
-                    fallback={
-                        <button
-                            class={ item.value === props.page
-                                ? 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[13px] font-semibold text-nur'
-                                : 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[13px] text-muted transition-colors duration-150 hover:border-line hover:text-text' }
-                            type="button"
-                            aria-label={ locale.t('pagination.page', { number: locale.n(item.value as number) }) }
-                            aria-current={ item.value === props.page ? 'page' : undefined }
-                            onClick={ () => props.onChange(item.value as number) }
-                        >
-                            { locale.n(item.value as number) }
-                        </button>
-                    }
-                >
-                    <span class="flex h-9 w-5 shrink-0 items-center justify-center text-[13px] text-faint" aria-hidden="true">...</span>
-                </Show>
-            }
+            <For each={ window } key={ (item) => String(item.position) } let={ item }>
+                <div class="contents">
+                    <Show
+                        when={ item.value === 'gap' }
+                        fallback={
+                            <button
+                                class={ item.value === props.page
+                                    ? 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[13px] font-semibold text-nur'
+                                    : 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[13px] text-muted transition-colors duration-150 hover:border-line hover:text-text' }
+                                type="button"
+                                aria-label={ locale.t('pagination.page', { number: locale.n(item.value as number) }) }
+                                aria-current={ item.value === props.page ? 'page' : undefined }
+                                onClick={ () => props.onChange(item.value as number) }
+                            >
+                                { locale.n(item.value as number) }
+                            </button>
+                        }
+                    >
+                        <span class="flex h-9 w-5 shrink-0 items-center justify-center text-[13px] text-faint" aria-hidden="true">...</span>
+                    </Show>
+                </div>
             </For>
 
             <button
