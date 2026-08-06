@@ -1,6 +1,7 @@
 import type { ChainInfo } from '../../api.ts';
 
 import { useToasts } from '../../stores/toasts.store.ts';
+import { useLocale } from '../../stores/locale.store.ts';
 
 import Button from '../ui/button.component.azeroth';
 
@@ -28,6 +29,7 @@ function codeOf(error: unknown): number | null
 export default component AddChainButton(props: { chain: ChainInfo })
 {
     const toasts = useToasts();
+    const locale = useLocale();
 
     state busy = false;
 
@@ -36,7 +38,7 @@ export default component AddChainButton(props: { chain: ChainInfo })
         const provider = (globalThis as { ethereum?: InjectedProvider }).ethereum;
         if (provider === undefined)
         {
-            toasts.push('info', 'No wallet found - install MetaMask, then try again', 'wallet');
+            toasts.push('info', locale.t('wallet.missing'), 'wallet');
             return;
         }
 
@@ -60,16 +62,16 @@ export default component AddChainButton(props: { chain: ChainInfo })
                     blockExplorerUrls: [globalThis.location.origin]
                 }]
             });
-            toasts.push('success', `${ props.chain.name } added to your wallet`, 'check');
+            toasts.push('success', locale.t('wallet.added', { chain: props.chain.name }), 'check');
         }
         catch (error)
         {
             if (codeOf(error) === 4001)
             {
-                toasts.push('info', 'Request dismissed', 'x');
+                toasts.push('info', locale.t('wallet.dismissed'), 'x');
                 return;
             }
-            toasts.push('error', 'Your wallet refused to add the network', 'alert');
+            toasts.push('error', locale.t('wallet.refused'), 'alert');
         }
         finally
         {
@@ -78,6 +80,6 @@ export default component AddChainButton(props: { chain: ChainInfo })
     };
 
     <Button variant="outline" size="md" icon="wallet" busy={ busy } onClick={ () => void add() }>
-        Add { props.chain.name }
+        { locale.t('wallet.add', { chain: props.chain.name }) }
     </Button>
 }

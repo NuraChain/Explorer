@@ -1,5 +1,7 @@
 import { createStore, createSignal, type Getter } from 'azerothjs';
 
+import type { MessageKey } from '../locales/en.ts';
+
 // Dark and light. Dark is the field the explorer was designed in and the one a first visit gets.
 
 export type Theme = 'dark' | 'light';
@@ -7,9 +9,10 @@ export const THEMES: Theme[] = ['dark', 'light'];
 
 const STORAGE_KEY = 'nura.theme';
 
-export const THEME_LABEL: Record<Theme, string> = {
-    dark: 'Dark',
-    light: 'Light'
+/** Message KEYS, not words: the control that renders these translates them. */
+export const THEME_LABEL: Record<Theme, MessageKey> = {
+    dark: 'theme.dark',
+    light: 'theme.light'
 };
 
 function isTheme(value: string | null): value is Theme

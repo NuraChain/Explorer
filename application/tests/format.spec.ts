@@ -5,7 +5,7 @@
 // misreports a balance has failed at its only job, so the arithmetic is pinned here.
 import { describe, it, expect } from 'vitest';
 
-import { formatAmount, formatBytes, formatCount, formatGwei, formatValue, gasShare, shortHash, timeAgo } from '../src/lib/format.ts';
+import { elapsed, formatAmount, formatCount, formatDateTime, formatGwei, formatValue, gasShare, scaleBytes, shortHash } from '../src/lib/format.ts';
 
 describe('formatAmount - wei to a readable decimal', () =>
 {
@@ -94,35 +94,58 @@ describe('shortHash', () =>
     });
 });
 
-describe('timeAgo', () =>
+describe('elapsed', () =>
 {
     const now = Date.parse('2026-08-03T12:00:00.000Z');
-    const ago = (seconds: number): string => timeAgo(new Date(now - seconds * 1000).toISOString(), now);
+    const ago = (seconds: number): { unit: string; count: number } =>
+        elapsed(new Date(now - seconds * 1000).toISOString(), now);
 
-    it('names the unit and pluralises it', () =>
+    it('picks the unit and the count the wording is built from', () =>
     {
-        expect(ago(1)).toBe('just now');
-        expect(ago(30)).toBe('30 seconds ago');
-        expect(ago(60)).toBe('1 minute ago');
-        expect(ago(120)).toBe('2 minutes ago');
-        expect(ago(3600)).toBe('1 hour ago');
-        expect(ago(86_400)).toBe('1 day ago');
+        expect(ago(1)).toEqual({ unit: 'justNow', count: 0 });
+        expect(ago(30)).toEqual({ unit: 'second', count: 30 });
+        expect(ago(60)).toEqual({ unit: 'minute', count: 1 });
+        expect(ago(120)).toEqual({ unit: 'minute', count: 2 });
+        expect(ago(3600)).toEqual({ unit: 'hour', count: 1 });
+        expect(ago(86_400)).toEqual({ unit: 'day', count: 1 });
+    });
+
+    it('rolls anything past a month up into days', () =>
+    {
+        expect(ago(90 * 86_400)).toEqual({ unit: 'day', count: 90 });
     });
 
     it('never reports the future as elapsed', () =>
     {
-        // A block timestamp a second ahead of the reader's clock is routine; "-1 seconds ago"
+        // A block timestamp a second ahead of the reader's clock is routine; a negative count
         // is not something an explorer should ever print.
-        expect(timeAgo(new Date(now + 5000).toISOString(), now)).toBe('just now');
+        expect(elapsed(new Date(now + 5000).toISOString(), now)).toEqual({ unit: 'justNow', count: 0 });
     });
 });
 
-describe('formatCount / formatBytes', () =>
+describe('scaleBytes', () =>
 {
-    it('separates thousands and scales bytes', () =>
+    it('stays in bytes below a kilobyte and scales above it', () =>
+    {
+        expect(scaleBytes(512)).toEqual({ unit: 'bytes', count: 512 });
+        expect(scaleBytes(2048)).toEqual({ unit: 'kilobytes', count: 2 });
+    });
+});
+
+describe('locale-aware prose numbers and dates', () =>
+{
+    it('separates thousands in the reader\'s digits', () =>
     {
         expect(formatCount(1234567)).toBe('1,234,567');
-        expect(formatBytes(512)).toBe('512 B');
-        expect(formatBytes(2048)).toBe('2.0 KB');
+        expect(formatCount(1234567, 'fa-IR')).toBe('۱٬۲۳۴٬۵۶۷');
+    });
+
+    it('gives Persian the Jalali calendar, not a transliterated Gregorian one', () =>
+    {
+        // 2026-08-03 Gregorian is 1405-05-12 Jalali. The year is the assertion that matters:
+        // printing 2026 in Persian digits would be a localisation that lies about the date.
+        const stamp = formatDateTime('2026-08-03T12:00:00.000Z', 'fa-IR');
+        expect(stamp).toContain('۱۴۰۵');
+        expect(stamp).not.toContain('۲۰۲۶');
     });
 });

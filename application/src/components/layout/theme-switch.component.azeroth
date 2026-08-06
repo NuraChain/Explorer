@@ -1,4 +1,5 @@
 import { useTheme, THEMES, THEME_LABEL, type Theme } from '../../stores/theme.store.ts';
+import { useLocale } from '../../stores/locale.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
 import type { IconName } from '../../icons/registry.ts';
@@ -8,10 +9,11 @@ import type { IconName } from '../../icons/registry.ts';
 export default component ThemeSwitch(props: { labelled?: boolean })
 {
     const theme = useTheme();
+    const locale = useLocale();
 
     const iconFor = (name: Theme): IconName => `theme-${ name }` as IconName;
 
-    <div class={ `flex items-center gap-0.5 rounded-lg border border-line bg-field p-0.5 ${ props.labelled === true ? 'w-full' : '' }` } role="group" aria-label="Theme">
+    <div class={ `flex items-center gap-0.5 rounded-lg border border-line bg-field p-0.5 ${ props.labelled === true ? 'w-full' : '' }` } role="group" aria-label={ locale.t('theme.label') }>
         <For each={ THEMES } key={ (name) => name }>
         { (name) =>
             <button
@@ -21,14 +23,14 @@ export default component ThemeSwitch(props: { labelled?: boolean })
                     theme.theme() === name ? 'bg-raised text-nur' : 'text-muted hover:text-text'
                 ].join(' ') }
                 type="button"
-                title={ THEME_LABEL[name] }
-                aria-label={ THEME_LABEL[name] }
+                title={ locale.t(THEME_LABEL[name]) }
+                aria-label={ locale.t(THEME_LABEL[name]) }
                 aria-pressed={ theme.theme() === name }
                 onClick={ () => theme.setTheme(name) }
             >
                 <Icon name={ iconFor(name) } size={ 15 } />
                 <Show when={ props.labelled === true }>
-                    <span>{ THEME_LABEL[name] }</span>
+                    <span>{ locale.t(THEME_LABEL[name]) }</span>
                 </Show>
             </button>
         }

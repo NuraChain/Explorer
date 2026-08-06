@@ -1,8 +1,9 @@
 import { Link, useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
-import { formatAmount, formatBytes, formatCount, formatDateTime, formatGwei, formatValue, timeAgo } from '../lib/format.ts';
+import { formatAmount, formatGwei, formatValue } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
 
@@ -12,6 +13,7 @@ import Badge from '../components/ui/badge.component.azeroth';
 export default component TransactionPage()
 {
     const params = useParams();
+    const locale = useLocale();
 
     resource stats = () => client.stats.summary();
     resource detail = (hash: string) => client.txs.one({ params: { hash } })
@@ -20,13 +22,13 @@ export default component TransactionPage()
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
 
-    useTitle(() => 'Transaction');
+    useTitle(() => locale.t('tx.title'));
 
     <div class="flex flex-col gap-5">
         <Show when={ detail.error() }>
             <div class="panel px-6 py-12 text-center">
-                <h1 class="text-[18px] font-bold">Transaction not in the index</h1>
-                <p class="mt-2 text-[14px] text-muted">It may still be pending, or newer than the indexer has reached.</p>
+                <h1 class="text-[18px] font-bold">{ locale.t('tx.missing.title') }</h1>
+                <p class="mt-2 text-[14px] text-muted">{ locale.t('tx.missing.hint') }</p>
             </div>
         </Show>
 
@@ -41,16 +43,16 @@ export default component TransactionPage()
                         <Icon name={ detail.data()!.transaction.status === 'reverted' ? 'alert' : 'success' } size={ 19 } />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <h1 class="text-[20px] font-bold tracking-tight">Transaction</h1>
+                        <h1 class="text-[20px] font-bold tracking-tight">{ locale.t('tx.title') }</h1>
                         <p class="text-[12px] text-muted">
-                            { formatDateTime(detail.data()!.transaction.at) } &middot; { timeAgo(detail.data()!.transaction.at) }
+                            { locale.dateTime(detail.data()!.transaction.at) } &middot; { locale.ago(detail.data()!.transaction.at) }
                         </p>
                     </div>
                     <Badge
                         tone={ detail.data()!.transaction.status === 'reverted' ? 'danger' : detail.data()!.transaction.status === 'unknown' ? 'neutral' : 'success' }
                         icon={ detail.data()!.transaction.status === 'reverted' ? 'alert' : 'success' }
                     >
-                        { detail.data()!.transaction.status }
+                        { locale.t(`chain.status.${ detail.data()!.transaction.status }`) }
                     </Badge>
                 </header>
 
@@ -59,38 +61,38 @@ export default component TransactionPage()
                 <Show when={ detail.data()!.transaction.status === 'reverted' }>
                     <p class="flex items-start gap-2 rounded-lg border border-outflow bg-raised px-4 py-3 text-[13px] text-outflow">
                         <Icon name="alert" size={ 15 } class="mt-0.5 shrink-0" />
-                        This transaction reverted. No value moved, but the sender still paid the gas below.
+                        { locale.t('tx.reverted.notice') }
                     </p>
                 </Show>
 
                 <dl class="panel divide-y divide-line">
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">Hash</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.hash') }</dt>
                         <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">Block</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.block') }</dt>
                         <dd class="flex-1">
                             <Link to={ `/block/${ detail.data()!.transaction.blockNumber }` } class="data text-[13px] text-beam no-underline hover:underline">
                                 #{ detail.data()!.transaction.blockNumber }
                             </Link>
-                            <span class="ms-2 text-[12px] text-muted">position { detail.data()!.transaction.index }</span>
+                            <span class="ms-2 text-[12px] text-muted">{ locale.t('tx.position', { index: locale.n(detail.data()!.transaction.index) }) }</span>
                         </dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">From</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.from') }</dt>
                         <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">To</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.to') }</dt>
                         <dd class="min-w-0 flex-1">
                             <Show
                                 when={ detail.data()!.transaction.to }
                                 fallback={
-                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[13px] text-muted">contract creation</span> }>
+                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[13px] text-muted">{ locale.t('chain.contractCreation') }</span> }>
                                     { (created) =>
                                         <span class="flex flex-wrap items-center gap-2">
-                                            <span class="text-[12px] text-muted">created</span>
+                                            <span class="text-[12px] text-muted">{ locale.t('tx.created') }</span>
                                             <HashLink value={ created() } to={ `/address/${ created() }` } lead={ 16 } tail={ 10 } copy />
                                         </span>
                                     }
@@ -102,24 +104,24 @@ export default component TransactionPage()
                         </dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">Value</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.value') }</dt>
                         <dd class="data flex-1 text-[15px] font-bold">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">Fee</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.fee') }</dt>
                         <dd class="flex-1">
                             <span class="data text-[13px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
                             <span class="ms-2 text-[12px] text-muted">
-                                { formatCount(Number(detail.data()!.transaction.gasUsed)) } gas at { formatGwei(detail.data()!.transaction.gasPrice) }
+                                { locale.t('tx.feeDetail', { gas: locale.n(Number(detail.data()!.transaction.gasUsed)), price: formatGwei(detail.data()!.transaction.gasPrice) }) }
                             </span>
                         </dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[12px] text-muted">Nonce</dt>
+                        <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.nonce') }</dt>
                         <dd class="data flex-1 text-[13px]">
                             { detail.data()!.transaction.nonce }
                             <Show when={ detail.data()!.transaction.inputSize > 0 }>
-                                <span class="ms-3 text-[12px] text-muted">calldata { formatBytes(detail.data()!.transaction.inputSize) }</span>
+                                <span class="ms-3 text-[12px] text-muted">{ locale.t('tx.calldata', { size: locale.bytes(detail.data()!.transaction.inputSize) }) }</span>
                             </Show>
                         </dd>
                     </div>
@@ -128,7 +130,7 @@ export default component TransactionPage()
                 <Show when={ detail.data()!.transfers.length > 0 }>
                     <section class="panel overflow-hidden">
                         <h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                            Token transfers
+                            { locale.t('tx.transfers') }
                         </h2>
                         <ul class="divide-y divide-line">
                             <For each={ detail.data()!.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` }>
@@ -137,12 +139,12 @@ export default component TransactionPage()
                                     <Icon name="token" size={ 15 } class="text-nur" />
                                     <div class="min-w-0 flex-1 text-[12px] text-muted">
                                         <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } />
-                                        <span class="mx-1.5">&rarr;</span>
+                                        <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
                                         <HashLink value={ row.to } to={ `/address/${ row.to }` } tone="muted" lead={ 8 } tail={ 6 } />
                                     </div>
                                     <p class="data text-[13px] font-semibold">
                                         { formatAmount(row.value, row.tokenDecimals) }
-                                        <span class="ms-1.5 text-muted">{ row.tokenSymbol === '' ? 'token' : row.tokenSymbol }</span>
+                                        <span class="ms-1.5 text-muted">{ row.tokenSymbol === '' ? locale.t('tx.token') : row.tokenSymbol }</span>
                                     </p>
                                 </li>
                             }

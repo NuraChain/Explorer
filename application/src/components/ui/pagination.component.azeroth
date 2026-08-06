@@ -1,5 +1,7 @@
 import Icon from '../../icons/icon.component.azeroth';
 
+import { useLocale } from '../../stores/locale.store.ts';
+
 // Paging for the long lists. Numbered rather than prev/next alone: on a chain the page number is
 // a position in history, and jumping to the far end - the genesis blocks, the oldest transfers -
 // is a normal thing to want. Prev/next only makes that a hundred clicks.
@@ -13,6 +15,8 @@ export default component Pagination(props: {
     onChange: (page: number) => void;
 })
 {
+    const locale = useLocale();
+
     derived window = ((): Array<{ position: number; value: number | 'gap' }> =>
     {
         let items: Array<number | 'gap'>;
@@ -42,24 +46,24 @@ export default component Pagination(props: {
     const stepClass = 'flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text disabled:pointer-events-none disabled:opacity-40';
 
     <Show when={ props.pages > 1 }>
-        <nav class="flex items-center justify-center gap-1.5 border-t border-line px-3 py-3 sm:gap-2 sm:px-4" aria-label="Pagination">
+        <nav class="flex items-center justify-center gap-1.5 border-t border-line px-3 py-3 sm:gap-2 sm:px-4" aria-label={ locale.t('pagination.label') }>
             <button
                 class={ stepClass }
                 type="button"
-                aria-label="First page"
+                aria-label={ locale.t('pagination.first') }
                 disabled={ props.page <= 1 }
                 onClick={ () => props.onChange(1) }
             >
-                <Icon name="chevrons-left" size={ 15 } />
+                <Icon name="chevrons-left" size={ 15 } class="icon-flip" />
             </button>
             <button
                 class={ stepClass }
                 type="button"
-                aria-label="Newer"
+                aria-label={ locale.t('pagination.newer') }
                 disabled={ props.page <= 1 }
                 onClick={ () => props.onChange(props.page - 1) }
             >
-                <Icon name="chevron-left" size={ 15 } />
+                <Icon name="chevron-left" size={ 15 } class="icon-flip" />
             </button>
 
             <For each={ window } key={ (item) => String(item.position) }>
@@ -72,11 +76,11 @@ export default component Pagination(props: {
                                 ? 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[13px] font-semibold text-nur'
                                 : 'data flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[13px] text-muted transition-colors duration-150 hover:border-line hover:text-text' }
                             type="button"
-                            aria-label={ `Page ${ item.value }` }
+                            aria-label={ locale.t('pagination.page', { number: locale.n(item.value as number) }) }
                             aria-current={ item.value === props.page ? 'page' : undefined }
                             onClick={ () => props.onChange(item.value as number) }
                         >
-                            { item.value }
+                            { locale.n(item.value as number) }
                         </button>
                     }
                 >
@@ -88,20 +92,20 @@ export default component Pagination(props: {
             <button
                 class={ stepClass }
                 type="button"
-                aria-label="Older"
+                aria-label={ locale.t('pagination.older') }
                 disabled={ props.page >= props.pages }
                 onClick={ () => props.onChange(props.page + 1) }
             >
-                <Icon name="chevron-right" size={ 15 } />
+                <Icon name="chevron-right" size={ 15 } class="icon-flip" />
             </button>
             <button
                 class={ stepClass }
                 type="button"
-                aria-label="Last page"
+                aria-label={ locale.t('pagination.last') }
                 disabled={ props.page >= props.pages }
                 onClick={ () => props.onChange(props.pages) }
             >
-                <Icon name="chevrons-right" size={ 15 } />
+                <Icon name="chevrons-right" size={ 15 } class="icon-flip" />
             </button>
         </nav>
     </Show>

@@ -18,6 +18,15 @@
         border-radius: 2px;
     }
 
+    /*
+     * Persian sits lower and taller than Latin at the same size - descenders carry dots, and the
+     * default 1.5 packs consecutive lines close enough that they collide. Scoped to the language
+     * rather than the direction, so it follows the text and not the layout.
+     */
+    html:lang(fa)
+    {
+        line-height: 1.85;
+    }
 }
 
 @utility panel
@@ -57,6 +66,14 @@
     to { transform: translateX(0); }
 }
 
+/* The same travel from the other side. `end-0` puts the sheet on the left in a mirrored layout,
+   so the ltr keyframe would fly it in from across the screen. */
+@keyframes az-slide-in-rtl
+{
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
 @keyframes az-fade
 {
     from { opacity: 0; }
@@ -71,4 +88,21 @@
 @utility animate-fade
 {
     animation: az-fade 140ms ease-out;
+}
+
+/*
+ * Direction-dependent rules. Unlayered on purpose: these have to beat the utilities layer, which
+ * is where @utility puts the class they are correcting.
+ */
+
+/* A glyph that means "back" or "forward" points the other way when the layout is mirrored. Opt-in
+ * per icon: chevrons and arrows earn it, a wallet or a magnifier mirrored is just broken. */
+[dir='rtl'] .icon-flip
+{
+    transform: scaleX(-1);
+}
+
+[dir='rtl'] .animate-slide-in
+{
+    animation-name: az-slide-in-rtl;
 }

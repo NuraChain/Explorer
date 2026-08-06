@@ -1,8 +1,9 @@
 import { Link, useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
-import { formatBytes, formatCount, formatDateTime, formatGwei, formatValue, gasShare, shortHash, timeAgo } from '../lib/format.ts';
+import { formatGwei, formatValue, gasShare, shortHash } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
 
@@ -10,11 +11,12 @@ import HashLink from '../components/chain/hash-link.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 
-const formatBaseFee = (value: string | null): string => (value === null ? 'n/a' : formatGwei(value));
-
 export default component BlockPage()
 {
     const params = useParams();
+    const locale = useLocale();
+
+    const formatBaseFee = (value: string | null): string => (value === null ? locale.t('chain.notAvailable') : formatGwei(value));
 
     state page = 1;
 
@@ -28,13 +30,13 @@ export default component BlockPage()
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
 
-    useTitle(() => `Block #${ params()['number'] ?? '' }`);
+    useTitle(() => locale.t('block.title', { number: params()['number'] ?? '' }));
 
     <div class="flex flex-col gap-5">
         <Show when={ detail.error() }>
             <div class="panel px-6 py-12 text-center">
-                <h1 class="text-[18px] font-bold">Block not in the index</h1>
-                <p class="mt-2 text-[14px] text-muted">It may be newer than the indexer has reached, or beyond the start block.</p>
+                <h1 class="text-[18px] font-bold">{ locale.t('block.missing.title') }</h1>
+                <p class="mt-2 text-[14px] text-muted">{ locale.t('block.missing.hint') }</p>
             </div>
         </Show>
 
@@ -46,57 +48,57 @@ export default component BlockPage()
                         <Icon name="block" size={ 19 } />
                     </span>
                     <div class="flex-1">
-                        <h1 class="data text-[22px] font-bold tracking-tight">Block #{ detail.data()!.block.number }</h1>
-                        <p class="text-[12px] text-muted">{ formatDateTime(detail.data()!.block.at) } &middot; { timeAgo(detail.data()!.block.at) }</p>
+                        <h1 class="data text-[22px] font-bold tracking-tight">{ locale.t('block.title', { number: detail.data()!.block.number }) }</h1>
+                        <p class="text-[12px] text-muted">{ locale.dateTime(detail.data()!.block.at) } &middot; { locale.ago(detail.data()!.block.at) }</p>
                     </div>
                     <nav class="flex items-center gap-1.5">
                         <Show when={ detail.data()!.block.number > 0 }>
-                            <Link to={ `/block/${ detail.data()!.block.number - 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label="Previous block">
-                                <Icon name="chevron-left" size={ 15 } />
+                            <Link to={ `/block/${ detail.data()!.block.number - 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label={ locale.t('block.previous') }>
+                                <Icon name="chevron-left" size={ 15 } class="icon-flip" />
                             </Link>
                         </Show>
-                        <Link to={ `/block/${ detail.data()!.block.number + 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label="Next block">
-                            <Icon name="chevron-right" size={ 15 } />
+                        <Link to={ `/block/${ detail.data()!.block.number + 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label={ locale.t('block.next') }>
+                            <Icon name="chevron-right" size={ 15 } class="icon-flip" />
                         </Link>
                     </nav>
                 </header>
 
                 <dl class="panel grid grid-cols-1 divide-y divide-line sm:grid-cols-2 sm:divide-y-0">
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-24 shrink-0 text-[12px] text-muted">Hash</dt>
+                        <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.hash') }</dt>
                         <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.block.hash } tone="text" lead={ 16 } tail={ 10 } copy /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-24 shrink-0 text-[12px] text-muted">Parent</dt>
+                        <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.parent') }</dt>
                         <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.block.parentHash } to={ `/block/${ detail.data()!.block.number - 1 }` } lead={ 16 } tail={ 10 } /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-24 shrink-0 text-[12px] text-muted">Validator</dt>
+                        <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.validator') }</dt>
                         <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.block.miner } to={ `/address/${ detail.data()!.block.miner }` } lead={ 12 } tail={ 8 } /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-24 shrink-0 text-[12px] text-muted">Size</dt>
-                        <dd class="data flex-1 text-[13px]">{ formatBytes(detail.data()!.block.size) }</dd>
+                        <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.size') }</dt>
+                        <dd class="flex-1 text-[13px]">{ locale.bytes(detail.data()!.block.size) }</dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-24 shrink-0 text-[12px] text-muted">Gas used</dt>
+                        <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.gasUsed') }</dt>
                         <dd class="flex-1">
-                            <span class="data text-[13px]">{ formatCount(Number(detail.data()!.block.gasUsed)) }</span>
-                            <span class="ms-2 text-[12px] text-muted">of { formatCount(Number(detail.data()!.block.gasLimit)) }</span>
+                            <span class="data text-[13px]">{ locale.n(Number(detail.data()!.block.gasUsed)) }</span>
+                            <span class="ms-2 text-[12px] text-muted">{ locale.t('block.gasOf', { limit: locale.n(Number(detail.data()!.block.gasLimit)) }) }</span>
                             <span class="mt-1.5 block h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-raised">
                                 <span class="block h-full rounded-full bg-nur" style={ `width: ${ (gasShare(detail.data()!.block.gasUsed, detail.data()!.block.gasLimit) * 100).toFixed(2) }%` }></span>
                             </span>
                         </dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-24 shrink-0 text-[12px] text-muted">Base fee</dt>
+                        <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.baseFee') }</dt>
                         <dd class="data flex-1 text-[13px]">{ formatBaseFee(detail.data()!.block.baseFee) }</dd>
                     </div>
                 </dl>
 
                 <section class="panel overflow-hidden">
                     <h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                        { formatCount(detail.data()!.total) } transactions
+                        { locale.t('block.transactions', { count: locale.n(detail.data()!.total) }) }
                     </h2>
                     <ul class="divide-y divide-line">
                         <For each={ detail.data()!.transactions } key={ (row) => row.hash }>
@@ -106,7 +108,7 @@ export default component BlockPage()
                                 <div class="min-w-0 flex-1">
                                     <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
                                     <p class="text-[11px] text-muted">
-                                        { shortHash(row.from, 8, 6) } &rarr; { row.to === null ? 'contract creation' : shortHash(row.to, 8, 6) }
+                                        { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
                                     </p>
                                 </div>
                                 <p class="data text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
@@ -115,7 +117,7 @@ export default component BlockPage()
                         </For>
                     </ul>
                     <Show when={ detail.data()!.total === 0 }>
-                        <EmptyState icon="block" title="This block is empty" hint="No transactions were included in it." />
+                        <EmptyState icon="block" title={ locale.t('block.empty.title') } hint={ locale.t('block.empty.hint') } />
                     </Show>
                     <Show when={ detail.data()!.pages > 1 }>
                         <div class="border-t border-line">
