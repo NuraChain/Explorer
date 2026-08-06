@@ -158,6 +158,7 @@ export const en = {
     'wallet.added': '{chain} added to your wallet',
     'wallet.dismissed': 'Request dismissed',
     'wallet.refused': 'Your wallet refused to add the network',
+    'wallet.mismatch': 'Your wallet already has this network saved under a different currency symbol. Remove it there, then try again.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Pagination',

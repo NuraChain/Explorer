@@ -59,7 +59,10 @@ export default component AddChainButton(props: { chain: ChainInfo })
                     rpcUrls: [props.chain.rpcUrl],
                     // This explorer, offered as the chain's explorer: a wallet that knows it can
                     // link straight from a transaction someone just signed to the page for it.
-                    blockExplorerUrls: [globalThis.location.origin]
+                    // The deployment's PUBLIC url wins over the current origin - the wallet stores
+                    // this permanently, and a localhost or preview host saved there is a dead link
+                    // the reader can never fix from inside the wallet.
+                    blockExplorerUrls: [props.chain.explorerUrl === '' ? globalThis.location.origin : props.chain.explorerUrl]
                 }]
             });
             toasts.push('success', locale.t('wallet.added', { chain: props.chain.name }), 'check');
@@ -69,6 +72,14 @@ export default component AddChainButton(props: { chain: ChainInfo })
             if (codeOf(error) === 4001)
             {
                 toasts.push('info', locale.t('wallet.dismissed'), 'x');
+                return;
+            }
+            // -32602 here is almost always one thing: the wallet already holds this chain id under
+            // a different ticker and refuses to re-add it. That is a fixable situation the reader
+            // can act on, so it must not read as the generic "your wallet said no".
+            if (codeOf(error) === -32602)
+            {
+                toasts.push('error', locale.t('wallet.mismatch'), 'alert');
                 return;
             }
             toasts.push('error', locale.t('wallet.refused'), 'alert');

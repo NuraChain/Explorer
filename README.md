@@ -115,6 +115,7 @@ the two files in step: a key added there belongs in `.env` too.
 | `CURRENCY_SYMBOL` | `ETH` | Suffixes every amount |
 | `CURRENCY_DECIMALS` | `18` | Native token decimals |
 | `CHAIN_SITE_URL` | *(unset)* | The chain's website, linked from its name in the footer |
+| `EXPLORER_URL` | *(unset)* | This explorer's public URL, given to wallets as the block explorer |
 | `START_BLOCK` | `0` | Height to index from |
 | `POLL_MS` | `2000` | How often to check for a new head |
 | `BATCH_SIZE` | `25` | Blocks per catch-up batch |

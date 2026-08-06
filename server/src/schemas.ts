@@ -14,7 +14,9 @@ export const chainInfo = object({
     /** The PUBLIC endpoint a wallet should talk to - what "add this network" hands MetaMask. */
     rpcUrl: string(),
     /** The chain's own website. Empty when the deployment did not name one. */
-    siteUrl: string()
+    siteUrl: string(),
+    /** This explorer's public url, for "view on block explorer" in a wallet. Empty = use origin. */
+    explorerUrl: string()
 });
 export type ChainInfo = Infer<typeof chainInfo>;
 
