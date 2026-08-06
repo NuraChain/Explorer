@@ -4,6 +4,7 @@ import { mountPages, type KitOptions } from '@azerothjs/kit';
 
 import type { ChainGateway } from './chain/client.ts';
 import { normalize, type IndexStore } from './chain/store.ts';
+import { createEtherscanApi } from './etherscan.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
 import {
     account,
@@ -258,6 +259,14 @@ export function buildApp(options: AppOptions): App
     // The typed client's runtime half: method + path per route, projected from the SAME
     // declaration register just installed. The browser fetches it once at boot.
     app.get('/api/_manifest', () => json(manifestOf(api)));
+
+    // The Etherscan-compatible surface, for wallets. It answers on `/api` and `/v2/api` EXACTLY -
+    // no subpath - so it cannot shadow `/api/blocks` and friends above, and a client configured
+    // with either base url reaches the same dispatcher.
+    const etherscan = createEtherscanApi(options);
+    const compatible = (context: { url: URL }): Promise<Response> => etherscan(context.url.searchParams);
+    app.get('/api', compatible);
+    app.get('/v2/api', compatible);
 
     // Mounted LAST so nothing shadows /api.
     if (options.pages !== undefined)

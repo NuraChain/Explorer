@@ -471,6 +471,59 @@ export class IndexStore
         return { rows, total };
     }
 
+    /**
+     * The Etherscan-shaped address query: a block RANGE, a sort direction and offset paging.
+     *
+     * Separate from {@link transactionsOfAddress} because that one answers the UI's question -
+     * newest first, fixed page size - and this one answers a wallet's: "everything this address
+     * did between two heights, oldest first, so I can resume from where I stopped."
+     */
+    public addressTransactionsInRange(
+        address: string,
+        fromBlock: number,
+        toBlock: number,
+        limit: number,
+        offset: number,
+        ascending: boolean
+    ): TransactionRow[]
+    {
+        const account = normalize(address);
+        // The direction is interpolated, not bound: sqlite takes no parameter in ORDER BY, and the
+        // value is a boolean from the caller, never a string off the query string.
+        const direction = ascending ? 'ASC' : 'DESC';
+        return this.#stmt(`
+            SELECT * FROM transactions
+            WHERE (from_addr = ? OR to_addr = ?) AND block_number >= ? AND block_number <= ?
+            ORDER BY block_number ${ direction }, tx_index ${ direction } LIMIT ? OFFSET ?`)
+            .all(account, account, fromBlock, toBlock, limit, offset) as unknown as TransactionRow[];
+    }
+
+    /** The same range query over token transfers, optionally narrowed to one token contract. */
+    public addressTransfersInRange(
+        address: string,
+        fromBlock: number,
+        toBlock: number,
+        limit: number,
+        offset: number,
+        ascending: boolean,
+        contract: string | null
+    ): TransferRow[]
+    {
+        const account = normalize(address);
+        const direction = ascending ? 'ASC' : 'DESC';
+        const narrowed = contract === null ? '' : 'AND token = ?';
+        const bindings: Array<string | number> = [account, account, fromBlock, toBlock];
+        if (contract !== null)
+        {
+            bindings.push(normalize(contract));
+        }
+        return this.#stmt(`
+            SELECT * FROM token_transfers
+            WHERE (from_addr = ? OR to_addr = ?) AND block_number >= ? AND block_number <= ? ${ narrowed }
+            ORDER BY block_number ${ direction }, log_index ${ direction } LIMIT ? OFFSET ?`)
+            .all(...bindings, limit, offset) as unknown as TransferRow[];
+    }
+
     public transfersOfTransaction(hash: string): TransferRow[]
     {
         return this.#stmt('SELECT * FROM token_transfers WHERE tx_hash = ? ORDER BY log_index ASC')
