@@ -87,17 +87,15 @@ export default component TransactionPage()
                             <Show
                                 when={ detail.data()!.transaction.to }
                                 fallback={
-                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[13px] text-muted">contract creation</span> }>
-                                    { (created) =>
+                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[13px] text-muted">contract creation</span> } let={ created }>
                                         <span class="flex flex-wrap items-center gap-2">
                                             <span class="text-[12px] text-muted">created</span>
-                                            <HashLink value={ created() } to={ `/address/${ created() }` } lead={ 16 } tail={ 10 } copy />
+                                            <HashLink value={ created } to={ `/address/${ created }` } lead={ 16 } tail={ 10 } copy />
                                         </span>
-                                    }
                                     </Show>
                                 }
-                            >
-                            { (to) => <HashLink value={ to() } to={ `/address/${ to() }` } lead={ 16 } tail={ 10 } copy /> }
+                             let={ to }>
+                            <HashLink value={ to } to={ `/address/${ to }` } lead={ 16 } tail={ 10 } copy />
                             </Show>
                         </dd>
                     </div>
@@ -131,9 +129,8 @@ export default component TransactionPage()
                             Token transfers
                         </h2>
                         <ul class="divide-y divide-line">
-                            <For each={ detail.data()!.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` }>
-                            { (row) =>
-                                <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                            <For each={ detail.data()!.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                                     <Icon name="token" size={ 15 } class="text-nur" />
                                     <div class="min-w-0 flex-1 text-[12px] text-muted">
                                         <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } />
@@ -145,7 +142,6 @@ export default component TransactionPage()
                                         <span class="ms-1.5 text-muted">{ row.tokenSymbol === '' ? 'token' : row.tokenSymbol }</span>
                                     </p>
                                 </li>
-                            }
                             </For>
                         </ul>
                     </section>

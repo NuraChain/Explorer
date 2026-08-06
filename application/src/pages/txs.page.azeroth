@@ -27,8 +27,7 @@ export default component TransactionsPage()
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
-                <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash }>
-                { (row) =>
+                <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash } let={ row }>
                     <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
                         <Badge
                             tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
@@ -47,7 +46,6 @@ export default component TransactionsPage()
                             <Tooltip label={ formatDateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ timeAgo(row.at) }</p></Tooltip>
                         </div>
                     </li>
-                }
                 </For>
             </ul>
             <Show when={ txs.data() === undefined }>

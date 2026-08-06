@@ -42,23 +42,21 @@ export default component SiteFooter()
                 <Show
                     when={ stats.data() }
                     fallback={ <p class="mt-3 text-[13px] text-muted">Connecting...</p> }
-                >
-                { (summary) =>
+                    let={ summary }>
                     <dl class="mt-3 flex flex-col gap-1.5 text-[13px]">
                         <div class="flex justify-between gap-3">
                             <dt class="text-muted">Chain</dt>
-                            <dd class="font-semibold">{ summary().chain.name }</dd>
+                            <dd class="font-semibold">{ summary.chain.name }</dd>
                         </div>
                         <div class="flex justify-between gap-3">
                             <dt class="text-muted">Chain ID</dt>
-                            <dd class="data">{ summary().chain.chainId }</dd>
+                            <dd class="data">{ summary.chain.chainId }</dd>
                         </div>
                         <div class="flex justify-between gap-3">
                             <dt class="text-muted">Indexed</dt>
-                            <dd class="data">{ formatCount(summary().head) }</dd>
+                            <dd class="data">{ formatCount(summary.head) }</dd>
                         </div>
                     </dl>
-                }
                 </Show>
             </div>
         </div>

@@ -12,8 +12,7 @@ export default component ThemeSwitch(props: { labelled?: boolean })
     const iconFor = (name: Theme): IconName => `theme-${ name }` as IconName;
 
     <div class={ `flex items-center gap-0.5 rounded-lg border border-line bg-field p-0.5 ${ props.labelled === true ? 'w-full' : '' }` } role="group" aria-label="Theme">
-        <For each={ THEMES } key={ (name) => name }>
-        { (name) =>
+        <For each={ THEMES } key={ (name) => name } let={ name }>
             <button
                 class={ [
                     'flex cursor-pointer items-center justify-center gap-2 rounded-md transition-colors duration-150',
@@ -31,7 +30,6 @@ export default component ThemeSwitch(props: { labelled?: boolean })
                     <span>{ THEME_LABEL[name] }</span>
                 </Show>
             </button>
-        }
         </For>
     </div>
 }

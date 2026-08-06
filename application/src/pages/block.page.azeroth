@@ -99,9 +99,8 @@ export default component BlockPage()
                         { formatCount(detail.data()!.total) } transactions
                     </h2>
                     <ul class="divide-y divide-line">
-                        <For each={ detail.data()!.transactions } key={ (row) => row.hash }>
-                        { (row) =>
-                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                        <For each={ detail.data()!.transactions } key={ (row) => row.hash } let={ row }>
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
                                 <Icon name={ row.status === 'reverted' ? 'alert' : 'success' } size={ 14 } class={ row.status === 'reverted' ? 'text-outflow' : 'text-inflow' } />
                                 <div class="min-w-0 flex-1">
                                     <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
@@ -111,7 +110,6 @@ export default component BlockPage()
                                 </div>
                                 <p class="data text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
                             </li>
-                        }
                         </For>
                     </ul>
                     <Show when={ detail.data()!.total === 0 }>

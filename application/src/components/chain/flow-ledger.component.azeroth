@@ -68,8 +68,7 @@ export default component FlowLedger(props: {
         </Show>
 
         <ul class="divide-y divide-line">
-            <For each={ props.rows } key={ (row) => row.hash }>
-            { (row) =>
+            <For each={ props.rows } key={ (row) => row.hash } let={ row }>
                 <li class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
                     {/* Left rail: value arriving. Bars grow toward the centre from both sides, so
                         the two directions read as one movement rather than two columns. */}
@@ -120,7 +119,6 @@ export default component FlowLedger(props: {
                         </Show>
                     </div>
                 </li>
-            }
             </For>
         </ul>
 

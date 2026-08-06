@@ -21,8 +21,10 @@ export default component Icon(props: {
         aria-hidden="true"
         focusable="false"
     >
-        <For each={ ICONS[props.name] } key={ (node) => JSON.stringify(node) }>
-        { (node) => <Dynamic component={ node[0] } props={ node[1] } /> }
+        <For each={ ICONS[props.name] } key={ (node) => JSON.stringify(node) } let={ node }>
+            <g>
+                <Dynamic component={ node[0] } props={ node[1] } />
+            </g>
         </For>
     </svg>
 }
