@@ -76,7 +76,7 @@ export default component FlowLedger(props: {
                         the two directions read as one movement rather than two columns. */}
                     <div class="flex items-center justify-end gap-2">
                         <Show when={ inbound(row) && amountOf(row) > 0n }>
-                            <span class="data text-[13px] font-semibold text-inflow">
+                            <span class="amount text-[13px] font-semibold text-inflow">
                                 +{ formatAmount(row.value, props.decimals) }
                             </span>
                             <span
@@ -108,7 +108,7 @@ export default component FlowLedger(props: {
                                 style={ `width: ${ share(amountOf(row)) }%` }
                                 aria-hidden="true"
                             ></span>
-                            <span class="data text-[13px] font-semibold text-outflow">
+                            <span class="amount text-[13px] font-semibold text-outflow">
                                 &#8722;{ formatAmount(row.value, props.decimals) }
                             </span>
                         </Show>

@@ -49,6 +49,25 @@
     unicode-bidi: isolate;
 }
 
+/*
+ * A chain AMOUNT: `data`, plus permission to wrap between characters.
+ *
+ * Amounts are the one kind of chain data with no bounded width - a balance is a uint256, and the
+ * four-figure grid that holds one is 108px wide at the narrowest breakpoint that draws it. Without
+ * this a long balance leaves the card and runs across the one beside it, because digits and
+ * thousands separators are a single unbreakable word. Truncating instead is not on the table: an
+ * explorer that shortens a balance to fit has misreported it. A wrapped number is ugly; a number
+ * outside its panel is wrong.
+ */
+@utility amount
+{
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
+    overflow-wrap: anywhere;
+}
+
 /* A hash or address that may wrap, but only between characters - never off the page. */
 @utility hash
 {

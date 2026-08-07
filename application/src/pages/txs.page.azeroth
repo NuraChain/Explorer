@@ -44,8 +44,8 @@ export default component TransactionsPage()
                                 { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
                             </p>
                         </div>
-                        <div class="text-end">
-                            <p class="data text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
+                        <div class="min-w-0 max-w-[45%] text-end">
+                            <p class="amount text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
                             <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                         </div>
                     </li>

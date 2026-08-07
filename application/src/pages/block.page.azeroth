@@ -110,7 +110,7 @@ export default component BlockPage()
                                         { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
                                     </p>
                                 </div>
-                                <p class="data text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
+                                <p class="amount max-w-[45%] shrink-0 text-end text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
                             </li>
                         </For>
                     </ul>

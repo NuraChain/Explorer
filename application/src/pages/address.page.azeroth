@@ -80,31 +80,34 @@ export default component AddressPage()
             </div>
         </header>
 
+        {/* Four across only once there is room for four balances. Between 640px and 1024px the
+            old sm:grid-cols-4 left each card 108px of inner width for a figure that wants up to
+            200px, so the number ran out of the card rather than the grid reflowing. */}
         <Show when={ account.data() !== undefined }>
         { () =>
-            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                 <div class="panel px-4 py-3">
                     <dt class="text-[12px] text-muted">{ locale.t('address.balance') }</dt>
-                    <dd class="data mt-0.5 text-[16px] font-bold">{ formatValue(account.data()!.balance, symbol, decimals) }</dd>
+                    <dd class="amount mt-0.5 text-[15px] font-bold sm:text-[16px]">{ formatValue(account.data()!.balance, symbol, decimals) }</dd>
                 </div>
                 {/* The two numbers the page is FOR, in the two colours that mean them. */}
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
                         <Icon name="inflow" size={ 12 } class="text-inflow" /> { locale.t('address.received') }
                     </dt>
-                    <dd class="data mt-0.5 text-[16px] font-bold text-inflow">{ formatAmount(account.data()!.flow.in, decimals) }</dd>
+                    <dd class="amount mt-0.5 text-[15px] font-bold text-inflow sm:text-[16px]">{ formatAmount(account.data()!.flow.in, decimals) }</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
                         <Icon name="outflow" size={ 12 } class="text-outflow" /> { locale.t('address.sent') }
                     </dt>
-                    <dd class="data mt-0.5 text-[16px] font-bold text-outflow">{ formatAmount(account.data()!.flow.out, decimals) }</dd>
+                    <dd class="amount mt-0.5 text-[15px] font-bold text-outflow sm:text-[16px]">{ formatAmount(account.data()!.flow.out, decimals) }</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
                         <Icon name="gas" size={ 12 } /> { locale.t('address.fees') }
                     </dt>
-                    <dd class="data mt-0.5 text-[16px] font-bold">{ formatAmount(account.data()!.flow.fees, decimals) }</dd>
+                    <dd class="amount mt-0.5 text-[15px] font-bold sm:text-[16px]">{ formatAmount(account.data()!.flow.fees, decimals) }</dd>
                 </div>
             </div>
         }
@@ -182,10 +185,10 @@ export default component AddressPage()
                                 </p>
                                 <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                             </div>
-                            <div class="text-end">
+                            <div class="min-w-0 max-w-[45%] text-end">
                                 <p class={ row.to === address
-                                    ? 'data text-[13px] font-semibold text-inflow'
-                                    : 'data text-[13px] font-semibold text-outflow' }
+                                    ? 'amount text-[13px] font-semibold text-inflow'
+                                    : 'amount text-[13px] font-semibold text-outflow' }
                                 >
                                     { row.to === address ? '+' : '−' }{ formatAmount(row.value, row.tokenDecimals) }
                                 </p>

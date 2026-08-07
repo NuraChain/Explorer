@@ -86,24 +86,26 @@ export default component Home()
             </p>
         </Show>
 
+        {/* Same four-up rule as the address page: a chain deep enough to have a ten-digit height
+            has counters too wide for a quarter of a tablet. */}
         <Show when={ stats.data() !== undefined }>
         { () =>
-            <dl class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+            <dl class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                 <div class="panel px-4 py-3">
                     <dt class="text-[12px] text-muted">{ locale.t('home.stat.height') }</dt>
-                    <dd class="data mt-0.5 text-[17px] font-bold">{ locale.n(stats.data()!.head) }</dd>
+                    <dd class="amount mt-0.5 text-[17px] font-bold">{ locale.n(stats.data()!.head) }</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="text-[12px] text-muted">{ locale.t('home.stat.transactions') }</dt>
-                    <dd class="data mt-0.5 text-[17px] font-bold">{ locale.n(stats.data()!.indexed.transactions) }</dd>
+                    <dd class="amount mt-0.5 text-[17px] font-bold">{ locale.n(stats.data()!.indexed.transactions) }</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="text-[12px] text-muted">{ locale.t('home.stat.blockTime') }</dt>
-                    <dd class="data mt-0.5 text-[17px] font-bold">{ stats.data()!.blockTime.toFixed(2) }s</dd>
+                    <dd class="amount mt-0.5 text-[17px] font-bold">{ stats.data()!.blockTime.toFixed(2) }s</dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="text-[12px] text-muted">{ locale.t('home.stat.baseFee') }</dt>
-                    <dd class="data mt-0.5 text-[17px] font-bold">{ formatGwei(stats.data()!.gasPrice) }</dd>
+                    <dd class="amount mt-0.5 text-[17px] font-bold">{ formatGwei(stats.data()!.gasPrice) }</dd>
                 </div>
             </dl>
         }
@@ -159,7 +161,9 @@ export default component Home()
                                     { row.to === null ? locale.t('chain.contractCreation') : locale.t('chain.to', { address: shortHash(row.to, 8, 6) }) }
                                 </p>
                             </div>
-                            <p class="data shrink-0 text-[12px]">{ formatValue(row.value, symbol, decimals) }</p>
+                            {/* Capped rather than shrink-0: an unbounded value column pushed the
+                                hash beside it down to nothing and then ran off the card anyway. */}
+                            <p class="amount max-w-[45%] shrink-0 text-end text-[12px]">{ formatValue(row.value, symbol, decimals) }</p>
                         </li>
                     </For>
                 </ul>

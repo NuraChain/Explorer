@@ -103,12 +103,12 @@ export default component TransactionPage()
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.value') }</dt>
-                        <dd class="data flex-1 text-[15px] font-bold">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</dd>
+                        <dd class="amount min-w-0 flex-1 text-[15px] font-bold">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.fee') }</dt>
                         <dd class="flex-1">
-                            <span class="data text-[13px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
+                            <span class="amount text-[13px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
                             <span class="ms-2 text-[12px] text-muted">
                                 { locale.t('tx.feeDetail', { gas: locale.n(Number(detail.data()!.transaction.gasUsed)), price: formatGwei(detail.data()!.transaction.gasPrice) }) }
                             </span>
@@ -139,7 +139,7 @@ export default component TransactionPage()
                                         <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
                                         <HashLink value={ row.to } to={ `/address/${ row.to }` } tone="muted" lead={ 8 } tail={ 6 } />
                                     </div>
-                                    <p class="data text-[13px] font-semibold">
+                                    <p class="amount text-[13px] font-semibold">
                                         { formatAmount(row.value, row.tokenDecimals) }
                                         <span class="ms-1.5 text-muted">{ row.tokenSymbol === '' ? locale.t('tx.token') : row.tokenSymbol }</span>
                                     </p>
