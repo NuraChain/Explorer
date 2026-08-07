@@ -10,9 +10,9 @@
         <meta name="description" content="An open block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved."/>
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f8fa"/>
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1118"/>
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+        <!-- One .ico carries every tab size. No apple-touch-icon: iOS ignores .ico, so a
+             home-screen bookmark falls back to a screenshot until a PNG is added here. -->
+        <link rel="icon" href="/favicon.ico" sizes="any"/>
         <link rel="stylesheet" href="/src/styles.css"/>
         <!-- Applies the stored language BEFORE first paint. The locale store would do it too, but
              only once the bundle has run, and a page that renders left-to-right and then flips is
