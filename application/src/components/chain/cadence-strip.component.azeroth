@@ -36,21 +36,21 @@ export default component CadenceStrip(props: {
         </div>
 
         <div class="flex h-[92px] items-end gap-[3px]" role="img" aria-label={ locale.t('cadence.chart', { count: locale.n(props.blocks.length) }) }>
-            <For each={ props.blocks } key={ (block) => String(block.number) }>
-            { (block, index) =>
-                <Link
-                    to={ `/block/${ block.number }` }
-                    class={ block.txCount > 0
-                        ? 'group relative flex-1 rounded-t-[2px] bg-nur transition-opacity duration-150 hover:opacity-100 motion-safe:animate-land'
-                        : 'group relative flex-1 rounded-t-[2px] bg-line transition-opacity duration-150 hover:opacity-100 motion-safe:animate-land' }
-                    style={ `height: ${ heights[index] ?? 12 }px` }
-                    aria-label={ locale.t('cadence.bar', { number: block.number, count: locale.n(block.txCount) }) }
-                >
-                    <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-raised px-2 py-1 text-[11px] text-text group-hover:block">
-                        <span class="data">#{ block.number }</span> &middot; { locale.t('chain.txCount', { count: locale.n(block.txCount) }) }
-                    </span>
-                </Link>
-            }
+            <For each={ props.blocks } key={ (block) => String(block.number) } let={ block } index={ index }>
+                <div class="contents">
+                    <Link
+                        to={ `/block/${ block.number }` }
+                        class={ block.txCount > 0
+                            ? 'group relative flex-1 rounded-t-[2px] bg-nur transition-opacity duration-150 hover:opacity-100 motion-safe:animate-land'
+                            : 'group relative flex-1 rounded-t-[2px] bg-line transition-opacity duration-150 hover:opacity-100 motion-safe:animate-land' }
+                        style={ `height: ${ heights[index] ?? 12 }px` }
+                        aria-label={ locale.t('cadence.bar', { number: block.number, count: locale.n(block.txCount) }) }
+                    >
+                        <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-raised px-2 py-1 text-[11px] text-text group-hover:block">
+                            <span class="data">#{ block.number }</span> &middot; { locale.t('chain.txCount', { count: locale.n(block.txCount) }) }
+                        </span>
+                    </Link>
+                </div>
             </For>
         </div>
 

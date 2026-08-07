@@ -27,8 +27,7 @@ export default component BlocksPage()
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
-                <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) }>
-                { (block) =>
+                <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
                     <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
                         <Link to={ `/block/${ block.number }` } class="data w-24 shrink-0 text-[14px] font-semibold text-nur no-underline hover:underline">
                             #{ block.number }
@@ -42,7 +41,6 @@ export default component BlocksPage()
                             <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[11px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
                         </div>
                     </li>
-                }
                 </For>
             </ul>
             <Show when={ blocks.data() === undefined }>

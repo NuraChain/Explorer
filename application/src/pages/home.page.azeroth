@@ -116,8 +116,7 @@ export default component Home()
                     <Link to="/blocks" class="text-[12px] text-beam no-underline hover:underline">{ locale.t('home.all') }</Link>
                 </div>
                 <ul class="divide-y divide-line">
-                    <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) }>
-                    { (block) =>
+                    <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
                         <li class="flex items-center gap-3 px-4 py-2.5">
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-nur">
                                 <Icon name="block" size={ 14 } />
@@ -133,7 +132,6 @@ export default component Home()
                                 <p class="text-[11px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p>
                             </div>
                         </li>
-                    }
                     </For>
                 </ul>
                 <Show when={ blocks.data()?.rows.length === 0 }>
@@ -147,8 +145,7 @@ export default component Home()
                     <Link to="/txs" class="text-[12px] text-beam no-underline hover:underline">{ locale.t('home.all') }</Link>
                 </div>
                 <ul class="divide-y divide-line">
-                    <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash }>
-                    { (row) =>
+                    <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash } let={ row }>
                         <li class="flex items-center gap-3 px-4 py-2.5">
                             <Badge
                                 tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
@@ -164,7 +161,6 @@ export default component Home()
                             </div>
                             <p class="data shrink-0 text-[12px]">{ formatValue(row.value, symbol, decimals) }</p>
                         </li>
-                    }
                     </For>
                 </ul>
                 <Show when={ txs.data()?.rows.length === 0 }>

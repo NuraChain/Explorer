@@ -22,8 +22,7 @@ export default component Toasts()
         role="status"
         aria-live="polite"
     >
-        <For each={ toasts.items() } key={ (entry) => String(entry.id) }>
-        { (entry) =>
+        <For each={ toasts.items() } key={ (entry) => String(entry.id) } let={ entry }>
             <div class="pointer-events-auto flex max-w-md items-center gap-2.5 rounded-lg border border-line bg-raised px-3.5 py-2.5 text-[13px] shadow-lg motion-safe:animate-rise">
                 <Show when={ entry.icon !== undefined }>
                     <Icon name={ entry.icon ?? 'help' } size={ 15 } class={ TONE[entry.tone] } />
@@ -38,7 +37,6 @@ export default component Toasts()
                     <Icon name="x" size={ 14 } />
                 </button>
             </div>
-        }
         </For>
     </div>
 }
