@@ -34,7 +34,7 @@ export const fa: Dictionary = {
     // --- Home ---------------------------------------------------------------------------------
     // The verb sits in `trail`, where Persian word order needs it.
     'home.hero.lead': '',
-    'home.hero.accent': 'نور',
+    'home.hero.accent': 'تراکنش ها',
     'home.hero.through': 'را در',
     'home.hero.fallback': 'زنجیره',
     'home.hero.trail': 'دنبال کنید',
