@@ -1,0 +1,21 @@
+{
+    "name": "Nura Explorer",
+    "short_name": "Nura",
+    "description": "An open block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#080B12",
+    "theme_color": "#080B12",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
