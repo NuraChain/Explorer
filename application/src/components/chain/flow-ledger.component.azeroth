@@ -73,17 +73,34 @@ export default component FlowLedger(props: {
             <For each={ props.rows } key={ (row) => row.hash } let={ row }>
                 <li class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
                     {/* Left rail: value arriving. Bars grow toward the centre from both sides, so
-                        the two directions read as one movement rather than two columns. */}
-                    <div class="flex items-center justify-end gap-2">
+                        the two directions read as one movement rather than two columns.
+
+                        `min-w-0` on both rails is what makes the two 1fr columns mean 1fr: without
+                        it a rail's automatic minimum is the width of the figure it holds, so a long
+                        value widens its own column, the hash column stops lining up down the
+                        ledger, and on a phone the row grows past the panel that clips it. */}
+                    <div class="flex min-w-0 items-center justify-end gap-2">
                         <Show when={ inbound(row) && amountOf(row) > 0n }>
-                            <span class="amount text-[13px] font-semibold text-inflow">
+                            {/* The figure does not shrink: it is the reading, and a percentage
+                                width on a flex SIBLING resolves against the whole rail, so the row
+                                holding the peak asked for the space the figure was standing in and
+                                flexbox took the difference out of both - the largest movement in
+                                view came out broken across three lines. The cap is for the
+                                narrowest screens only, where a long value would otherwise push the
+                                row wider than the panel that clips it. */}
+                            <span class="amount max-w-[60%] shrink-0 text-[13px] font-semibold text-inflow">
                                 +{ formatAmount(row.value, props.decimals) }
                             </span>
-                            <span
-                                class="h-2 rounded-s-full bg-inflow"
-                                style={ `width: ${ share(amountOf(row)) }%` }
-                                aria-hidden="true"
-                            ></span>
+                            {/* The bar is sized inside a track that takes whatever the figure left,
+                                so a row spends its full width and the peak reaches the rail's outer
+                                edge. The track only moves by the width of the figure beside it,
+                                which is what keeps the bars comparable down the ledger. */}
+                            <span class="flex h-2 min-w-0 flex-1 justify-end" aria-hidden="true">
+                                <span
+                                    class="h-2 rounded-s-full bg-inflow"
+                                    style={ `width: ${ share(amountOf(row)) }%` }
+                                ></span>
+                            </span>
                         </Show>
                     </div>
 
@@ -101,14 +118,15 @@ export default component FlowLedger(props: {
                     </Link>
 
                     {/* Right rail: value leaving. */}
-                    <div class="flex items-center gap-2">
+                    <div class="flex min-w-0 items-center gap-2">
                         <Show when={ !inbound(row) && amountOf(row) > 0n }>
-                            <span
-                                class="h-2 rounded-e-full bg-outflow"
-                                style={ `width: ${ share(amountOf(row)) }%` }
-                                aria-hidden="true"
-                            ></span>
-                            <span class="amount text-[13px] font-semibold text-outflow">
+                            <span class="flex h-2 min-w-0 flex-1 justify-start" aria-hidden="true">
+                                <span
+                                    class="h-2 rounded-e-full bg-outflow"
+                                    style={ `width: ${ share(amountOf(row)) }%` }
+                                ></span>
+                            </span>
+                            <span class="amount max-w-[60%] shrink-0 text-[13px] font-semibold text-outflow">
                                 &#8722;{ formatAmount(row.value, props.decimals) }
                             </span>
                         </Show>
