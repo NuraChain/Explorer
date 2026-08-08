@@ -103,7 +103,10 @@ export default component TransactionPage()
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.value') }</dt>
-                        <dd class="amount min-w-0 flex-1 text-[15px] font-bold">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</dd>
+                        {/* `amount` on the value, not on the dd: the utility forces ltr, and on a
+                            block element that also decides where the line starts, so the figure
+                            stood against the far edge from its own label in a mirrored layout. */}
+                        <dd class="min-w-0 flex-1 text-[15px] font-bold"><span class="amount">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</span></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.fee') }</dt>
@@ -116,8 +119,12 @@ export default component TransactionPage()
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[12px] text-muted">{ locale.t('tx.nonce') }</dt>
-                        <dd class="data flex-1 text-[13px]">
-                            { detail.data()!.transaction.nonce }
+                        {/* The nonce is chain data and the calldata size beside it is a sentence in
+                            the reader's language, so only the first goes inside the isolate - on
+                            the dd it took the whole row to the wrong edge and dragged the words
+                            with it. */}
+                        <dd class="flex-1 text-[13px]">
+                            <span class="data">{ detail.data()!.transaction.nonce }</span>
                             <Show when={ detail.data()!.transaction.inputSize > 0 }>
                                 <span class="ms-3 text-[12px] text-muted">{ locale.t('tx.calldata', { size: locale.bytes(detail.data()!.transaction.inputSize) }) }</span>
                             </Show>
