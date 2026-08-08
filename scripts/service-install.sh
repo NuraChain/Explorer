@@ -70,4 +70,6 @@ EOF
 
 systemctl daemon-reload
 
+systemctl enable nura-explorer
+
 echo "> Service Installed."
