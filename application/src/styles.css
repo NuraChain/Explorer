@@ -1,3 +1,8 @@
 @import 'tailwindcss';
+
+/* Vazirmatn, self-hosted from the package rather than a CDN: the app still makes no
+   third-party request and still works offline, but a Persian reader no longer depends on
+   having the face installed. Variable, so every weight the UI uses comes from one file. */
+@import '@fontsource-variable/vazirmatn';
 @import './styles/tokens.css';
 @import './styles/base.css';

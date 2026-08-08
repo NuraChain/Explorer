@@ -15,13 +15,17 @@
 @theme
 {
     /*
-     * Vazirmatn carries the Persian text and Archivo the Latin. Neither is SHIPPED - like every
-     * font here they are named and used if present, so the app makes no third-party request and
-     * works offline. The fallbacks after Vazirmatn are the Persian faces that are already on a
-     * Windows, macOS or Linux desktop, so a reader without it still gets correct Persian shaping
-     * rather than tofu.
+     * Vazirmatn carries the Persian text and Archivo the Latin. Vazirmatn is the one face SHIPPED
+     * with the app, self-hosted from @fontsource-variable/vazirmatn, so Persian renders the same
+     * everywhere without a third-party request and without needing the font installed. Archivo is
+     * still named-and-used-if-present. The fallbacks after Vazirmatn are the Persian faces already
+     * on a Windows, macOS or Linux desktop, so a reader who somehow gets neither still sees
+     * correct Persian shaping rather than tofu.
      */
-    --font-display: Archivo, Vazirmatn, 'Segoe UI', Tahoma, 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
+    --font-display: Archivo, 'Vazirmatn Variable', Vazirmatn, 'Segoe UI', Tahoma, 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
+
+    /* Persian leads with the shipped face instead of Archivo - see `html:lang(fa)` in base.css. */
+    --font-persian: 'Vazirmatn Variable', Vazirmatn, 'Segoe UI', Tahoma, 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
 
     --animate-rise: rise 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
