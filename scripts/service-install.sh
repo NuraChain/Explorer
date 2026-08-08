@@ -2,13 +2,6 @@
 
 set -euo pipefail
 
-NODE_PATH="${NODE_PATH:-$(command -v node || true)}"
-
-if [ -z "$NODE_PATH" ]; then
-  echo "error: node binary not found (set NODE_PATH to override)" >&2
-  exit 1
-fi
-
 if [ "$(id -u)" -ne 0 ]; then
   echo "error: writing the unit file needs root - re-run with sudo" >&2
   exit 1
@@ -28,6 +21,20 @@ SERVICE_PATH_APP="src/main.ts"
 
 SERVICE_DIR="${SERVICE_DIR:-/etc/systemd/system}"
 SERVICE_FILE="$SERVICE_DIR/${SERVICE_NAME}.service"
+
+# systemd resolves a bare ExecStart name against its OWN path, not the invoking shell's, so a node
+# that only exists under nvm or ~/.local is a unit that fails to start. Check the list it uses.
+node_found=""
+for dir in /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin; do
+  if [ -x "$dir/node" ]; then
+    node_found="$dir/node"
+    break
+  fi
+done
+
+if [ -z "$node_found" ]; then
+  echo "warning: no 'node' in systemd's search path - link one there (e.g. ln -s \"\$(command -v node)\" /usr/local/bin/node)" >&2
+fi
 
 # The CLIENT half does have a build step, and production imports the SSR bundle at boot - a
 # missing one is a service that restart-loops. Say so here rather than in the log at 3am.
@@ -55,9 +62,10 @@ Restart=always
 # Without this the server runs its DEVELOPMENT path: no SSR, and the devtools bridge attaches.
 Environment=NODE_ENV=production
 WorkingDirectory=$SERVICE_PATH
-# Quoted: systemd splits ExecStart on whitespace, and an interpreter installed under a path with
-# a space in it (nvm on some setups, /opt installs) would otherwise be read as two arguments.
-ExecStart="$NODE_PATH" $SERVICE_PATH_APP
+# Bare 'node', not a resolved path: systemd looks a bare name up in its own fixed search path
+# (/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin), so an upgrade that moves the
+# binary needs no reinstall of the unit.
+ExecStart=node $SERVICE_PATH_APP
 
 StandardOutput=file:$SERVICE_PATH/logs/service_output.log
 StandardError=file:$SERVICE_PATH/logs/service_error.log
