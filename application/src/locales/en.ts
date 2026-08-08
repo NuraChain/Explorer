@@ -5,10 +5,24 @@
 // Keys are grouped by where the string appears, because that is how they are searched for when a
 // screen is being changed. Placeholders are `{name}`; see `interpolate` in ../lib/i18n.ts.
 //
-// What is NOT here, deliberately: token symbols, chain names, addresses, hashes and the product
-// name. Those are data or identifiers, and translating them would make the explorer disagree with
-// the chain it is reading.
+// What is NOT here, deliberately: token symbols, addresses and hashes. Those are identifiers, and
+// translating them would make the explorer disagree with the chain it is reading. The product name
+// IS here - it is ours rather than the chain's, and a Latin wordmark stranded in the middle of a
+// right-to-left page reads as an untranslated page.
+//
+// Chain names are neither: they are configuration, so they are localized by `chainName` in
+// ../stores/locale.store.ts, a lookup that leaves an unrecognised name exactly as configured.
 export const en = {
+    // --- Brand --------------------------------------------------------------------------------
+    // Three slots for the same reason the hero has four: the accented word does not sit in the
+    // same position in every language. English accents the SECOND word, so `lead` carries the
+    // proper noun and `trail` is empty; a language that leads with the accent fills them the
+    // other way round. `brand.name` is the flat form, for the places that take text not markup.
+    'brand.name': 'Nura Explorer',
+    'brand.lead': 'Nura',
+    'brand.accent': 'Explorer',
+    'brand.trail': '',
+
     // --- Chrome -------------------------------------------------------------------------------
     'nav.sections': 'Sections',
     'nav.home': 'Home',

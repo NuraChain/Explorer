@@ -5,7 +5,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <!-- The pre-hydration values. Each page sets its own title once it knows what it is
              showing; this is what a crawler, a social preview and a reader without JS get, so
-             it names the product rather than the chain (which is configuration). -->
+             it names the product rather than the chain (which is configuration). The script
+             below swaps it for the Persian name when that is the language being restored. -->
         <title>Nura Explorer</title>
         <meta name="description" content="An open block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved."/>
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f8fa"/>
@@ -42,6 +43,13 @@
                 }
                 document.documentElement.lang = lang;
                 document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+                if (lang === 'fa')
+                {
+                    // Kept in sync with `brand.name` in src/locales/fa.ts by hand, exactly like
+                    // the two lines above. The bundle renames the tab on its first render, but
+                    // this is the only title a reader without JS ever sees.
+                    document.title = 'کاوشگر نورا';
+                }
             }
             catch (error)
             {

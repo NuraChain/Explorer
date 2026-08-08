@@ -5,6 +5,8 @@ import { useLocale } from '../../stores/locale.store.ts';
 import Icon from '../../icons/icon.component.azeroth';
 import type { IconName } from '../../icons/registry.ts';
 
+import BrandMark from './brand-mark.component.azeroth';
+
 // Where the PROJECT lives, which is why these are hardcoded: they belong to the explorer itself,
 // not to whichever network a deployment is pointed at, so they do not move when RPC_URL does.
 // Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
@@ -29,7 +31,7 @@ export default component SiteFooter()
                     <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
                         <Icon name="layers" size={ 14 } />
                     </span>
-                    <span class="text-[14px] font-bold tracking-tight">Nura <span class="text-nur">Explorer</span></span>
+                    <BrandMark class="text-[14px]" />
                 </span>
                 <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
             </div>

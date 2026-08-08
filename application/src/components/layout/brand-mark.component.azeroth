@@ -1,0 +1,21 @@
+import { useLocale } from '../../stores/locale.store.ts';
+
+// The wordmark, assembled from catalog slots instead of written as markup, because the accented
+// word does not sit in the same place in every language: English reads `Nura Explorer` and accents
+// the second word, Persian reads `کاوشگر نورا` and accents the first. Reversing the SLOTS keeps one
+// mark for both, where reversing the markup would need a branch on direction.
+//
+// One component for the header and the footer. They carry the same mark at two sizes, and as two
+// copies of the markup they would drift apart the first time either was touched.
+export default component BrandMark(props: { class?: string })
+{
+    const locale = useLocale();
+
+    // The separating space lives here rather than in the catalog: an empty slot must not leave a
+    // stray space beside the icon, and trailing whitespace inside a string is invisible to whoever
+    // edits the dictionary next.
+    const lead = (): string => locale.t('brand.lead') === '' ? '' : `${ locale.t('brand.lead') } `;
+    const trail = (): string => locale.t('brand.trail') === '' ? '' : ` ${ locale.t('brand.trail') }`;
+
+    <span class={ `font-bold tracking-tight ${ props.class ?? '' }` }>{ lead() }<span class="text-nur">{ locale.t('brand.accent') }</span>{ trail() }</span>
+}

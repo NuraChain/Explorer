@@ -48,7 +48,9 @@ export default component Home()
         return summary === undefined ? 0 : Math.max(0, summary.chainHead - summary.head);
     })();
 
-    useTitle(() => locale.t('title.chainExplorer', { chain: stats.data()?.chain.name ?? locale.t('title.chainFallback') }));
+    useTitle(() => locale.t('title.chainExplorer', {
+        chain: stats.data() === undefined ? locale.t('title.chainFallback') : locale.chainName(stats.data()!.chain.name)
+    }));
 
     <div class="flex flex-col gap-6">
         <section class="pt-2">
@@ -57,7 +59,7 @@ export default component Home()
             <h1 class="text-[26px] font-bold leading-tight tracking-tight sm:text-[32px]">
                 { locale.t('home.hero.lead') } <span class="text-nur">{ locale.t('home.hero.accent') }</span> { locale.t('home.hero.through') }
                 <Show when={ stats.data() !== undefined } fallback={ <span> { locale.t('home.hero.fallback') }</span> }>
-                { () => <span> { stats.data()!.chain.name }</span> }
+                { () => <span> { locale.chainName(stats.data()!.chain.name) }</span> }
                 </Show>
                 { locale.t('home.hero.trail') === '' ? '' : ` ${ locale.t('home.hero.trail') }` }
             </h1>

@@ -5,6 +5,7 @@ import Icon from './icons/icon.component.azeroth';
 
 import { routes } from './routes.ts';
 import { useLocale } from './stores/locale.store.ts';
+import BrandMark from './components/layout/brand-mark.component.azeroth';
 import SearchBar from './components/layout/search-bar.component.azeroth';
 import NavDrawer from './components/layout/nav-drawer.component.azeroth';
 import ThemeSwitch from './components/layout/theme-switch.component.azeroth';
@@ -33,7 +34,7 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                         <span class="flex h-7 w-7 items-center justify-center rounded-md bg-nur text-void">
                             <Icon name="layers" size={ 16 } />
                         </span>
-                        <span class="text-[15px] font-bold tracking-tight text-text">Nura <span class="text-nur">Explorer</span></span>
+                        <BrandMark class="text-[15px] text-text" />
                     </Link>
 
                     <nav class="hidden items-center gap-4 text-[13px] sm:flex" aria-label={ locale.t('nav.sections') }>

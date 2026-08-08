@@ -3,9 +3,22 @@ import type { Dictionary } from './en.ts';
 // Persian (fa-IR). Typed against the English dictionary, so a key added there and forgotten here
 // is a build error rather than an English string leaking into a Persian page.
 //
-// Untranslated on purpose: `gwei`, ERC standard numbers, and everything the chain itself names -
-// token symbols, the chain name, addresses and hashes arrive as data and are shown as they are.
+// Untranslated on purpose: `gwei`, ERC standard numbers, token symbols, addresses and hashes.
+// Those arrive as data and are shown as they are.
+//
+// The chain NAME is the exception, and it is not here either: it comes from the deployment's
+// configuration, so `chainName` in ../stores/locale.store.ts localizes it by lookup - «زنجیره نورا»
+// for Nura Chain, and anything else printed exactly as configured.
 export const fa: Dictionary = {
+    // --- Brand --------------------------------------------------------------------------------
+    // «کاوشگر نورا». Persian puts the common noun first, so the accented word LEADS: `lead` is
+    // empty and the proper noun moves to `trail`. Reversing the slots rather than the markup is
+    // what lets the header and the footer keep one wordmark for both languages.
+    'brand.name': 'کاوشگر نورا',
+    'brand.lead': '',
+    'brand.accent': 'کاوشگر',
+    'brand.trail': 'نورا',
+
     // --- Chrome -------------------------------------------------------------------------------
     'nav.sections': 'بخش‌ها',
     'nav.home': 'خانه',

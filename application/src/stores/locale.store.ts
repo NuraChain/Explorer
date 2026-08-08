@@ -35,6 +35,20 @@ export const LOCALE_TAG: Record<Locale, string> = {
 
 const CATALOG: Record<Locale, Dictionary> = { en, fa };
 
+/**
+ * Chain names cannot live in the dictionary: they arrive from the deployment's own configuration,
+ * and this explorer runs against NuraChain, a local Anvil, or any other EVM node.
+ *
+ * So this is a lookup with PASSTHROUGH rather than a translation table. A name we ship a reading
+ * for is localized; every other name is printed exactly as configured, which is the only safe
+ * answer for a chain nobody here has heard of. Display ONLY - the wallet, the API and the chain
+ * keep the configured name, see AddChainButton.
+ */
+const CHAIN_NAMES: Record<Locale, Record<string, string>> = {
+    en: {},
+    fa: { 'Nura Chain': 'زنجیره نورا' }
+};
+
 const STORAGE_KEY = 'nura.locale';
 
 function isLocale(value: string | null): value is Locale
@@ -107,6 +121,12 @@ export interface LocaleApi
     /** A count in the reader's digits. NOT for chain amounts - those stay Latin, see format.ts. */
     n(value: number): string;
 
+    /**
+     * A chain name as the reader should SEE it, which is not always how it is configured. An
+     * untranslated name comes back unchanged. Never use this for a value leaving the page.
+     */
+    chainName(name: string): string;
+
     /** An absolute timestamp; Persian gets the Jalali calendar from Intl. */
     dateTime(iso: string): string;
 
@@ -156,6 +176,7 @@ export const useLocale = createStore((): LocaleApi =>
         },
         t,
         n: (value) => formatCount(value, LOCALE_TAG[locale()]),
+        chainName: (name) => CHAIN_NAMES[locale()][name] ?? name,
         dateTime: (iso) => formatDateTime(iso, LOCALE_TAG[locale()]),
         ago: (iso, now) =>
         {

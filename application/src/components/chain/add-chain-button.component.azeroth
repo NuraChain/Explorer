@@ -50,6 +50,9 @@ export default component AddChainButton(props: { chain: ChainInfo })
                 params: [{
                     // Wallets take the id as a HEX quantity, not a decimal number.
                     chainId: `0x${ props.chain.chainId.toString(16) }`,
+                    // The CONFIGURED name, never the localized one. This is the identity the
+                    // wallet stores and shows for the rest of its life, and a Persian reader who
+                    // adds the chain must still end up with the same network everyone else has.
                     chainName: props.chain.name,
                     nativeCurrency: {
                         name: props.chain.symbol,
@@ -65,7 +68,7 @@ export default component AddChainButton(props: { chain: ChainInfo })
                     blockExplorerUrls: [props.chain.explorerUrl === '' ? globalThis.location.origin : props.chain.explorerUrl]
                 }]
             });
-            toasts.push('success', locale.t('wallet.added', { chain: props.chain.name }), 'check');
+            toasts.push('success', locale.t('wallet.added', { chain: locale.chainName(props.chain.name) }), 'check');
         }
         catch (error)
         {
@@ -91,6 +94,6 @@ export default component AddChainButton(props: { chain: ChainInfo })
     };
 
     <Button variant="outline" size="md" icon="wallet" busy={ busy } onClick={ () => void add() }>
-        { locale.t('wallet.add', { chain: props.chain.name }) }
+        { locale.t('wallet.add', { chain: locale.chainName(props.chain.name) }) }
     </Button>
 }
