@@ -69,45 +69,53 @@ export default component AddressPage()
                     </Show>
                 </span>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[12px] uppercase tracking-[0.14em] text-muted">
+                    {/* `break-words` because a token name is whatever the contract says it is, and
+                        the spam ones are a single unbroken word. This panel does not clip. */}
+                    <p class="break-words text-[12px] uppercase tracking-[0.14em] text-muted">
                         <Show when={ account.data()?.token } fallback={ <span>{ account.data()?.isContract === true ? locale.t('address.kind.contract') : locale.t('address.kind.address') }</span> } let={ token }>
                             <span>{ locale.t('address.kind.token') } &middot; { token.name } ({ token.symbol })</span>
                         </Show>
                     </p>
-                    <p class="hash mt-0.5 text-[14px] font-semibold sm:text-[15px]">{ address }</p>
+                    {/* The identity line IS the address: printed once, whole, and copyable from
+                        where it is read. A shortened second copy of it used to sit at the far end
+                        of this row, which said the same thing twice. */}
+                    <p class="mt-0.5"><HashLink value={ address } tone="text" class="text-[14px] font-semibold sm:text-[15px]" full copy /></p>
                 </div>
-                <HashLink value={ address } tone="muted" lead={ 6 } tail={ 4 } copy />
             </div>
         </header>
 
         {/* Four across only once there is room for four balances. Between 640px and 1024px the
             old sm:grid-cols-4 left each card 108px of inner width for a figure that wants up to
-            200px, so the number ran out of the card rather than the grid reflowing. */}
+            200px, so the number ran out of the card rather than the grid reflowing.
+
+            Every figure inside wears `amount` on a SPAN. On the dd itself the utility's ltr also
+            fixes where the line starts, and each card printed its label against one edge and its
+            number against the other in a mirrored layout. */}
         <Show when={ account.data() !== undefined }>
         { () =>
             <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                 <div class="panel px-4 py-3">
                     <dt class="text-[12px] text-muted">{ locale.t('address.balance') }</dt>
-                    <dd class="amount mt-0.5 text-[15px] font-bold sm:text-[16px]">{ formatValue(account.data()!.balance, symbol, decimals) }</dd>
+                    <dd class="mt-0.5 text-[15px] font-bold sm:text-[16px]"><span class="amount">{ formatValue(account.data()!.balance, symbol, decimals) }</span></dd>
                 </div>
                 {/* The two numbers the page is FOR, in the two colours that mean them. */}
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
                         <Icon name="inflow" size={ 12 } class="text-inflow" /> { locale.t('address.received') }
                     </dt>
-                    <dd class="amount mt-0.5 text-[15px] font-bold text-inflow sm:text-[16px]">{ formatAmount(account.data()!.flow.in, decimals) }</dd>
+                    <dd class="mt-0.5 text-[15px] font-bold text-inflow sm:text-[16px]"><span class="amount">{ formatAmount(account.data()!.flow.in, decimals) }</span></dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
                         <Icon name="outflow" size={ 12 } class="text-outflow" /> { locale.t('address.sent') }
                     </dt>
-                    <dd class="amount mt-0.5 text-[15px] font-bold text-outflow sm:text-[16px]">{ formatAmount(account.data()!.flow.out, decimals) }</dd>
+                    <dd class="mt-0.5 text-[15px] font-bold text-outflow sm:text-[16px]"><span class="amount">{ formatAmount(account.data()!.flow.out, decimals) }</span></dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[12px] text-muted">
                         <Icon name="gas" size={ 12 } /> { locale.t('address.fees') }
                     </dt>
-                    <dd class="amount mt-0.5 text-[15px] font-bold sm:text-[16px]">{ formatAmount(account.data()!.flow.fees, decimals) }</dd>
+                    <dd class="mt-0.5 text-[15px] font-bold sm:text-[16px]"><span class="amount">{ formatAmount(account.data()!.flow.fees, decimals) }</span></dd>
                 </div>
             </div>
         }
@@ -125,7 +133,7 @@ export default component AddressPage()
             >
                 { locale.t('address.tab.transactions') }
                 <Show when={ account.data() !== undefined }>
-                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ locale.n(account.data()!.txCount) }</span> }
+                { () => <span class="ms-1.5 text-[12px] tabular-nums opacity-70">{ locale.n(account.data()!.txCount) }</span> }
                 </Show>
             </button>
             <button
@@ -139,7 +147,7 @@ export default component AddressPage()
             >
                 { locale.t('address.tab.transfers') }
                 <Show when={ account.data() !== undefined }>
-                { () => <span class="data ms-1.5 text-[12px] opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
+                { () => <span class="ms-1.5 text-[12px] tabular-nums opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
                 </Show>
             </button>
         </div>
@@ -186,11 +194,16 @@ export default component AddressPage()
                                 <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                             </div>
                             <div class="min-w-0 max-w-[45%] text-end">
+                                {/* `amount` on the span, so the paragraph inherits the reader's
+                                    direction and resolves the cell's `text-end` to the same edge
+                                    the hash below it lands on. The sign stays INSIDE the isolate:
+                                    a bare +/- is bidi-neutral and would swap to the far side of
+                                    its own digits in a mirrored line. */}
                                 <p class={ row.to === address
-                                    ? 'amount text-[13px] font-semibold text-inflow'
-                                    : 'amount text-[13px] font-semibold text-outflow' }
+                                    ? 'text-[13px] font-semibold text-inflow'
+                                    : 'text-[13px] font-semibold text-outflow' }
                                 >
-                                    { row.to === address ? '+' : '−' }{ formatAmount(row.value, row.tokenDecimals) }
+                                    <span class="amount">{ row.to === address ? '+' : '−' }{ formatAmount(row.value, row.tokenDecimals) }</span>
                                 </p>
                                 <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 8 } tail={ 4 } />
                             </div>
