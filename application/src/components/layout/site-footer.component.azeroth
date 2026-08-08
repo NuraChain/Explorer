@@ -36,7 +36,7 @@ export default component SiteFooter()
                 <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
             </div>
 
-            <nav aria-label={ locale.t('footer.explore') }>
+            <nav class="text-center" aria-label={ locale.t('footer.explore') }>
                 <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
                 <ul class="mt-3 flex flex-col gap-2 text-[13px]">
                     <li><Link to="/" class="text-muted no-underline hover:text-text">{ locale.t('nav.home') }</Link></li>
@@ -47,13 +47,16 @@ export default component SiteFooter()
 
             {/* Named in text, not by logo alone: the icon set carries no brand marks, and a
                 generic glyph beside a name still reads correctly in either direction. */}
-            <nav aria-label={ locale.t('footer.community') }>
+            <nav class="text-center" aria-label={ locale.t('footer.community') }>
                 <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
                 <ul class="mt-3 flex flex-col gap-2 text-[13px]">
                     <For each={ SOCIALS } key={ (link) => link.name } let={ link }>
                         <li>
+                            {/* `w-fit` keeps the hover target on the words, so centring takes an
+                                explicit `mx-auto` - the column's `text-center` cannot move a
+                                block-level flex row. */}
                             <a
-                                class="flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
+                                class="mx-auto flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
                                 href={ link.href }
                                 target="_blank"
                                 rel="noreferrer"
