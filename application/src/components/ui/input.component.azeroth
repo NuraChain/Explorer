@@ -14,6 +14,9 @@ export default component Input(props: {
 
     /** Proportional text instead of monospace, for the rare non-chain field. */
     prose?: boolean;
+
+    /** Centre the text and placeholder instead of starting them at the icon. */
+    center?: boolean;
     size?: 'sm' | 'md';
     onInput?: (value: string) => void;
 
@@ -34,6 +37,7 @@ export default component Input(props: {
             class={ [
                 'min-w-0 flex-1 bg-transparent text-text outline-none placeholder:font-sans placeholder:text-muted',
                 props.prose === true ? '' : 'hash',
+                props.center === true ? 'text-center' : '',
                 big ? 'text-[15px]' : 'text-[13px]'
             ].filter(Boolean).join(' ') }
             type={ props.type ?? 'text' }
