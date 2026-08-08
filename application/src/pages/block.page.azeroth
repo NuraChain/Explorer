@@ -92,7 +92,14 @@ export default component BlockPage()
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-24 shrink-0 text-[12px] text-muted">{ locale.t('block.baseFee') }</dt>
-                        <dd class="data flex-1 text-[13px]">{ formatBaseFee(detail.data()!.block.baseFee) }</dd>
+                        {/* `data` on the VALUE, not on the row - the utility forces ltr, and on the
+                            dd itself that also drags the line to the left edge of a mirrored layout
+                            while every other row here starts at the right. Same shape as gas used.
+                            The unavailable reading is a WORD, in the reader's language, so it stays
+                            out of the monospace ltr span. */}
+                        <dd class="flex-1 text-[13px]">
+                            <span class={ detail.data()!.block.baseFee === null ? '' : 'data' }>{ formatBaseFee(detail.data()!.block.baseFee) }</span>
+                        </dd>
                     </div>
                 </dl>
 
