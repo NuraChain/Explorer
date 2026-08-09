@@ -11,10 +11,10 @@ import BrandMark from './brand-mark.component.azeroth';
 // not to whichever network a deployment is pointed at, so they do not move when RPC_URL does.
 // Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
 const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
+    { name: 'X', href: 'https://x.com/nurachainnet', icon: 'social-x' },
     { name: 'GitHub', href: 'https://github.com/NuraChain/Explorer', icon: 'social-github' },
     { name: 'Discord', href: 'https://discord.gg/8BMAXTdXQg', icon: 'social-discord' },
-    { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' },
-    { name: 'X', href: 'https://x.com/nurachainnet', icon: 'social-x' }
+    { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' }
 ];
 
 // The footer says what this explorer IS and where its project can be reached - the questions a
