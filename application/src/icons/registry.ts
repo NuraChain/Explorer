@@ -28,7 +28,7 @@ import {
     type IconNode
 } from 'lucide';
 
-import { DISCORD, GITHUB, TELEGRAM } from './brands.ts';
+import { DISCORD, GITHUB, TELEGRAM, X_COM } from './brands.ts';
 
 // One name per icon, resolved once. A component asks for `name="inflow"` and gets the same mark
 // everywhere - so the arrow that means "value arrived" cannot quietly differ between two pages.
@@ -58,6 +58,7 @@ export const ICONS = {
     'social-github': GITHUB,
     'social-discord': DISCORD,
     'social-telegram': TELEGRAM,
+    'social-x': X_COM,
     'success': CircleCheck,
     'theme-dark': Moon,
     'theme-light': Sun,
