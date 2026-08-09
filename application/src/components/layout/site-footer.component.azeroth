@@ -12,7 +12,7 @@ import BrandMark from './brand-mark.component.azeroth';
 // Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
 const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
     { name: 'GitHub', href: 'https://github.com/NuraChain/Explorer', icon: 'social-github' },
-    { name: 'Discord', href: 'https://discord.gg/ykW3PU64h9', icon: 'social-discord' },
+    { name: 'Discord', href: 'https://discord.gg/8BMAXTdXQg', icon: 'social-discord' },
     { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' }
 ];
 
