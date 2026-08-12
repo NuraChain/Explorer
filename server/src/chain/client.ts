@@ -8,6 +8,12 @@ import { loadConfig, num, str } from '@azerothjs/http';
 export interface ChainEnv
 {
     rpcUrl: string;
+
+    /**
+     * The RPC url the public API may disclose. `RPC_URL` can carry credentials in its userinfo,
+     * so this is either PUBLIC_RPC_URL verbatim or RPC_URL with those credentials stripped.
+     */
+    publicRpcUrl: string;
     chainId: number;
     name: string;
     symbol: string;
@@ -49,6 +55,7 @@ export function loadChainEnv(): ChainEnv
 {
     const config = loadConfig({
         rpcUrl: str('RPC_URL', { default: 'http://127.0.0.1:8545' }),
+        publicRpcUrl: str('PUBLIC_RPC_URL', { default: '' }),
         chainId: num('CHAIN_ID', { default: 31337 }),
         name: str('CHAIN_NAME', { default: 'Local EVM' }),
         symbol: str('CURRENCY_SYMBOL', { default: 'ETH' }),
@@ -68,7 +75,30 @@ export function loadChainEnv(): ChainEnv
         rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 }),
         dbPath: str('DB_PATH', { default: '.data/index.db' })
     });
-    return config;
+    return {
+        ...config,
+        publicRpcUrl: config.publicRpcUrl === '' ? redactedRpcUrl(config.rpcUrl) : config.publicRpcUrl
+    };
+}
+
+/**
+ * The public form of the configured RPC url: the userinfo removed, or an empty string when the
+ * url does not parse. Credentialed provider urls (`https://key:secret@host`) must never be
+ * echoed by a public endpoint, so this is the fallback when PUBLIC_RPC_URL is not set.
+ */
+function redactedRpcUrl(rpcUrl: string): string
+{
+    try
+    {
+        const url = new URL(rpcUrl);
+        url.username = '';
+        url.password = '';
+        return url.toString();
+    }
+    catch
+    {
+        return '';
+    }
 }
 
 /** The viem chain description for {@link ChainEnv}. */
