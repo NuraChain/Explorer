@@ -80,7 +80,7 @@ function build({ store, chain }: ApiDeps)
                         name: chain.env.name,
                         symbol: chain.env.symbol,
                         decimals: chain.env.decimals,
-                        rpcUrl: chain.env.rpcUrl,
+                        rpcUrl: chain.env.publicRpcUrl,
                         siteUrl: chain.env.siteUrl,
                         explorerUrl: chain.env.explorerUrl
                     },

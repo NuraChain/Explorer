@@ -11,7 +11,7 @@ import { dirname, resolve } from 'node:path';
 // because these rows were written down as the chain was read.
 
 /** Bumped whenever a column changes; the index rebuilds itself from the chain. */
-const SCHEMA_VERSION = '1';
+const SCHEMA_VERSION = '2';
 
 /** The ERC-20 / ERC-721 `Transfer(address,address,uint256)` topic. */
 export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_tx_block ON transactions (block_number DESC, tx_index ASC);
 CREATE INDEX IF NOT EXISTS idx_tx_from ON transactions (from_addr, block_number DESC);
 CREATE INDEX IF NOT EXISTS idx_tx_to ON transactions (to_addr, block_number DESC);
+CREATE TABLE IF NOT EXISTS address_flow (
+    address TEXT PRIMARY KEY,
+    in_flow TEXT NOT NULL,
+    out_flow TEXT NOT NULL,
+    fees TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS token_transfers (
     tx_hash TEXT NOT NULL,
     log_index INTEGER NOT NULL,
@@ -243,9 +249,13 @@ export class IndexStore
             + 'DROP TABLE IF EXISTS transactions;'
             + 'DROP TABLE IF EXISTS token_transfers;'
             + 'DROP TABLE IF EXISTS tokens;'
+            + 'DROP TABLE IF EXISTS address_flow;'
             + 'DROP TABLE IF EXISTS meta;');
         this.#db.exec(DDL);
         this.setMeta('schema', SCHEMA_VERSION);
+        // A rebuilt schema starts with no flow ledger, so the marker that says it was already
+        // rebuilt from `transactions` must not survive either.
+        this.#clearFlowBuilt();
     }
 
     public close(): void
@@ -263,6 +273,12 @@ export class IndexStore
     {
         this.#stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value')
             .run(key, value);
+    }
+
+    /** Clears the marker that says `address_flow` has been rebuilt from `transactions`. */
+    #clearFlowBuilt(): void
+    {
+        this.#stmt('DELETE FROM meta WHERE key = ?').run('flowBuilt');
     }
 
     /** The highest block indexed, or startBlock-1 when the index is empty. */
@@ -290,8 +306,9 @@ export class IndexStore
         }
         if (known !== null)
         {
-            this.#db.exec('DELETE FROM blocks; DELETE FROM transactions; DELETE FROM token_transfers; DELETE FROM tokens;');
+            this.#db.exec('DELETE FROM blocks; DELETE FROM transactions; DELETE FROM token_transfers; DELETE FROM tokens; DELETE FROM address_flow;');
             this.#stmt('DELETE FROM meta WHERE key = ?').run('cursor');
+            this.#clearFlowBuilt();
             this.#knownTokens.clear();
         }
         this.setMeta('genesis', genesisHash);
@@ -314,6 +331,10 @@ export class IndexStore
         this.#stmt('DELETE FROM token_transfers WHERE block_number >= ?').run(number);
         this.#stmt('DELETE FROM transactions WHERE block_number >= ?').run(number);
         this.#stmt('DELETE FROM blocks WHERE number >= ?').run(number);
+        // The dropped transactions may have touched any address, so every aggregate row is now
+        // suspect. Clear the ledger and let the next read rebuild it from what remains.
+        this.#stmt('DELETE FROM address_flow').run();
+        this.#clearFlowBuilt();
     }
 
     public insertBlock(row: BlockRow, transactions: TransactionRow[], transfers: TransferRow[]): void
@@ -336,6 +357,32 @@ export class IndexStore
                 row_.nonce, row_.input_size, row_.gas_used, row_.effective_gas_price, row_.status,
                 row_.contract_address, row_.timestamp);
         }
+
+        // Native flow is maintained incrementally so no address ever forces a scan of its whole
+        // history. Only successful transactions move value; reverted ones move nothing, and a
+        // receipt the node never returned (status -1) is not success. One Map per block keeps the
+        // working set bounded by the addresses this block touched.
+        const flow = new Map<string, { in: bigint; out: bigint; fees: bigint }>();
+        for (const row_ of transactions)
+        {
+            if (row_.status !== 1)
+            {
+                continue;
+            }
+            const value = BigInt(row_.value);
+            const fee = BigInt(row_.gas_used) * BigInt(row_.effective_gas_price);
+            if (row_.to_addr !== null)
+            {
+                const inbound = flow.get(row_.to_addr) ?? { in: 0n, out: 0n, fees: 0n };
+                inbound.in += value;
+                flow.set(row_.to_addr, inbound);
+            }
+            const outbound = flow.get(row_.from_addr) ?? { in: 0n, out: 0n, fees: 0n };
+            outbound.out += value;
+            outbound.fees += fee;
+            flow.set(row_.from_addr, outbound);
+        }
+        this.#applyFlowDeltas(flow);
 
         const transfer = this.#stmt(`
             INSERT INTO token_transfers (tx_hash, log_index, block_number, token, from_addr, to_addr, value, token_id, kind, timestamp)
@@ -375,6 +422,74 @@ export class IndexStore
         }
         this.#knownTokens.add(account);
         return true;
+    }
+
+    /**
+     * Merges one block's worth of flow deltas into `address_flow`, reading each touched
+     * address's current row once and upserting the new total. All arithmetic is BigInt because
+     * wei totals exceed sqlite's 64-bit integer range.
+     */
+    #applyFlowDeltas(deltas: ReadonlyMap<string, { in: bigint; out: bigint; fees: bigint }>): void
+    {
+        const read = this.#stmt('SELECT in_flow, out_flow, fees FROM address_flow WHERE address = ?');
+        const upsert = this.#stmt(`
+            INSERT INTO address_flow (address, in_flow, out_flow, fees) VALUES (?, ?, ?, ?)
+            ON CONFLICT (address) DO UPDATE SET in_flow = excluded.in_flow,
+                out_flow = excluded.out_flow, fees = excluded.fees`);
+        for (const [address, delta] of deltas)
+        {
+            const current = read.get(address) as { in_flow: string; out_flow: string; fees: string } | undefined;
+            const inbound = (current === undefined ? 0n : BigInt(current.in_flow)) + delta.in;
+            const outbound = (current === undefined ? 0n : BigInt(current.out_flow)) + delta.out;
+            const fees = (current === undefined ? 0n : BigInt(current.fees)) + delta.fees;
+            upsert.run(address, inbound.toString(), outbound.toString(), fees.toString());
+        }
+    }
+
+    /**
+     * Rebuilds `address_flow` from every successful transaction, in bounded pages. This is NOT
+     * a SQL SUM: wei values exceed sqlite's 64-bit integer range and TEXT->REAL would lose
+     * precision, so the totals are BigInt-accumulated here. It runs only after a reorg or chain
+     * switch clears the marker, never on every address read.
+     */
+    #rebuildFlow(): void
+    {
+        this.transaction(() =>
+        {
+            this.#stmt('DELETE FROM address_flow').run();
+            const totals = new Map<string, { in: bigint; out: bigint; fees: bigint }>();
+            const pageSize = 20_000;
+            const page = this.#stmt(`
+                SELECT from_addr, to_addr, value, gas_used, effective_gas_price, status
+                FROM transactions WHERE status = 1 ORDER BY rowid LIMIT ? OFFSET ?`);
+            let offset = 0;
+            while (true)
+            {
+                const rows = page.all(pageSize, offset) as unknown as Array<Pick<TransactionRow,
+                    'from_addr' | 'to_addr' | 'value' | 'gas_used' | 'effective_gas_price' | 'status'>>;
+                if (rows.length === 0)
+                {
+                    break;
+                }
+                for (const row of rows)
+                {
+                    const value = BigInt(row.value);
+                    if (row.to_addr !== null)
+                    {
+                        const inbound = totals.get(row.to_addr) ?? { in: 0n, out: 0n, fees: 0n };
+                        inbound.in += value;
+                        totals.set(row.to_addr, inbound);
+                    }
+                    const outbound = totals.get(row.from_addr) ?? { in: 0n, out: 0n, fees: 0n };
+                    outbound.out += value;
+                    outbound.fees += BigInt(row.gas_used) * BigInt(row.effective_gas_price);
+                    totals.set(row.from_addr, outbound);
+                }
+                offset += rows.length;
+            }
+            this.#applyFlowDeltas(totals);
+            this.setMeta('flowBuilt', '1');
+        });
     }
 
     // ----------------------------------------------------------------------------------
@@ -530,31 +645,24 @@ export class IndexStore
             .all(hash.toLowerCase()) as unknown as TransferRow[];
     }
 
-    /** Native value in and out of an address, in wei - the flow ledger's totals. */
+    /**
+     * Native value in and out of an address, in wei - the flow ledger's totals.
+     *
+     * Read from `address_flow` rather than summed over `transactions`: wei values exceed
+     * sqlite's 64-bit integer range and TEXT->REAL would lose precision, so the ledger is
+     * maintained in BigInt during ingest and rebuilt from scratch after a reorg or chain switch.
+     * A missing row is a legitimate zero - the address has no successful transactions.
+     */
     public flowOfAddress(address: string): { in: string; out: string; fees: string }
     {
         const account = normalize(address);
-        const rows = this.#stmt(
-            'SELECT to_addr, value, gas_used, effective_gas_price, from_addr FROM transactions WHERE (from_addr = ? OR to_addr = ?) AND status = 1')
-            .all(account, account) as unknown as Array<Pick<TransactionRow, 'to_addr' | 'value' | 'gas_used' | 'effective_gas_price' | 'from_addr'>>;
-
-        let inbound = 0n;
-        let outbound = 0n;
-        let fees = 0n;
-        for (const row of rows)
+        if (this.getMeta('flowBuilt') !== '1')
         {
-            const value = BigInt(row.value);
-            if (row.to_addr === account)
-            {
-                inbound += value;
-            }
-            if (row.from_addr === account)
-            {
-                outbound += value;
-                fees += BigInt(row.gas_used) * BigInt(row.effective_gas_price);
-            }
+            this.#rebuildFlow();
         }
-        return { in: inbound.toString(), out: outbound.toString(), fees: fees.toString() };
+        const row = this.#stmt('SELECT in_flow, out_flow, fees FROM address_flow WHERE address = ?')
+            .get(account) as { in_flow: string; out_flow: string; fees: string } | undefined;
+        return { in: row?.in_flow ?? '0', out: row?.out_flow ?? '0', fees: row?.fees ?? '0' };
     }
 
     public token(address: string): TokenRow | null

@@ -22,9 +22,16 @@ COPY package*.json ./
 COPY application/package.json application/
 COPY server/package.json server/
 RUN npm ci --omit=dev --workspace server
+# Run as an unprivileged user. main.ts writes logs/ and the sqlite index under .data/,
+# so create both now and give the service user ownership before dropping privileges.
+RUN groupadd --system nura \
+    && useradd --system --gid nura --home-dir /app nura \
+    && mkdir -p logs .data \
+    && chown -R nura:nura logs .data
 COPY server/src ./src
 COPY --from=client /build/application/dist ./client
 # The self-contained SSR bundle (vite build --ssr) - the kit renders 'server' pages with it.
 COPY --from=client /build/application/dist-server ./client-server
 EXPOSE 3000
+USER nura
 CMD ["node", "src/main.ts"]
