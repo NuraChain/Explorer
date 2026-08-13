@@ -74,7 +74,7 @@ and fills in as blocks land.
 
 ```ini
 RPC_URL=https://rpc.nurachain.net
-CHAIN_ID=1010
+CHAIN_ID=22
 CHAIN_NAME=Nura Chain
 CURRENCY_SYMBOL=NURA
 CHAIN_SITE_URL=https://nurachain.net
