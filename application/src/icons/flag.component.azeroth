@@ -1,0 +1,27 @@
+import { FLAGS, FLAG_VIEWBOX } from './flags.ts';
+
+import type { Locale } from '../stores/locale.store.ts';
+
+// A locale's flag, from the fill-only paths in ./flags.ts. Separate from Icon on purpose: that
+// pipeline paints everything in currentColor at stroke-width 1.75, and a flag is the one mark
+// in the app whose colours are its own.
+//
+// The hairline rect is drawn on top rather than as a CSS border so it sits INSIDE the rounded
+// clip: several flags are white at their edges, and on the light theme they would otherwise
+// dissolve into the page.
+export default component Flag(props: { locale: Locale; class?: string })
+{
+    <svg
+        class={ `shrink-0 rounded-[2px] ${ props.class ?? '' }` }
+        viewBox={ FLAG_VIEWBOX }
+        width={ 18 }
+        height={ 12 }
+        aria-hidden="true"
+        focusable="false"
+    >
+        <For each={ FLAGS[props.locale] } key={ (shape) => shape.d } let={ shape }>
+            <path d={ shape.d } fill={ shape.fill } />
+        </For>
+        <rect x="0.5" y="0.5" width="23" height="15" rx="1.5" fill="none" stroke="var(--line)" />
+    </svg>
+}
