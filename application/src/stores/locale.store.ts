@@ -3,6 +3,14 @@ import { createStore, createSignal, type Getter } from 'azerothjs';
 import { elapsed, formatCount, formatDateTime, scaleBytes } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
 import { fa } from '../locales/fa.ts';
+import { ar } from '../locales/ar.ts';
+import { es } from '../locales/es.ts';
+import { pt } from '../locales/pt.ts';
+import { hi } from '../locales/hi.ts';
+import { zh } from '../locales/zh.ts';
+import { ru } from '../locales/ru.ts';
+import { fr } from '../locales/fr.ts';
+import { tr } from '../locales/tr.ts';
 import type { Dictionary } from '../locales/en.ts';
 
 // The reader's language, and everything that follows from it: the dictionary, the writing
@@ -12,28 +20,55 @@ import type { Dictionary } from '../locales/en.ts';
 // date without the page knowing it is a date - `t`, `n`, `dateTime` and `ago` all read the locale
 // signal, so anything that calls one re-runs when the language changes.
 
-export type Locale = 'en' | 'fa';
+export type Locale = 'en' | 'fa' | 'ar' | 'es' | 'pt' | 'hi' | 'zh' | 'ru' | 'fr' | 'tr';
 
-export const LOCALES: Locale[] = ['en', 'fa'];
+export const LOCALES: Locale[] = ['en', 'fa', 'ar', 'es', 'pt', 'hi', 'zh', 'ru', 'fr', 'tr'];
 
 /** Each language named in ITSELF - a reader looking for Persian is not looking for "Persian". */
 export const LOCALE_LABEL: Record<Locale, string> = {
     en: 'English',
-    fa: 'فارسی'
+    fa: 'فارسی',
+    ar: 'العربية',
+    es: 'Español',
+    pt: 'Português',
+    hi: 'हिन्दी',
+    zh: '中文',
+    ru: 'Русский',
+    fr: 'Français',
+    tr: 'Türkçe'
 };
 
 export const LOCALE_DIR: Record<Locale, 'ltr' | 'rtl'> = {
     en: 'ltr',
-    fa: 'rtl'
+    fa: 'rtl',
+    ar: 'rtl',
+    es: 'ltr',
+    pt: 'ltr',
+    hi: 'ltr',
+    zh: 'ltr',
+    ru: 'ltr',
+    fr: 'ltr',
+    tr: 'ltr'
 };
 
-/** The BCP 47 tag handed to Intl. `fa-IR` gives Persian digits and the Jalali calendar. */
+/**
+ * The BCP 47 tag handed to Intl. `fa-IR` gives Persian digits and the Jalali calendar; `ar-EG`
+ * gives Eastern Arabic digits WITHOUT the Hijri calendar an `ar-SA` would spring on dates.
+ */
 export const LOCALE_TAG: Record<Locale, string> = {
     en: 'en-US',
-    fa: 'fa-IR'
+    fa: 'fa-IR',
+    ar: 'ar-EG',
+    es: 'es-ES',
+    pt: 'pt-BR',
+    hi: 'hi-IN',
+    zh: 'zh-CN',
+    ru: 'ru-RU',
+    fr: 'fr-FR',
+    tr: 'tr-TR'
 };
 
-const CATALOG: Record<Locale, Dictionary> = { en, fa };
+const CATALOG: Record<Locale, Dictionary> = { en, fa, ar, es, pt, hi, zh, ru, fr, tr };
 
 /**
  * Chain names cannot live in the dictionary: they arrive from the deployment's own configuration,
@@ -46,7 +81,17 @@ const CATALOG: Record<Locale, Dictionary> = { en, fa };
  */
 const CHAIN_NAMES: Record<Locale, Record<string, string>> = {
     en: {},
-    fa: { 'Nura Chain': 'زنجیره نورا' }
+    fa: { 'Nura Chain': 'زنجیره نورا' },
+    // Readings only where the SCRIPT demands one - a Latin name mid-sentence reads as a foreign
+    // body in Arabic and Devanagari. The Latin and Cyrillic languages keep the configured name.
+    ar: { 'Nura Chain': 'سلسلة نورا' },
+    es: {},
+    pt: {},
+    hi: { 'Nura Chain': 'नूरा चेन' },
+    zh: {},
+    ru: {},
+    fr: {},
+    tr: {}
 };
 
 const STORAGE_KEY = 'nura.locale';
@@ -185,8 +230,9 @@ export const useLocale = createStore((): LocaleApi =>
             {
                 return t('time.justNow');
             }
-            // The plural key is the singular one with an 's'; Persian defines both as the same
-            // string, so this picks a form in English without the caller knowing about plurals.
+            // The plural key is the singular one with an 's'; a language that does not inflect
+            // after a numeral (Persian, Turkish, Chinese, Hindi) defines both as the same string,
+            // so this picks a form where it matters without the caller knowing about plurals.
             const key = (count === 1 ? `time.${ unit }` : `time.${ unit }s`) as MessageKey;
             return t(key, { count: formatCount(count, LOCALE_TAG[locale()]) });
         },

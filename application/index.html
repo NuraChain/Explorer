@@ -20,21 +20,38 @@
         <link rel="stylesheet" href="/src/styles.css"/>
         <!-- Applies the stored language BEFORE first paint. The locale store would do it too, but
              only once the bundle has run, and a page that renders left-to-right and then flips is
-             worse than one that starts correct. Kept in sync with locale.store.ts by hand: it is
-             four lines, and importing the module here would defeat the point. -->
+             worse than one that starts correct. The three lists are kept in sync with
+             locale.store.ts (LOCALES, LOCALE_DIR) and each locale's `brand.name` by hand -
+             importing the modules here would defeat the point. -->
         <script>
             try
             {
+                var locales = ['en', 'fa', 'ar', 'es', 'pt', 'hi', 'zh', 'ru', 'fr', 'tr'];
+                var rtl = ['fa', 'ar'];
+                // The bundle renames the tab on its first render; this is the only title a
+                // reader without JS ever sees. English keeps the title in the markup above.
+                var titles = {
+                    fa: 'کاوشگر نورا',
+                    ar: 'مستكشف نورا',
+                    es: 'Explorador Nura',
+                    pt: 'Explorador Nura',
+                    hi: 'नूरा एक्सप्लोरर',
+                    zh: 'Nura 区块浏览器',
+                    ru: 'Обозреватель Nura',
+                    fr: 'Explorateur Nura',
+                    tr: 'Nura Gezgini'
+                };
                 var saved = localStorage.getItem('nura.locale');
-                var lang = saved === 'fa' || saved === 'en' ? saved : 'en';
-                if (saved !== 'fa' && saved !== 'en')
+                var lang = locales.indexOf(saved) === -1 ? '' : saved;
+                if (lang === '')
                 {
                     // First match in PREFERENCE ORDER, matching initial() in locale.store.ts.
+                    lang = 'en';
                     var wanted = navigator.languages || [];
                     for (var i = 0; i < wanted.length; i++)
                     {
                         var subtag = wanted[i].toLowerCase().split('-')[0];
-                        if (subtag === 'fa' || subtag === 'en')
+                        if (locales.indexOf(subtag) !== -1)
                         {
                             lang = subtag;
                             break;
@@ -42,13 +59,10 @@
                     }
                 }
                 document.documentElement.lang = lang;
-                document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
-                if (lang === 'fa')
+                document.documentElement.dir = rtl.indexOf(lang) === -1 ? 'ltr' : 'rtl';
+                if (titles[lang] !== undefined)
                 {
-                    // Kept in sync with `brand.name` in src/locales/fa.ts by hand, exactly like
-                    // the two lines above. The bundle renames the tab on its first render, but
-                    // this is the only title a reader without JS ever sees.
-                    document.title = 'کاوشگر نورا';
+                    document.title = titles[lang];
                 }
             }
             catch (error)

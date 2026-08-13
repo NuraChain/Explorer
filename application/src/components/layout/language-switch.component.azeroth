@@ -1,35 +1,35 @@
-import { useLocale, LOCALES, LOCALE_LABEL, LOCALE_TAG } from '../../stores/locale.store.ts';
+import { useLocale, LOCALES, LOCALE_LABEL, LOCALE_TAG, type Locale } from '../../stores/locale.store.ts';
 
-// The language control, built like ThemeSwitch: both choices visible as a segmented control
-// rather than one button that swaps meaning. Two languages fit; a third would want a menu.
+import Icon from '../../icons/icon.component.azeroth';
+
+// The language control. Two languages fit a segmented control; ten do not, so this is a native
+// <select> - the browser gives the menu, the keyboard behaviour and the phone's picker sheet for
+// free, and the closed control stays exactly one language wide.
 //
 // Each option is labelled in its OWN language and carries `lang`, so the browser picks the right
-// font for it and a screen reader does not read "فارسی" with an English voice.
+// font for it and a screen reader does not read "فارسی" with an English voice. The chevron is
+// drawn here because `appearance-none` (needed to restyle the field) also removes the native one.
 export default component LanguageSwitch(props: { labelled?: boolean })
 {
     const locale = useLocale();
 
-    <div
-        class={ `flex items-center gap-0.5 rounded-lg border border-line bg-field p-0.5 ${ props.labelled === true ? 'w-full' : '' }` }
-        role="group"
-        aria-label={ locale.t('language.label') }
-    >
-        <For each={ LOCALES } key={ (name) => name } let={ name }>
-            <button
-                class={ [
-                    'flex cursor-pointer items-center justify-center rounded-md px-2 transition-colors duration-150',
-                    props.labelled === true ? 'h-9 flex-1 text-[14px]' : 'h-7 text-[12px] font-semibold',
-                    locale.locale() === name ? 'bg-raised text-nur' : 'text-muted hover:text-text'
-                ].join(' ') }
-                type="button"
-                lang={ LOCALE_TAG[name] }
-                title={ LOCALE_LABEL[name] }
-                aria-label={ LOCALE_LABEL[name] }
-                aria-pressed={ locale.locale() === name }
-                onClick={ () => locale.setLocale(name) }
-            >
-                { LOCALE_LABEL[name] }
-            </button>
-        </For>
-    </div>
+    <span class={ `relative inline-flex items-center ${ props.labelled === true ? 'w-full' : '' }` }>
+        <select
+            class={ [
+                'cursor-pointer appearance-none rounded-lg border border-line bg-field text-text outline-none transition-colors duration-150 hover:border-nur',
+                props.labelled === true ? 'h-10 w-full ps-3 pe-8 text-[14px]' : 'h-8 ps-2.5 pe-7 text-[12px] font-semibold'
+            ].join(' ') }
+            aria-label={ locale.t('language.label') }
+            onChange={ (event) => locale.setLocale((event.target as HTMLSelectElement).value as Locale) }
+        >
+            <For each={ LOCALES } key={ (name) => name } let={ name }>
+                <option
+                    value={ name }
+                    lang={ LOCALE_TAG[name] }
+                    selected={ locale.locale() === name }
+                >{ LOCALE_LABEL[name] }</option>
+            </For>
+        </select>
+        <Icon name="chevron-down" size={ 14 } class="pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-muted" />
+    </span>
 }
