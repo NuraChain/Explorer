@@ -22,7 +22,9 @@ import {
     Layers,
     Menu,
     Moon,
+    Play,
     Search,
+    Send,
     Sun,
     Wallet,
     X,
@@ -54,7 +56,9 @@ export const ICONS = {
     'layers': Layers,
     'menu': Menu,
     'outflow': ArrowUpRight,
+    'run': Play,
     'search': Search,
+    'send': Send,
     // The community marks - real logos, from ./brands.ts. Filled rather than stroked, which is
     // what makes them recognisable at a glance next to the outline set.
     'social-github': GITHUB,

@@ -5,7 +5,39 @@
 // misreports a balance has failed at its only job, so the arithmetic is pinned here.
 import { describe, it, expect } from 'vitest';
 
-import { elapsed, formatAmount, formatCount, formatDateTime, formatGwei, formatValue, gasShare, scaleBytes, shortHash } from '../src/lib/format.ts';
+import { elapsed, formatAmount, formatCount, formatDateTime, formatGwei, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
+
+describe('parseAmount - what someone typed, into wei', () =>
+{
+    it('scales a decimal by the currency\'s own decimals', () =>
+    {
+        expect(parseAmount('1')).toBe('1000000000000000000');
+        expect(parseAmount('0.1')).toBe('100000000000000000');
+        expect(parseAmount('12.5')).toBe('12500000000000000000');
+        expect(parseAmount('0')).toBe('0');
+        expect(parseAmount('1.5', 6)).toBe('1500000');
+    });
+
+    it('does the arithmetic as STRINGS, so no amount is rounded on its way out', () =>
+    {
+        // Through a double, 0.1 * 1e18 is 100000000000000000**0**16 - short by 16 wei, and
+        // nobody notices until the transfer arrives light.
+        expect(parseAmount('0.1')).toBe('100000000000000000');
+        expect(parseAmount('123456789.123456789123456789')).toBe('123456789123456789123456789');
+    });
+
+    it('refuses anything it would have to guess at', () =>
+    {
+        // A rejected field is a question the reader can answer; an accepted wrong one is money.
+        expect(parseAmount('')).toBeNull();
+        expect(parseAmount('abc')).toBeNull();
+        expect(parseAmount('-1')).toBeNull();
+        expect(parseAmount('1e18')).toBeNull();
+        // More precision than the currency has - truncating would send a different amount than
+        // the one on the screen.
+        expect(parseAmount('0.0000000000000000001')).toBeNull();
+    });
+});
 
 describe('formatAmount - wei to a readable decimal', () =>
 {

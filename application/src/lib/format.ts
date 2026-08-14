@@ -42,6 +42,33 @@ export function formatAmount(amount: string, decimals = 18, maxFraction = 4): st
     return `${ sign }0.${ trimmed }`;
 }
 
+/**
+ * The one direction that goes the other way: a typed decimal into the smallest unit.
+ *
+ * For the field where someone says how much native currency to send with a call - so it is the
+ * one place in the UI where a person's typing becomes an amount that leaves their wallet. It is
+ * string arithmetic end to end: `Number('0.1') * 1e18` is 100000000000000000**0****16**, and
+ * nobody notices until the transfer is short.
+ *
+ * Returns null rather than guessing at anything that is not a plain decimal - a rejected field is
+ * a question the reader can answer, an accepted wrong one is money gone.
+ */
+export function parseAmount(text: string, decimals = 18): string | null
+{
+    const value = text.trim();
+    if (!/^\d+(\.\d*)?$/.test(value))
+    {
+        return null;
+    }
+    const [whole = '0', fraction = ''] = value.split('.');
+    if (fraction.length > decimals)
+    {
+        // Truncating here would silently send a different amount than the one on the screen.
+        return null;
+    }
+    return `${ BigInt(whole) }${ fraction.padEnd(decimals, '0') }`.replace(/^0+(?=\d)/, '');
+}
+
 /** An amount with its unit, e.g. `1.25 ETH`. */
 export function formatValue(amount: string, symbol: string, decimals = 18): string
 {
