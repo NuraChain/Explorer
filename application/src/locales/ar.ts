@@ -151,6 +151,18 @@ export const ar: Dictionary = {
     'contract.mutability.payable': 'قابلة للدفع',
     'contract.mutability.unknown': 'غير معروف',
 
+    'contract.read': 'قراءة',
+    'contract.read.hint': 'يجيب عنها هذا المستكشف. بلا محفظة وبلا رسوم.',
+    'contract.write': 'كتابة',
+    'contract.write.hint': 'هذه ترسل معاملة من محفظتك أنت، على هذه الشبكة. محفظتك تسأل قبل أي توقيع، وأنت من يدفع الغاز.',
+    'contract.unnamedGroup': 'مُعرِّفات بلا اسم',
+    'contract.call.query': 'استعلام',
+    'contract.call.write': 'كتابة',
+    'contract.call.value': 'القيمة المُرسَلة ({symbol})',
+    'contract.call.badAmount': 'هذا ليس مبلغًا يمكن إرساله على هذه السلسلة.',
+    'contract.call.sent': 'أُرسلت المعاملة',
+    'contract.call.noReturn': 'لم يُرجع هذا النداء شيئًا.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'التدفق',
     'flow.in': 'وارد',
@@ -188,6 +200,9 @@ export const ar: Dictionary = {
     'wallet.dismissed': 'رُفض الطلب',
     'wallet.refused': 'رفضت محفظتك إضافة الشبكة',
     'wallet.mismatch': 'محفظتك تحفظ هذه الشبكة برمز عملة مختلف. احذفها من هناك ثم حاول مجدداً.',
+    'wallet.connect': 'وصل المحفظة',
+    'wallet.switch': 'التبديل إلى {chain}',
+    'wallet.switchFailed': 'لم تنتقل محفظتك إلى {chain}. أضف الشبكة أولًا ثم أعد المحاولة.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'التصفح',

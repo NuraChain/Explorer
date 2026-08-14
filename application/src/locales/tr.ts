@@ -151,6 +151,18 @@ export const tr: Dictionary = {
     'contract.mutability.payable': 'ödeme alan',
     'contract.mutability.unknown': 'bilinmiyor',
 
+    'contract.read': 'Okuma',
+    'contract.read.hint': 'Bu gezginin kendisi yanıtlar. Cüzdan da yok, ücret de.',
+    'contract.write': 'Yazma',
+    'contract.write.hint': 'Bunlar kendi cüzdanınızdan, bu ağ üzerinde işlem gönderir. Cüzdanınız imzalamadan önce sorar, gaz ücretini siz ödersiniz.',
+    'contract.unnamedGroup': 'Adsız seçiciler',
+    'contract.call.query': 'Sorgula',
+    'contract.call.write': 'Yaz',
+    'contract.call.value': 'Gönderilecek tutar ({symbol})',
+    'contract.call.badAmount': 'Bu, bu zincirin gönderebileceği bir tutar değil.',
+    'contract.call.sent': 'İşlem gönderildi',
+    'contract.call.noReturn': 'Bu çağrı hiçbir şey döndürmedi.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Akış',
     'flow.in': 'giriş',
@@ -188,6 +200,9 @@ export const tr: Dictionary = {
     'wallet.dismissed': 'İstek kapatıldı',
     'wallet.refused': 'Cüzdanınız ağı eklemeyi reddetti',
     'wallet.mismatch': 'Cüzdanınızda bu ağ farklı bir para birimi simgesiyle kayıtlı. Orada silin, sonra yeniden deneyin.',
+    'wallet.connect': 'Cüzdan bağla',
+    'wallet.switch': '{chain} ağına geç',
+    'wallet.switchFailed': 'Cüzdanınız {chain} ağına geçmedi. Önce ağı ekleyin, sonra yeniden deneyin.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Sayfalama',

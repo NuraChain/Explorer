@@ -151,6 +151,18 @@ export const ru: Dictionary = {
     'contract.mutability.payable': 'платёжная',
     'contract.mutability.unknown': 'неизвестно',
 
+    'contract.read': 'Чтение',
+    'contract.read.hint': 'Отвечает сам обозреватель. Без кошелька и без комиссии.',
+    'contract.write': 'Запись',
+    'contract.write.hint': 'Эти отправляют транзакцию из вашего собственного кошелька в этой сети. Кошелёк спросит перед подписью, а газ платите вы.',
+    'contract.unnamedGroup': 'Безымянные селекторы',
+    'contract.call.query': 'Запросить',
+    'contract.call.write': 'Записать',
+    'contract.call.value': 'Сумма к отправке ({symbol})',
+    'contract.call.badAmount': 'Такую сумму эта сеть отправить не может.',
+    'contract.call.sent': 'Транзакция отправлена',
+    'contract.call.noReturn': 'Вызов ничего не вернул.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Поток',
     'flow.in': 'вход',
@@ -188,6 +200,9 @@ export const ru: Dictionary = {
     'wallet.dismissed': 'Запрос отклонён',
     'wallet.refused': 'Кошелёк отказался добавить сеть',
     'wallet.mismatch': 'В кошельке эта сеть уже сохранена с другим символом валюты. Удалите её там и попробуйте снова.',
+    'wallet.connect': 'Подключить кошелёк',
+    'wallet.switch': 'Перейти на {chain}',
+    'wallet.switchFailed': 'Ваш кошелёк не перешёл на {chain}. Сначала добавьте сеть, затем повторите.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Пагинация',

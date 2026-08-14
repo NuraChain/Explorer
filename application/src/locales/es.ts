@@ -150,6 +150,18 @@ export const es: Dictionary = {
     'contract.mutability.payable': 'pagable',
     'contract.mutability.unknown': 'desconocida',
 
+    'contract.read': 'Lectura',
+    'contract.read.hint': 'Lo responde este explorador. Sin cartera y sin comisión.',
+    'contract.write': 'Escritura',
+    'contract.write.hint': 'Estas envían una transacción desde tu propia cartera, en esta red. Tu cartera pregunta antes de firmar nada, y el gas lo pagas tú.',
+    'contract.unnamedGroup': 'Selectores sin nombre',
+    'contract.call.query': 'Consultar',
+    'contract.call.write': 'Escribir',
+    'contract.call.value': 'Valor a enviar ({symbol})',
+    'contract.call.badAmount': 'Esa no es una cantidad que esta cadena pueda enviar.',
+    'contract.call.sent': 'Transacción enviada',
+    'contract.call.noReturn': 'La llamada no devolvió nada.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Flujo',
     'flow.in': 'entrada',
@@ -187,6 +199,9 @@ export const es: Dictionary = {
     'wallet.dismissed': 'Solicitud descartada',
     'wallet.refused': 'Tu cartera rechazó añadir la red',
     'wallet.mismatch': 'Tu cartera ya tiene esta red guardada con otro símbolo de moneda. Elimínala allí y vuelve a intentarlo.',
+    'wallet.connect': 'Conectar cartera',
+    'wallet.switch': 'Cambiar a {chain}',
+    'wallet.switchFailed': 'Tu cartera no cambió a {chain}. Añade la red primero y vuelve a intentarlo.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Paginación',

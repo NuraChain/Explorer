@@ -155,6 +155,18 @@ export const fa: Dictionary = {
     'contract.mutability.payable': 'قابل پرداخت',
     'contract.mutability.unknown': 'نامشخص',
 
+    'contract.read': 'خواندن',
+    'contract.read.hint': 'پاسخ از همین کاوشگر. بدون کیف پول، بدون کارمزد.',
+    'contract.write': 'نوشتن',
+    'contract.write.hint': 'این‌ها از کیف پول خودتان و روی همین شبکه تراکنش می‌فرستند. کیف پول پیش از امضا می‌پرسد و کارمزد را شما می‌پردازید.',
+    'contract.unnamedGroup': 'شناسه‌های بی‌نام',
+    'contract.call.query': 'پرس‌وجو',
+    'contract.call.write': 'نوشتن',
+    'contract.call.value': 'مقدار ارسالی ({symbol})',
+    'contract.call.badAmount': 'این مقدار برای ارسال روی این زنجیره معتبر نیست.',
+    'contract.call.sent': 'تراکنش فرستاده شد',
+    'contract.call.noReturn': 'این فراخوانی چیزی برنگرداند.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'جریان',
     'flow.in': 'ورودی',
@@ -192,6 +204,9 @@ export const fa: Dictionary = {
     'wallet.dismissed': 'درخواست رد شد',
     'wallet.refused': 'کیف پول شما از افزودن شبکه خودداری کرد',
     'wallet.mismatch': 'کیف پول شما این شبکه را با نماد ارز دیگری ذخیره کرده است. آن را از کیف پول حذف کنید و دوباره تلاش کنید.',
+    'wallet.connect': 'اتصال کیف پول',
+    'wallet.switch': 'تغییر به {chain}',
+    'wallet.switchFailed': 'کیف پول شما به {chain} تغییر نکرد. اول شبکه را اضافه کنید، بعد دوباره تلاش کنید.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'صفحه‌بندی',

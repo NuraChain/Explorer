@@ -1,18 +1,18 @@
 import { Link } from 'azerothjs';
 
-import type { ContractDetail, ContractFunction } from '../../api.ts';
+import type { ChainInfo, ContractDetail } from '../../api.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 import { useToasts } from '../../stores/toasts.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
 
+import ContractCall from './contract-call.component.azeroth';
 import HashLink from './hash-link.component.azeroth';
+import WalletConnect from './wallet-connect.component.azeroth';
 import Badge from '../ui/badge.component.azeroth';
 import EmptyState from '../ui/empty-state.component.azeroth';
 import Tooltip from '../ui/tooltip.component.azeroth';
-
-import type { Tone } from '../ui/variants.ts';
 
 // What a deployed contract is, for a reader who has only its address.
 //
@@ -22,17 +22,11 @@ import type { Tone } from '../ui/variants.ts';
 // because its selector is a published constant, while `0x7c88e3d9` is printed as four bytes
 // because nobody has published what it means. Both are shown. Only one is named.
 //
-// Mutability is the other thing worth reading here: whether a call can CHANGE anything is what
-// someone about to make one needs to know, so it is a badge rather than a footnote.
-const MUTABILITY_TONE: Record<string, Tone> = {
-    view: 'neutral',
-    pure: 'neutral',
-    nonpayable: 'accent',
-    payable: 'success',
-    unknown: 'neutral'
-};
-
-export default component ContractPanel(props: { detail: ContractDetail })
+// A named function can also be CALLED, which is the other half of this panel: the ones that only
+// read are answered through this explorer's node, and the ones that write are handed to the
+// reader's own wallet. Those two live in separate sections for the same reason they are described
+// differently - one is free and one spends money.
+export default component ContractPanel(props: { detail: ContractDetail; chain: ChainInfo })
 {
     const locale = useLocale();
     const toasts = useToasts();
@@ -40,9 +34,11 @@ export default component ContractPanel(props: { detail: ContractDetail })
     state showBytecode = false;
 
     derived named = props.detail.functions.filter((entry) => entry.signature !== '').length;
-
-    /** The arguments a function takes, printed as the signature declares them. */
-    const args = (entry: ContractFunction): string => entry.inputs.join(', ');
+    derived readable = props.detail.functions.filter((entry) =>
+        entry.signature !== '' && (entry.mutability === 'view' || entry.mutability === 'pure'));
+    derived writable = props.detail.functions.filter((entry) =>
+        entry.signature !== '' && (entry.mutability === 'nonpayable' || entry.mutability === 'payable'));
+    derived unnamed = props.detail.functions.filter((entry) => entry.signature === '');
 
     const copyBytecode = async (): Promise<void> =>
     {
@@ -147,51 +143,82 @@ export default component ContractPanel(props: { detail: ContractDetail })
             </section>
         </Show>
 
-        <section class="panel overflow-hidden">
-            <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
-                <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                    <Icon name="contract" size={ 14 } /> { locale.t('contract.functions') }
-                </span>
-                <Show when={ props.detail.functions.length > 0 }>
-                    <span class="text-[12px] text-muted">
-                        { locale.t('contract.functions.named', { named: locale.n(named), total: locale.n(props.detail.functions.length) }) }
+        {/* Read and write are separate sections, not one list with a badge. A `view` costs
+            nothing and is answered by this explorer's node; everything in the second section
+            needs a signature, a fee and a wallet - and nobody should discover that difference
+            by pressing the wrong button in a uniform list. */}
+        <Show when={ readable.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
+                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="run" size={ 14 } /> { locale.t('contract.read') }
                     </span>
-                </Show>
-            </h2>
-            <Show
-                when={ props.detail.functions.length > 0 }
-                fallback={ <EmptyState icon="contract" title={ locale.t('contract.functions.empty.title') } hint={ locale.t('contract.functions.empty.hint') } /> }
-            >
-                {/* Capped in HEIGHT rather than in count: a contract with two hundred entry points
-                    has two hundred entry points, and paging them would hide the ones a reader is
-                    scrolling to find. */}
-                <ul class="max-h-[26rem] divide-y divide-line overflow-y-auto">
-                    <For each={ props.detail.functions } key={ (row) => row.selector } let={ row }>
-                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-                            <span class="data w-24 shrink-0 text-[12px] text-muted">{ row.selector }</span>
-                            <span class="min-w-0 flex-1">
-                                <Show
-                                    when={ row.signature !== '' }
-                                    fallback={ <span class="text-[13px] italic text-muted">{ locale.t('contract.unnamed') }</span> }
-                                >
-                                    <span class="hash text-[13px]">
-                                        <span class="font-semibold">{ row.name }</span>(<span class="text-muted">{ args(row) }</span>)
-                                    </span>
-                                </Show>
-                            </span>
-                            <Show when={ row.mutability !== 'unknown' }>
-                                <Badge tone={ MUTABILITY_TONE[row.mutability] ?? 'neutral' }>
-                                    { locale.t(`contract.mutability.${ row.mutability }`) }
-                                </Badge>
-                            </Show>
+                    <span class="text-[12px] text-muted">{ locale.t('contract.read.hint') }</span>
+                </h2>
+                <ul class="max-h-[30rem] overflow-y-auto">
+                    <For each={ readable } key={ (row) => row.selector } let={ row }>
+                        <li class="border-b border-line last:border-b-0">
+                            <ContractCall address={ props.detail.address } entry={ row } chain={ props.chain } />
                         </li>
                     </For>
                 </ul>
-            </Show>
-            <Show when={ props.detail.fromImplementation }>
-                <p class="border-t border-line px-4 py-2.5 text-[12px] text-muted">{ locale.t('contract.viaImplementation') }</p>
-            </Show>
-        </section>
+            </section>
+        </Show>
+
+        <Show when={ writable.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="send" size={ 14 } /> { locale.t('contract.write') }
+                    </span>
+                    {/* The wallet control sits at the TOP of the section it applies to, so the
+                        state of the connection is visible before a row is ever opened. */}
+                    <WalletConnect chain={ props.chain } compact />
+                </h2>
+                <p class="border-b border-line px-4 py-2.5 text-[12px] text-muted">{ locale.t('contract.write.hint') }</p>
+                <ul class="max-h-[30rem] overflow-y-auto">
+                    <For each={ writable } key={ (row) => row.selector } let={ row }>
+                        <li class="border-b border-line last:border-b-0">
+                            <ContractCall address={ props.detail.address } entry={ row } chain={ props.chain } />
+                        </li>
+                    </For>
+                </ul>
+            </section>
+        </Show>
+
+        {/* Listed but not callable, and the difference is the honest part: without a signature
+            there is no way to know what arguments these take. Their COUNT is the measure of what
+            this page does not know about the contract. */}
+        <Show when={ unnamed.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
+                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="help" size={ 14 } /> { locale.t('contract.unnamedGroup') }
+                    </span>
+                    <span class="text-[12px] text-muted">
+                        { locale.t('contract.functions.named', { named: locale.n(named), total: locale.n(props.detail.functions.length) }) }
+                    </span>
+                </h2>
+                <ul class="divide-y divide-line">
+                    <For each={ unnamed } key={ (row) => row.selector } let={ row }>
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                            <span class="data w-24 shrink-0 text-[12px] text-muted">{ row.selector }</span>
+                            <span class="min-w-0 flex-1 text-[13px] italic text-muted">{ locale.t('contract.unnamed') }</span>
+                        </li>
+                    </For>
+                </ul>
+            </section>
+        </Show>
+
+        <Show when={ props.detail.functions.length === 0 }>
+            <section class="panel overflow-hidden">
+                <EmptyState icon="contract" title={ locale.t('contract.functions.empty.title') } hint={ locale.t('contract.functions.empty.hint') } />
+            </section>
+        </Show>
+
+        <Show when={ props.detail.fromImplementation }>
+            <p class="px-1 text-[12px] text-muted">{ locale.t('contract.viaImplementation') }</p>
+        </Show>
 
         <Show when={ props.detail.events.length > 0 }>
             <section class="panel overflow-hidden">

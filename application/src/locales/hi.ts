@@ -151,6 +151,18 @@ export const hi: Dictionary = {
     'contract.mutability.payable': 'भुगतान योग्य',
     'contract.mutability.unknown': 'अज्ञात',
 
+    'contract.read': 'पढ़ना',
+    'contract.read.hint': 'इसका उत्तर यही एक्सप्लोरर देता है। न वॉलेट, न शुल्क।',
+    'contract.write': 'लिखना',
+    'contract.write.hint': 'ये आपके अपने वॉलेट से, इसी नेटवर्क पर लेनदेन भेजते हैं। हस्ताक्षर से पहले वॉलेट पूछता है, और गैस आप चुकाते हैं।',
+    'contract.unnamedGroup': 'बिना नाम के सेलेक्टर',
+    'contract.call.query': 'क्वेरी',
+    'contract.call.write': 'लिखें',
+    'contract.call.value': 'भेजी जाने वाली राशि ({symbol})',
+    'contract.call.badAmount': 'यह ऐसी राशि नहीं है जिसे यह चेन भेज सके।',
+    'contract.call.sent': 'लेनदेन भेजा गया',
+    'contract.call.noReturn': 'इस कॉल ने कुछ नहीं लौटाया।',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'प्रवाह',
     'flow.in': 'आवक',
@@ -188,6 +200,9 @@ export const hi: Dictionary = {
     'wallet.dismissed': 'अनुरोध खारिज हुआ',
     'wallet.refused': 'आपके वॉलेट ने नेटवर्क जोड़ने से मना कर दिया',
     'wallet.mismatch': 'आपके वॉलेट में यह नेटवर्क किसी और मुद्रा चिह्न के साथ सहेजा है। उसे वहाँ से हटाएँ, फिर दोबारा कोशिश करें।',
+    'wallet.connect': 'वॉलेट जोड़ें',
+    'wallet.switch': '{chain} पर जाएँ',
+    'wallet.switchFailed': 'आपका वॉलेट {chain} पर नहीं गया। पहले नेटवर्क जोड़ें, फिर दोबारा कोशिश करें।',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'पृष्ठांकन',

@@ -150,6 +150,18 @@ export const zh: Dictionary = {
     'contract.mutability.payable': '可支付',
     'contract.mutability.unknown': '未知',
 
+    'contract.read': '读取',
+    'contract.read.hint': '由本浏览器作答。无需钱包，也不收费。',
+    'contract.write': '写入',
+    'contract.write.hint': '这些会从你自己的钱包在本网络上发出交易。签名前钱包会询问，燃料费由你支付。',
+    'contract.unnamedGroup': '未命名选择器',
+    'contract.call.query': '查询',
+    'contract.call.write': '写入',
+    'contract.call.value': '随调用发送的金额（{symbol}）',
+    'contract.call.badAmount': '这不是本链可以发送的金额。',
+    'contract.call.sent': '交易已发出',
+    'contract.call.noReturn': '此调用没有返回值。',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': '流向',
     'flow.in': '流入',
@@ -187,6 +199,9 @@ export const zh: Dictionary = {
     'wallet.dismissed': '请求已取消',
     'wallet.refused': '钱包拒绝添加该网络',
     'wallet.mismatch': '钱包中已用不同的货币符号保存了该网络。请先在钱包中删除，再重试。',
+    'wallet.connect': '连接钱包',
+    'wallet.switch': '切换到 {chain}',
+    'wallet.switchFailed': '你的钱包没有切换到 {chain}。请先添加该网络，然后重试。',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': '分页',

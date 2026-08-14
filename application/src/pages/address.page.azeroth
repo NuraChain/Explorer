@@ -180,10 +180,10 @@ export default component AddressPage()
             </Show>
         </div>
 
-        <Show when={ active === 'contract' }>
-            <Show when={ contract.data() } let={ detail }>
-                <ContractPanel detail={ detail } />
-            </Show>
+        {/* Both, or neither: the panel offers calls, and a call needs the chain id the wallet has
+            to be on before one is sent. */}
+        <Show when={ active === 'contract' && contract.data() !== undefined && stats.data() !== undefined }>
+        { () => <ContractPanel detail={ contract.data()! } chain={ stats.data()!.chain } /> }
         </Show>
 
         <Show when={ active === 'flow' }>

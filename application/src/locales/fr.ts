@@ -150,6 +150,18 @@ export const fr: Dictionary = {
     'contract.mutability.payable': 'payable',
     'contract.mutability.unknown': 'inconnue',
 
+    'contract.read': 'Lecture',
+    'contract.read.hint': 'Répondu par cet explorateur. Sans portefeuille et sans frais.',
+    'contract.write': 'Écriture',
+    'contract.write.hint': 'Celles-ci envoient une transaction depuis votre propre portefeuille, sur ce réseau. Le portefeuille demande avant toute signature, et le gaz est à votre charge.',
+    'contract.unnamedGroup': 'Sélecteurs sans nom',
+    'contract.call.query': 'Interroger',
+    'contract.call.write': 'Écrire',
+    'contract.call.value': 'Montant à envoyer ({symbol})',
+    'contract.call.badAmount': 'Ce n’est pas un montant que cette chaîne peut envoyer.',
+    'contract.call.sent': 'Transaction envoyée',
+    'contract.call.noReturn': 'L’appel n’a rien renvoyé.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Flux',
     'flow.in': 'entrée',
@@ -187,6 +199,9 @@ export const fr: Dictionary = {
     'wallet.dismissed': 'Demande rejetée',
     'wallet.refused': 'Votre portefeuille a refusé d’ajouter le réseau',
     'wallet.mismatch': 'Votre portefeuille a déjà ce réseau avec un autre symbole de devise. Supprimez-le là-bas, puis réessayez.',
+    'wallet.connect': 'Connecter un portefeuille',
+    'wallet.switch': 'Passer sur {chain}',
+    'wallet.switchFailed': 'Votre portefeuille n’est pas passé sur {chain}. Ajoutez d’abord le réseau, puis réessayez.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Pagination',

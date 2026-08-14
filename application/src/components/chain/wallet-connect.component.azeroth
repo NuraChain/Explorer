@@ -1,0 +1,91 @@
+import type { ChainInfo } from '../../api.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+import Button from '../ui/button.component.azeroth';
+import Tooltip from '../ui/tooltip.component.azeroth';
+
+// The wallet control, in whichever of its three states applies: not connected, connected to the
+// wrong network, or ready.
+//
+// One component rather than the same three-way branch written wherever a wallet is needed - and
+// the middle state is the reason it exists. The same calldata sent on another chain reaches a
+// different contract, or nothing at all, so being on the wrong network has to be a visible state
+// with a way out of it, never a Write button that happens to do the wrong thing.
+export default component WalletConnect(props: { chain: ChainInfo; compact?: boolean })
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+    const wallet = useWallet();
+
+    state busy = false;
+
+    derived connected = wallet.account() !== '';
+    derived rightChain = wallet.chainId() === props.chain.chainId;
+    derived size = props.compact === true ? 'sm' : 'md';
+
+    const connect = async (): Promise<void> =>
+    {
+        if (!wallet.available())
+        {
+            toasts.push('info', locale.t('wallet.missing'), 'wallet');
+            return;
+        }
+        busy = true;
+        try
+        {
+            await wallet.connect();
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    const switchChain = async (): Promise<void> =>
+    {
+        busy = true;
+        try
+        {
+            if (!await wallet.switchTo(props.chain.chainId))
+            {
+                // The wallet may simply not have this network yet, which the header's own
+                // "add chain" button is what solves - so this points at a fix, not at a fault.
+                toasts.push('error', locale.t('wallet.switchFailed', { chain: locale.chainName(props.chain.name) }), 'alert');
+            }
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    <Show
+        when={ connected }
+        fallback={
+            <Button variant="outline" size={ size } icon="wallet" busy={ busy } onClick={ () => void connect() }>
+                { locale.t('wallet.connect') }
+            </Button>
+        }
+    >
+        <Show
+            when={ rightChain }
+            fallback={
+                <Button variant="outline" size={ size } icon="alert" busy={ busy } onClick={ () => void switchChain() }>
+                    { locale.t('wallet.switch', { chain: locale.chainName(props.chain.name) }) }
+                </Button>
+            }
+        >
+            <Tooltip label={ wallet.account() }>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-raised px-2.5 py-1 text-[12px] text-inflow">
+                    <Icon name="wallet" size={ 12 } />
+                    <span class="data">{ wallet.account().slice(0, 6) }…{ wallet.account().slice(-4) }</span>
+                </span>
+            </Tooltip>
+        </Show>
+    </Show>
+}

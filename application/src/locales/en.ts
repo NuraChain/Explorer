@@ -167,6 +167,20 @@ export const en = {
     'contract.mutability.payable': 'payable',
     'contract.mutability.unknown': 'unknown',
 
+    // The two halves of calling one. Worded so the difference between them is unmissable: the
+    // first costs nothing and changes nothing, the second spends the reader's own money.
+    'contract.read': 'Read',
+    'contract.read.hint': 'Answered by this explorer. No wallet, no fee.',
+    'contract.write': 'Write',
+    'contract.write.hint': 'These send a transaction from your own wallet, on this network. Your wallet asks before anything is signed, and you pay the gas.',
+    'contract.unnamedGroup': 'Unnamed selectors',
+    'contract.call.query': 'Query',
+    'contract.call.write': 'Write',
+    'contract.call.value': 'Value to send ({symbol})',
+    'contract.call.badAmount': 'That is not an amount this chain can send.',
+    'contract.call.sent': 'Transaction sent',
+    'contract.call.noReturn': 'The call returned nothing.',
+
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Flow',
     'flow.in': 'in',
@@ -204,6 +218,9 @@ export const en = {
     'wallet.dismissed': 'Request dismissed',
     'wallet.refused': 'Your wallet refused to add the network',
     'wallet.mismatch': 'Your wallet already has this network saved under a different currency symbol. Remove it there, then try again.',
+    'wallet.connect': 'Connect wallet',
+    'wallet.switch': 'Switch to {chain}',
+    'wallet.switchFailed': 'Your wallet did not switch to {chain}. Add the network first, then try again.',
 
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Pagination',

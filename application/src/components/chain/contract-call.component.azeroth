@@ -1,0 +1,247 @@
+import { Link } from 'azerothjs';
+
+import { client, type ChainInfo, type ContractFunction } from '../../api.ts';
+import { parseAmount } from '../../lib/format.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+import WalletConnect from './wallet-connect.component.azeroth';
+import Badge from '../ui/badge.component.azeroth';
+import Button from '../ui/button.component.azeroth';
+import Input from '../ui/input.component.azeroth';
+
+import { TONE_CLASS, type Tone } from '../ui/variants.ts';
+
+// One function, made callable.
+//
+// The split that matters is the one the EVM itself makes. A `view` function costs nothing and
+// changes nothing, so it is answered here, through this explorer's own node - no wallet, no
+// signature, no fee. Anything else is a TRANSACTION: it needs a key this page will never have,
+// so the explorer's part ends at handing the calldata to a wallet, and the wallet asks its owner.
+//
+// Which is why the two paths look different on purpose. A reader must never be one identical
+// button away from signing something when they meant to read a balance.
+
+const MUTABILITY_TONE: Record<string, Tone> = {
+    view: 'neutral',
+    pure: 'neutral',
+    nonpayable: 'accent',
+    payable: 'success',
+    unknown: 'neutral'
+};
+
+export default component ContractCall(props: {
+    address: string;
+    entry: ContractFunction;
+    chain: ChainInfo;
+})
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+    const wallet = useWallet();
+
+    state open = false;
+    state args: string[] = props.entry.inputs.map(() => '');
+    state amount = '';
+    state busy = false;
+
+    /** What came back, in the three shapes an answer takes. Only one is ever set. */
+    state values: Array<{ type: string; value: string; at: number }> = [];
+    state failure = '';
+    state hash = '';
+
+    derived reads = props.entry.mutability === 'view' || props.entry.mutability === 'pure';
+    derived payable = props.entry.mutability === 'payable';
+
+    /** Connected AND on this chain - the only state in which a transaction may be offered. */
+    derived ready = wallet.account() !== '' && wallet.chainId() === props.chain.chainId;
+
+    // Carrying its own position, because a list of bare types has nothing else to key a row by:
+    // `transferFrom(address,address,uint256)` has two identical ones.
+    derived fields = props.entry.inputs.map((type, at) => ({ type, at }));
+
+    const set = (at: number, value: string): void =>
+    {
+        args = args.map((entry, index) => (index === at ? value : entry));
+    };
+
+    /** Every attempt starts from nothing shown - a stale result under a new argument lies. */
+    const clear = (): void =>
+    {
+        values = [];
+        failure = '';
+        hash = '';
+    };
+
+    const query = async (): Promise<void> =>
+    {
+        clear();
+        busy = true;
+        try
+        {
+            const result = await client.address.call({
+                params: { address: props.address },
+                input: { selector: props.entry.selector, args }
+            });
+            // Positioned as it is returned: two outputs of the same type are two different
+            // answers, and a list keyed on the type alone would collapse them into one row.
+            values = result.values.map((row, at) => ({ ...row, at }));
+            failure = result.error;
+        }
+        catch (error)
+        {
+            // A 400 from the server is an argument this page let through - it says which one.
+            failure = error instanceof Error ? error.message : String(error);
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    const write = async (): Promise<void> =>
+    {
+        clear();
+
+        const value = payable && amount.trim() !== '' ? parseAmount(amount, props.chain.decimals) : '0';
+        if (value === null)
+        {
+            failure = locale.t('contract.call.badAmount');
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            // Encoded by the server, sent by the wallet. The bytes are shown to nobody in
+            // between - the wallet displays them, and that is the screen that matters.
+            const { data } = await client.address.calldata({
+                params: { address: props.address },
+                input: { selector: props.entry.selector, args }
+            });
+            hash = await wallet.send({ to: props.address, data, value });
+            toasts.push('success', locale.t('contract.call.sent'), 'send');
+        }
+        catch (error)
+        {
+            const message = error instanceof Error ? error.message : String(error);
+            // 4001 is "the person said no" in every injected wallet, and a refusal is not a fault.
+            failure = message.includes('4001') || message.toLowerCase().includes('rejected')
+                ? locale.t('wallet.dismissed')
+                : message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    {/* A <div>, not the <li> it visually is: the list reconciler moves rows by element identity,
+        so the <li> belongs to the <For> in the parent and this fills it. */}
+    <div>
+        <button
+            class="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-start transition-colors duration-150 hover:bg-raised"
+            type="button"
+            aria-expanded={ open }
+            onClick={ () => open = !open }
+        >
+            <span class="data w-24 shrink-0 text-[12px] text-muted">{ props.entry.selector }</span>
+            <span class="hash min-w-0 flex-1 text-[13px]">
+                <span class="font-semibold">{ props.entry.name }</span>(<span class="text-muted">{ props.entry.inputs.join(', ') }</span>)
+            </span>
+            <Badge tone={ MUTABILITY_TONE[props.entry.mutability] ?? 'neutral' }>
+                { locale.t(`contract.mutability.${ props.entry.mutability }`) }
+            </Badge>
+            <Icon name="chevron-down" size={ 14 } class={ open ? 'shrink-0 rotate-180 text-muted' : 'shrink-0 text-muted' } />
+        </button>
+
+        <Show when={ open }>
+            <div class="flex flex-col gap-2.5 border-t border-line bg-raised px-4 py-3">
+                <For each={ fields } key={ (field) => String(field.at) } let={ field }>
+                    <div class="flex flex-col gap-1">
+                        <span class="data text-[11px] text-muted">{ field.type }</span>
+                        <Input
+                            label={ `${ props.entry.name } - ${ field.type }` }
+                            placeholder={ field.type }
+                            size="sm"
+                            value={ args[field.at] ?? '' }
+                            onInput={ (value) => set(field.at, value) }
+                        />
+                    </div>
+                </For>
+
+                {/* Only where the function accepts it. A value field on a non-payable function is
+                    an invitation to send currency that the contract will refuse, reverting and
+                    charging for the privilege. */}
+                <Show when={ payable }>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[11px] text-muted">{ locale.t('contract.call.value', { symbol: props.chain.symbol }) }</span>
+                        <Input
+                            label={ locale.t('contract.call.value', { symbol: props.chain.symbol }) }
+                            placeholder="0.0"
+                            size="sm"
+                            value={ amount }
+                            onInput={ (value) => amount = value }
+                        />
+                    </div>
+                </Show>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <Show
+                        when={ reads }
+                        fallback={
+                            // No Write button exists until the wallet is connected AND on this
+                            // chain: the same calldata sent on another network reaches a
+                            // different contract, or nothing at all.
+                            <Show when={ ready } fallback={ <WalletConnect chain={ props.chain } compact /> }>
+                                <Button variant="primary" icon="send" busy={ busy } onClick={ () => void write() }>
+                                    { locale.t('contract.call.write') }
+                                </Button>
+                            </Show>
+                        }
+                    >
+                        <Button variant="outline" icon="run" busy={ busy } onClick={ () => void query() }>
+                            { locale.t('contract.call.query') }
+                        </Button>
+                    </Show>
+                </div>
+
+                <Show when={ values.length > 0 }>
+                    <dl class="flex flex-col gap-1 rounded-lg border border-line bg-field px-3 py-2">
+                        <For each={ values } key={ (row) => String(row.at) } let={ row }>
+                            <div class="flex flex-wrap items-baseline gap-x-2">
+                                <dt class="data text-[11px] text-muted">{ row.type }</dt>
+                                <dd class="min-w-0 flex-1"><span class="amount text-[13px]">{ row.value }</span></dd>
+                            </div>
+                        </For>
+                    </dl>
+                </Show>
+
+                {/* A function that returns nothing still answered - saying so beats a panel that
+                    looks like the button did not work. */}
+                <Show when={ values.length === 0 && failure === '' && hash === '' && props.entry.outputs.length === 0 && reads }>
+                    <p class="text-[12px] text-muted">{ locale.t('contract.call.noReturn') }</p>
+                </Show>
+
+                <Show when={ hash !== '' }>
+                    <p class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-field px-3 py-2 text-[12px]">
+                        <Icon name="success" size={ 14 } class="text-inflow" />
+                        <span class="text-muted">{ locale.t('contract.call.sent') }</span>
+                        <Link to={ `/tx/${ hash }` } class="data text-beam no-underline hover:underline">{ hash.slice(0, 12) }…{ hash.slice(-8) }</Link>
+                    </p>
+                </Show>
+
+                <Show when={ failure !== '' }>
+                    <p class={ `flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] ${ TONE_CLASS.danger }` }>
+                        <Icon name="alert" size={ 14 } class="mt-0.5 shrink-0" />
+                        <span class="hash min-w-0">{ failure }</span>
+                    </p>
+                </Show>
+            </div>
+        </Show>
+    </div>
+}
