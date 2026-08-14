@@ -63,6 +63,30 @@ bytes, and says so on the page:
 Source verification is **not** implemented: nothing here compiles source or checks it against the
 deployed code, and the page says as much above everything it shows.
 
+### Calling one
+
+A named function can also be called, and the page splits the two kinds because the EVM does:
+
+- **Read** - `view` and `pure`. Answered by this server through its own node: arguments are
+  encoded, `eth_call` runs, and the return is decoded against the type the standard declares. No
+  wallet, no signature, no fee. A revert comes back as the reason it gives, printed where the
+  value would have been, because a revert is an answer.
+- **Write** - everything else. The server encodes the calldata and stops there. The browser hands
+  those bytes to the reader's own wallet (EIP-1193, so any injected wallet), the wallet asks its
+  owner, and the wallet sends it. **Nothing here signs, and the server's own node connection is
+  never in that path.**
+
+Two constraints are load-bearing:
+
+- The read endpoint is not an RPC passthrough. Only `view`/`pure` entries of the signature table
+  can be named, so the callable surface is a fixed list of published getters rather than whatever
+  a caller writes in the body.
+- No Write button exists until the wallet is connected **and on this chain**. The same calldata
+  sent on another network reaches a different contract, or nothing at all.
+
+Selectors with no published signature are listed but not callable - without an ABI there is no
+way to know what arguments they take.
+
 ---
 
 <div align="center">
@@ -224,7 +248,8 @@ server/                         the API and the indexer
   src/chain/store.ts            the SQLite index
   src/chain/contract.ts         bytecode -> selectors, event topics, compiler metadata
   src/chain/signatures.ts       the selector -> signature table that gives them names back
-  src/inspect.ts                one contract, from the node and the index together
+  src/chain/values.ts           typed text <-> abi encoding, for the arguments of a call
+  src/inspect.ts                one contract: describing it, reading it, encoding a call to it
 ```
 
 The API is declared once in `server/src/app.ts`, and the browser gets a typed client from that
