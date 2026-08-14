@@ -462,15 +462,26 @@ export class IndexStore
         return { rows, total };
     }
 
+    /**
+     * Every token transfer this address took part in - as the sender, as the recipient, OR as the
+     * token itself.
+     *
+     * That third case is the one a from/to pair cannot answer. A token contract is never a party
+     * to its own transfers: they move between holders and name the contract only in `token`. So an
+     * address page keyed on the counterparties alone showed a token's page an empty ledger while
+     * the index held every transfer that token had ever emitted.
+     *
+     * The three columns are each indexed, so the OR is three seeks rather than a table scan.
+     */
     public transfersOfAddress(address: string, limit: number, offset: number): { rows: TransferRow[]; total: number }
     {
         const account = normalize(address);
-        const total = (this.#stmt('SELECT COUNT(*) AS n FROM token_transfers WHERE from_addr = ? OR to_addr = ?')
-            .get(account, account) as { n: number }).n;
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM token_transfers WHERE from_addr = ? OR to_addr = ? OR token = ?')
+            .get(account, account, account) as { n: number }).n;
         const rows = this.#stmt(`
-            SELECT * FROM token_transfers WHERE from_addr = ? OR to_addr = ?
+            SELECT * FROM token_transfers WHERE from_addr = ? OR to_addr = ? OR token = ?
             ORDER BY block_number DESC, log_index DESC LIMIT ? OFFSET ?`)
-            .all(account, account, limit, offset) as unknown as TransferRow[];
+            .all(account, account, account, limit, offset) as unknown as TransferRow[];
         return { rows, total };
     }
 

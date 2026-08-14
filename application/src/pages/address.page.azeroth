@@ -1,6 +1,6 @@
 import { useParams } from 'azerothjs';
 
-import { client } from '../api.ts';
+import { client, type Transfer } from '../api.ts';
 import { formatAmount, formatValue } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
@@ -18,6 +18,20 @@ import Tooltip from '../components/ui/tooltip.component.azeroth';
 // flow figures answer "what happened to the money", and the ledger below answers "when, and with
 // whom". Token transfers are a second tab because they are a different asset - mixing them into
 // one list would make neither total mean anything.
+
+/**
+ * How a transfer row reads FROM THIS PAGE - one source for the four things that say it.
+ *
+ * `asset` is a token contract looking at its own transfers: the address is what moved, not who
+ * moved it, so the row gets no sign and no direction colour. A `+` there would claim the contract
+ * received something it never held.
+ */
+const FACE = {
+    in: { icon: 'inflow', badge: 'text-inflow', amount: 'text-inflow', sign: '+' },
+    out: { icon: 'outflow', badge: 'text-outflow', amount: 'text-outflow', sign: '−' },
+    asset: { icon: 'token', badge: 'text-nur', amount: '', sign: '' }
+} as const;
+
 export default component AddressPage()
 {
     const params = useParams();
@@ -67,6 +81,14 @@ export default component AddressPage()
         tab = next;
         page = 1;
     };
+
+    /**
+     * Which way a transfer moved, as this page reads it. Three cases, not two: a token contract
+     * appears in its own transfers as the TOKEN rather than as a counterparty, and every row on
+     * its page is one of those.
+     */
+    const way = (row: Transfer): keyof typeof FACE =>
+        row.to === address ? 'in' : row.from === address ? 'out' : 'asset';
 
     useTitle(() => locale.t('address.title', { short: address.slice(0, 10) }));
 
@@ -212,11 +234,8 @@ export default component AddressPage()
                 <ul class="divide-y divide-line">
                     <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
                         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                            <span class={ row.to === address
-                                ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-inflow'
-                                : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-outflow' }
-                            >
-                                <Icon name={ row.to === address ? 'inflow' : 'outflow' } size={ 14 } />
+                            <span class={ `flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised ${ FACE[way(row)].badge }` }>
+                                <Icon name={ FACE[way(row)].icon } size={ 14 } />
                             </span>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[13px] font-semibold">
@@ -225,6 +244,18 @@ export default component AddressPage()
                                         <span class="data ms-1.5 text-[12px] text-muted">#{ row.tokenId }</span>
                                     </Show>
                                 </p>
+                                {/* Only where the page cannot say "you". A row with no direction
+                                    has to name both ends or it says nothing about who was paid -
+                                    and the arrow flips with the reader's own direction. Copy is
+                                    off on the pair: the row already carries one copy button, and
+                                    three of them in a list turn the ledger into a toolbar. */}
+                                <Show when={ way(row) === 'asset' }>
+                                    <p class="text-[12px] text-muted">
+                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                        <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
+                                        <HashLink value={ row.to } to={ `/address/${ row.to }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                    </p>
+                                </Show>
                                 <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                             </div>
                             <div class="min-w-0 max-w-[45%] text-end">
@@ -233,11 +264,8 @@ export default component AddressPage()
                                     the hash below it lands on. The sign stays INSIDE the isolate:
                                     a bare +/- is bidi-neutral and would swap to the far side of
                                     its own digits in a mirrored line. */}
-                                <p class={ row.to === address
-                                    ? 'text-[13px] font-semibold text-inflow'
-                                    : 'text-[13px] font-semibold text-outflow' }
-                                >
-                                    <span class="amount">{ row.to === address ? '+' : '−' }{ formatAmount(row.value, row.tokenDecimals) }</span>
+                                <p class={ `text-[13px] font-semibold ${ FACE[way(row)].amount }` }>
+                                    <span class="amount">{ FACE[way(row)].sign }{ formatAmount(row.value, row.tokenDecimals) }</span>
                                 </p>
                                 <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 8 } tail={ 4 } />
                             </div>

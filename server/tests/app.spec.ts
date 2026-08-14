@@ -7,7 +7,7 @@ import { toFunctionSelector } from 'viem';
 import { buildApp } from '../src/app.ts';
 import { analyze, describeFunctions, detectStandards } from '../src/chain/contract.ts';
 import { syncOnce } from '../src/chain/indexer.ts';
-import { IndexStore } from '../src/chain/store.ts';
+import { IndexStore, TRANSFER_TOPIC } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/client.ts';
 import type {
@@ -18,7 +18,8 @@ import type {
     ContractDetail,
     SearchResult,
     Summary,
-    TransactionPage
+    TransactionPage,
+    TransferPage
 } from '../src/schemas.ts';
 
 const ENV: ChainEnv = {
@@ -28,6 +29,8 @@ const ENV: ChainEnv = {
 
 const ALICE = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const BOB = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+/** An ERC-20 contract: it EMITS transfers, and is never a party to one. */
+const TOKEN = '0xdddddddddddddddddddddddddddddddddddddddd';
 
 /** One block carrying `count` transfers of 1 NURA from Alice to Bob. */
 function block(number: number, parentHash: string, hash: string, count = 1): BlockWithReceipts
@@ -45,6 +48,25 @@ function block(number: number, parentHash: string, hash: string, count = 1): Blo
             contractAddress: null, logs: []
         }))
     };
+}
+
+/** An address as an indexed log topic: left-padded to 32 bytes, the way the EVM writes it. */
+function topic(address: string): string
+{
+    return `0x${ address.slice(2).padStart(64, '0') }`;
+}
+
+/** The same block, with its transaction emitting one ERC-20 `Transfer` of 1 token to Bob. */
+function tokenBlock(number: number, parentHash: string, hash: string): BlockWithReceipts
+{
+    const carrier = block(number, parentHash, hash);
+    carrier.transactions[0]!.logs = [{
+        index: 0,
+        address: TOKEN,
+        topics: [TRANSFER_TOPIC, topic(ALICE), topic(BOB)],
+        data: `0x${ (10n ** 18n).toString(16).padStart(64, '0') }`
+    }];
+    return carrier;
 }
 
 /** What a stubbed chain answers beyond its blocks: deployed code, and what a call returns. */
@@ -171,6 +193,36 @@ describe('the index', () =>
         expect(seen.size).toBe(4);
     });
 
+    it('finds a token\'s transfers on the TOKEN\'s own page, where no from/to pair can', async () =>
+    {
+        // A token contract is named in `token`, never as a counterparty, so a query keyed on the
+        // two parties alone showed a token's page nothing at all - the bug this covers.
+        const { store } = await indexed([...CHAIN, tokenBlock(3, '0xb2', '0xb3')]);
+
+        expect(store.transfersOfAddress(ALICE, 10, 0).total).toBe(1);
+        expect(store.transfersOfAddress(BOB, 10, 0).total).toBe(1);
+
+        const emitted = store.transfersOfAddress(TOKEN, 10, 0);
+        expect(emitted.total).toBe(1);
+        expect(emitted.rows[0]!.token).toBe(TOKEN);
+        expect(emitted.rows[0]!.value).toBe((10n ** 18n).toString());
+        // Checksummed input must not miss rows stored lower-cased, on this column too.
+        expect(store.transfersOfAddress(TOKEN.toUpperCase(), 10, 0).total).toBe(1);
+        // An address that is none of the three still sees nothing.
+        expect(store.transfersOfAddress('0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', 10, 0).total).toBe(0);
+    });
+
+    it('counts a transfer once, even when the token is also a party to it', async () =>
+    {
+        // A token holding its own token matches two arms of the OR; the row must not double.
+        const selfSend = tokenBlock(3, '0xb2', '0xb3');
+        selfSend.transactions[0]!.logs = [{
+            index: 0, address: TOKEN, topics: [TRANSFER_TOPIC, topic(ALICE), topic(TOKEN)], data: '0x01'
+        }];
+        const { store } = await indexed([...CHAIN, selfSend]);
+        expect(store.transfersOfAddress(TOKEN, 10, 0).total).toBe(1);
+    });
+
     it('sums native flow in each direction', async () =>
     {
         const { store } = await indexed(CHAIN);
@@ -277,6 +329,27 @@ describe('the API over the index', () =>
         expect(account.balance).toBe((5n * 10n ** 18n).toString());
         expect(account.txCount).toBe(4);
         expect(account.flow.out).toBe((4n * 10n ** 18n).toString());
+    });
+
+    it('serves a token contract its OWN transfers rather than an empty ledger', async () =>
+    {
+        const { store, chain } = await indexed([...CHAIN, tokenBlock(3, '0xb2', '0xb3')]);
+        const app = buildApp({ dev: false, store, chain });
+        const at = (path: string): Promise<Response> => app.handle(new Request(`http://local${ path }`));
+
+        // The tab's counter and the tab's contents have to agree - one of them reading 0 while
+        // the other lists rows is how a page reads as broken.
+        const account = (await (await at(`/api/address/${ TOKEN }`)).json()) as Account;
+        expect(account.transferCount).toBe(1);
+
+        const page = (await (await at(`/api/address/${ TOKEN }/transfers`)).json()) as TransferPage;
+        expect(page.total).toBe(1);
+        expect(page.rows).toHaveLength(1);
+        expect(page.rows[0]!.token).toBe(TOKEN);
+        // Neither end is the page's own address: this row has no direction, and the UI prints the
+        // pair instead of a sign.
+        expect(page.rows[0]!.from).toBe(ALICE);
+        expect(page.rows[0]!.to).toBe(BOB);
     });
 
     it('pages blocks and transactions in a countable envelope', async () =>
