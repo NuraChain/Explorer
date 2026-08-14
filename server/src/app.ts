@@ -5,12 +5,15 @@ import { mountPages, type KitOptions } from '@azerothjs/kit';
 import type { ChainGateway } from './chain/client.ts';
 import { normalize, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
-import { inspectContract } from './inspect.ts';
+import { calldataFor, inspectContract, readContract } from './inspect.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
 import {
     account,
     blockDetail,
     blockPage,
+    contractCalldata,
+    contractCallInput,
+    contractCallResult,
     contractDetail,
     pageQuery,
     searchQuery,
@@ -202,7 +205,23 @@ function build({ store, chain }: ApiDeps)
             // any of them would describe a contract that no longer exists in that form. Only the
             // deployment - who put it there - comes from the index, because the chain cannot say.
             contract: routes.get('/:address/contract', { output: contractDetail }, async ({ params }) =>
-                inspectContract({ store, chain }, params.address))
+                inspectContract({ store, chain }, params.address)),
+
+            // A read, executed against the node. POST rather than GET because the arguments are a
+            // structured body, and rather than QUERY because this has to survive whatever reverse
+            // proxy a deployment puts in front of it - a method a WAF has never heard of comes
+            // back 405, and a button that works only on localhost is worse than a purist verb.
+            //
+            // Not a general RPC passthrough: only `view`/`pure` functions of the signature table
+            // can be named (see inspect.ts), so the callable surface is a fixed list of published
+            // getters. Writes never come through here at all.
+            call: routes.post('/:address/call', { input: contractCallInput, output: contractCallResult }, async ({ params, input }) =>
+                readContract({ store, chain }, params.address, input.selector, input.args)),
+
+            // Encoding only - no node, no signing, no sending. The browser hands the bytes to a
+            // wallet, and the wallet's owner decides whether they become a transaction.
+            calldata: routes.post('/:address/calldata', { input: contractCallInput, output: contractCalldata }, ({ input }) =>
+                ({ data: calldataFor(input.selector, input.args) }))
         })),
 
         search: feature('/search', (routes) => ({

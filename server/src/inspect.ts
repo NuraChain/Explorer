@@ -1,11 +1,12 @@
-import { decodeAbiParameters } from 'viem';
+import { BadRequestError } from '@azerothjs/http';
 
 import type { ChainGateway } from './chain/client.ts';
 import { analyze, describeEvents, describeFunctions, detectStandards } from './chain/contract.ts';
-import { READABLE_CALLS, selectorOf, type ReadableCall } from './chain/signatures.ts';
+import { FUNCTION_BY_SELECTOR, READABLE_CALLS, selectorOf, type KnownFunction } from './chain/signatures.ts';
 import { normalize, type IndexStore } from './chain/store.ts';
+import { ArgumentError, decodeReturn, encodeCall } from './chain/values.ts';
 import { iso } from './present.ts';
-import type { ContractDetail, ContractRead, ProxyKind } from './schemas.ts';
+import type { ContractCallResult, ContractDetail, ContractRead, ProxyKind } from './schemas.ts';
 
 // One contract, described from the node and the index together.
 //
@@ -77,24 +78,11 @@ async function findProxy(chain: ChainGateway, address: string, code: string): Pr
 }
 
 /** One getter's answer, decoded to text. Null when the contract refused or answered nonsense. */
-function decodeRead(type: ReadableCall['type'], data: string): string | null
+function decodeRead(type: string, data: string): string | null
 {
-    if (data === '0x' || data === '')
-    {
-        return null;
-    }
     try
     {
-        const [value] = decodeAbiParameters([{ type }], data as `0x${ string }`);
-        if (typeof value === 'bigint')
-        {
-            return value.toString();
-        }
-        if (typeof value === 'boolean')
-        {
-            return value ? 'true' : 'false';
-        }
-        return String(value);
+        return decodeReturn([type], data)[0]?.value ?? null;
     }
     catch
     {
@@ -121,6 +109,108 @@ async function readValues(chain: ChainGateway, address: string, selectors: Reado
         return value === null ? null : { name: entry.name, signature: entry.signature, type: entry.type, value };
     }));
     return answers.filter((entry): entry is ContractRead => entry !== null);
+}
+
+/**
+ * The function a call names, or a refusal.
+ *
+ * A selector this server cannot name is a selector it cannot encode arguments for either - there
+ * is no ABI behind it - so the refusal is the honest answer rather than a best effort.
+ */
+function resolve(selector: string): KnownFunction
+{
+    const entry = FUNCTION_BY_SELECTOR.get(selector.toLowerCase());
+    if (entry === undefined)
+    {
+        throw new BadRequestError(`No published signature is known for ${ selector }, so its arguments cannot be encoded.`);
+    }
+    return entry;
+}
+
+/** Turns a rejected argument into the 400 the field that produced it can be pointed at. */
+function asBadRequest(error: unknown): never
+{
+    if (error instanceof ArgumentError)
+    {
+        throw new BadRequestError(`Argument ${ error.at + 1 }: ${ error.message }`);
+    }
+    throw error;
+}
+
+/**
+ * The calldata for a call, encoded and handed back.
+ *
+ * NOTHING is sent here, and nothing touches the chain: this server has a node connection and no
+ * business signing with it. The bytes go to the browser, the browser gives them to a wallet, and
+ * the wallet's owner decides. That is also why this stays a pure function of its input - an
+ * explorer that could send transactions would be a very different thing to run.
+ */
+export function calldataFor(selector: string, args: readonly string[]): string
+{
+    const entry = resolve(selector);
+    try
+    {
+        return encodeCall(entry, args);
+    }
+    catch (error)
+    {
+        return asBadRequest(error);
+    }
+}
+
+/**
+ * One `eth_call` against a contract, decoded.
+ *
+ * Restricted to `view` and `pure` functions of the signature table, which is what keeps this from
+ * being an open relay for the node behind it: the callable surface is a fixed list of published
+ * read-only getters, not whatever the caller writes in the body. A state-changing function is
+ * refused here on purpose - it belongs to a wallet, which pays for it and asks first.
+ */
+export async function readContract(
+    { chain }: InspectDeps,
+    target: string,
+    selector: string,
+    args: readonly string[]
+): Promise<ContractCallResult>
+{
+    const entry = resolve(selector);
+    if (entry.mutability !== 'view' && entry.mutability !== 'pure')
+    {
+        throw new BadRequestError(`${ entry.signature } changes state; send it from a wallet rather than reading it here.`);
+    }
+
+    let data: string;
+    try
+    {
+        data = encodeCall(entry, args);
+    }
+    catch (error)
+    {
+        return asBadRequest(error);
+    }
+
+    try
+    {
+        const returned = await chain.call(normalize(target), data);
+        return { values: decodeReturn(entry.outputs, returned), error: '' };
+    }
+    catch (error)
+    {
+        // A revert is an ANSWER, not a server fault: `ownerOf` on an unminted id is supposed to
+        // fail, and the reason it gives is the useful part. It comes back as a 200 carrying the
+        // reason, so the page can print it where the value would have gone.
+        return { values: [], error: reasonOf(error) };
+    }
+}
+
+/** The one line worth showing from a viem error, capped so a node cannot fill the page. */
+function reasonOf(error: unknown): string
+{
+    const short = typeof error === 'object' && error !== null && 'shortMessage' in error
+        ? String((error as { shortMessage: unknown }).shortMessage)
+        : String(error instanceof Error ? error.message : error);
+    const line = short.split('\n')[0] ?? '';
+    return line.length > 200 ? `${ line.slice(0, 199) }…` : line;
 }
 
 export interface InspectDeps

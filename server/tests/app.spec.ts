@@ -10,7 +10,16 @@ import { syncOnce } from '../src/chain/indexer.ts';
 import { IndexStore } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/client.ts';
-import type { Account, BlockPage, ContractDetail, SearchResult, Summary, TransactionPage } from '../src/schemas.ts';
+import type {
+    Account,
+    BlockPage,
+    ContractCalldata,
+    ContractCallResult,
+    ContractDetail,
+    SearchResult,
+    Summary,
+    TransactionPage
+} from '../src/schemas.ts';
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
@@ -38,10 +47,17 @@ function block(number: number, parentHash: string, hash: string, count = 1): Blo
     };
 }
 
-/** A chain the test drives directly: `chain.blocks` IS the canonical chain. */
-function stubChain(blocks: BlockWithReceipts[], code: Record<string, string> = {}): ChainGateway
+/** What a stubbed chain answers beyond its blocks: deployed code, and what a call returns. */
+interface ChainStub
 {
-    const codeAt = (address: string): string => code[address.toLowerCase()] ?? '0x';
+    code?: Record<string, string>;
+    call?: (address: string, data: string) => Promise<string>;
+}
+
+/** A chain the test drives directly: `chain.blocks` IS the canonical chain. */
+function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): ChainGateway
+{
+    const codeAt = (address: string): string => stub.code?.[address.toLowerCase()] ?? '0x';
     return {
         env: ENV,
         head: async () => blocks[blocks.length - 1]?.number ?? 0,
@@ -53,18 +69,17 @@ function stubChain(blocks: BlockWithReceipts[], code: Record<string, string> = {
         isContract: async address => codeAt(address) !== '0x',
         code: async address => codeAt(address),
         storageAt: async () => `0x${ '0'.repeat(64) }`,
-        // Every getter refuses. A contract that answers is exercised where that IS the subject -
-        // here it would only assert that the stub returns what the stub was told to.
-        call: async () => '0x'
+        // Silence by default: a getter that answers is stubbed only where that IS the subject.
+        call: stub.call ?? (async () => '0x')
     };
 }
 
 const silent = { info: () => undefined, warn: () => undefined, error: () => undefined, debug: () => undefined } as never;
 
-async function indexed(blocks: BlockWithReceipts[], code: Record<string, string> = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
+async function indexed(blocks: BlockWithReceipts[], stub: ChainStub = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
 {
     const store = new IndexStore(':memory:');
-    const chain = stubChain(blocks, code);
+    const chain = stubChain(blocks, stub);
     store.ensureChain(await chain.genesisHash());
     await syncOnce(store, chain, silent);
     return { store, chain };
@@ -387,7 +402,7 @@ describe('reading a contract off its bytecode', () =>
             ...creation.transactions[0]!, to: null, value: 0n, inputSize: 120, contractAddress: deployed
         };
 
-        const { store, chain } = await indexed([creation], { [deployed]: TOKEN_CODE });
+        const { store, chain } = await indexed([creation], { code: { [deployed]: TOKEN_CODE } });
         const app = buildApp({ dev: false, store, chain });
         const detail = (await (await app.handle(new Request(`http://local/api/address/${ deployed }/contract`))).json()) as ContractDetail;
 
@@ -409,5 +424,97 @@ describe('reading a contract off its bytecode', () =>
         expect(detail.isContract).toBe(false);
         expect(detail.functions).toEqual([]);
         expect(detail.creation).toBeNull();
+    });
+});
+
+describe('calling a contract', () =>
+{
+    const CONTRACT = '0xdddddddddddddddddddddddddddddddddddddddd';
+
+    /** A uint256 as the EVM returns one: one 32-byte word. */
+    const word = (value: bigint): string => `0x${ value.toString(16).padStart(64, '0') }`;
+
+    async function post(path: string, body: unknown, stub: ChainStub = {}): Promise<Response>
+    {
+        const { store, chain } = await indexed(CHAIN, stub);
+        const app = buildApp({ dev: false, store, chain });
+        return app.handle(new Request(`http://local${ path }`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body)
+        }));
+    }
+
+    it('encodes an argument as the type its signature declares', async () =>
+    {
+        const response = await post(`/api/address/${ CONTRACT }/calldata`, {
+            selector: toFunctionSelector('transfer(address,uint256)'),
+            args: [BOB, '1000000000000000000']
+        });
+        const { data } = (await response.json()) as ContractCalldata;
+
+        // Selector, then the address right-padded into a word, then the amount in the next.
+        expect(data.slice(0, 10)).toBe(toFunctionSelector('transfer(address,uint256)'));
+        expect(data.slice(10, 74)).toBe(BOB.slice(2).padStart(64, '0'));
+        expect(BigInt(`0x${ data.slice(74) }`)).toBe(10n ** 18n);
+    });
+
+    it('refuses an argument that does not fit its type, naming which one', async () =>
+    {
+        // A silently-coerced address becomes a transaction someone signs against the wrong
+        // account, so this has to be a refusal rather than a best effort.
+        const response = await post(`/api/address/${ CONTRACT }/calldata`, {
+            selector: toFunctionSelector('transfer(address,uint256)'),
+            args: ['0x123', '1']
+        });
+        expect(response.status).toBe(400);
+        expect(JSON.stringify(await response.json())).toContain('Argument 1');
+    });
+
+    it('refuses a selector no published signature describes', async () =>
+    {
+        const response = await post(`/api/address/${ CONTRACT }/calldata`, { selector: '0x12345678', args: [] });
+        expect(response.status).toBe(400);
+    });
+
+    it('refuses to execute a state-changing function as a read', async () =>
+    {
+        // The read endpoint reaches the node. Anything that can CHANGE what the node holds
+        // belongs to a wallet, which asks its owner first and pays for the answer.
+        const response = await post(`/api/address/${ CONTRACT }/call`, {
+            selector: toFunctionSelector('transfer(address,uint256)'),
+            args: [BOB, '1']
+        });
+        expect(response.status).toBe(400);
+    });
+
+    it('reads a getter through the node and decodes what came back', async () =>
+    {
+        const response = await post(
+            `/api/address/${ CONTRACT }/call`,
+            { selector: toFunctionSelector('balanceOf(address)'), args: [ALICE] },
+            { call: async () => word(42n) });
+        const result = (await response.json()) as ContractCallResult;
+
+        expect(result.error).toBe('');
+        expect(result.values).toEqual([{ type: 'uint256', value: '42' }]);
+    });
+
+    it('reports a revert as an answer rather than as a failure', async () =>
+    {
+        // `ownerOf` on an unminted id is SUPPOSED to fail, and the reason is the useful part.
+        // A 500 here would read as "the explorer broke" for a contract behaving correctly.
+        const response = await post(
+            `/api/address/${ CONTRACT }/call`,
+            { selector: toFunctionSelector('ownerOf(uint256)'), args: ['7'] },
+            { call: async () =>
+            {
+                throw Object.assign(new Error('reverted'), { shortMessage: 'execution reverted: nonexistent token' });
+            } });
+        const result = (await response.json()) as ContractCallResult;
+
+        expect(response.status).toBe(200);
+        expect(result.values).toEqual([]);
+        expect(result.error).toContain('nonexistent token');
     });
 });

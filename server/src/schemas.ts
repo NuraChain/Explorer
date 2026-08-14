@@ -145,6 +145,8 @@ export const contractFunction = object({
     signature: string(),
     name: string(),
     inputs: array(string()),
+    /** What it answers with. Empty means it returns nothing - or that nobody has declared it. */
+    outputs: array(string()),
     mutability: enumOf(MUTABILITY)
 });
 export type ContractFunction = Infer<typeof contractFunction>;
@@ -198,6 +200,30 @@ export const contractDetail = object({
     }).nullable()
 });
 export type ContractDetail = Infer<typeof contractDetail>;
+
+/**
+ * One call, described by the caller: which function, and the arguments as TYPED TEXT.
+ *
+ * Text, not numbers: a uint256 argument does not survive a JSON number, and the field it came
+ * from held a string anyway. The server turns each one into the ABI's value (chain/values.ts),
+ * which is also where a malformed one is refused by name.
+ */
+export const contractCallInput = object({
+    selector: string(),
+    args: array(string())
+});
+export type ContractCallInput = Infer<typeof contractCallInput>;
+
+export const contractCallResult = object({
+    values: array(object({ type: string(), value: string() })),
+    /** '' when the call returned. Otherwise why it did not - usually the revert reason. */
+    error: string()
+});
+export type ContractCallResult = Infer<typeof contractCallResult>;
+
+/** The calldata for a call the caller intends to SIGN. Encoded here, sent by their wallet. */
+export const contractCalldata = object({ data: string() });
+export type ContractCalldata = Infer<typeof contractCalldata>;
 
 export const blockDetail = object({ block, transactions: array(transaction), total: number(), page: number(), pages: number() });
 export type BlockDetail = Infer<typeof blockDetail>;

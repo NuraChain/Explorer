@@ -23,6 +23,13 @@ export interface KnownFunction
     signature: string;
     name: string;
     inputs: string[];
+
+    /**
+     * What the function answers with. Not in the bytecode at ANY optimisation level - the EVM
+     * returns bytes and the ABI decides what they mean - so a call can only be decoded for a
+     * signature whose standard declared this. Empty means it returns nothing.
+     */
+    outputs: string[];
     mutability: Mutability;
 }
 
@@ -35,135 +42,138 @@ export interface KnownEvent
 }
 
 /**
- * Signature -> the mutability its standard declares.
+ * Signature -> the mutability and return types its standard declares.
  *
- * Mutability cannot be recovered from bytecode: `view` is a promise made in the ABI, not a flag in
- * the EVM. It is carried here because the standard that named the function also declared it, and
- * a reader deciding whether a call can change anything needs to know.
+ * Neither survives compilation: `view` is a promise made in the ABI rather than a flag in the
+ * EVM, and a return type is what the ABI says the returned bytes MEAN. Both are carried here
+ * because the standard that named the function also declared them - and without them a call
+ * cannot be offered at all, because there would be no way to say what came back.
+ *
+ * The third column is comma-separated, exactly as a signature's arguments are; '' returns nothing.
  */
-const FUNCTIONS: ReadonlyArray<readonly [string, Mutability]> = [
+const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // --- ERC-20 -----------------------------------------------------------------------------
-    ['name()', 'view'],
-    ['symbol()', 'view'],
-    ['decimals()', 'view'],
-    ['totalSupply()', 'view'],
-    ['balanceOf(address)', 'view'],
-    ['transfer(address,uint256)', 'nonpayable'],
-    ['transferFrom(address,address,uint256)', 'nonpayable'],
-    ['approve(address,uint256)', 'nonpayable'],
-    ['allowance(address,address)', 'view'],
-    ['increaseAllowance(address,uint256)', 'nonpayable'],
-    ['decreaseAllowance(address,uint256)', 'nonpayable'],
-    ['mint(address,uint256)', 'nonpayable'],
-    ['burn(uint256)', 'nonpayable'],
-    ['burnFrom(address,uint256)', 'nonpayable'],
-    ['cap()', 'view'],
+    ['name()', 'view', 'string'],
+    ['symbol()', 'view', 'string'],
+    ['decimals()', 'view', 'uint8'],
+    ['totalSupply()', 'view', 'uint256'],
+    ['balanceOf(address)', 'view', 'uint256'],
+    ['transfer(address,uint256)', 'nonpayable', 'bool'],
+    ['transferFrom(address,address,uint256)', 'nonpayable', 'bool'],
+    ['approve(address,uint256)', 'nonpayable', 'bool'],
+    ['allowance(address,address)', 'view', 'uint256'],
+    ['increaseAllowance(address,uint256)', 'nonpayable', 'bool'],
+    ['decreaseAllowance(address,uint256)', 'nonpayable', 'bool'],
+    ['mint(address,uint256)', 'nonpayable', ''],
+    ['burn(uint256)', 'nonpayable', ''],
+    ['burnFrom(address,uint256)', 'nonpayable', ''],
+    ['cap()', 'view', 'uint256'],
     // BNB-chain's BEP-20 addition; it appears on a great many EVM tokens.
-    ['getOwner()', 'view'],
+    ['getOwner()', 'view', 'address'],
 
     // --- EIP-2612 (permit) ------------------------------------------------------------------
-    ['permit(address,address,uint256,uint256,uint8,bytes32,bytes32)', 'nonpayable'],
-    ['nonces(address)', 'view'],
-    ['DOMAIN_SEPARATOR()', 'view'],
-    ['eip712Domain()', 'view'],
+    ['permit(address,address,uint256,uint256,uint8,bytes32,bytes32)', 'nonpayable', ''],
+    ['nonces(address)', 'view', 'uint256'],
+    ['DOMAIN_SEPARATOR()', 'view', 'bytes32'],
+    ['eip712Domain()', 'view', 'bytes1,string,string,uint256,address,bytes32,uint256[]'],
 
     // --- ERC-165 ----------------------------------------------------------------------------
-    ['supportsInterface(bytes4)', 'view'],
+    ['supportsInterface(bytes4)', 'view', 'bool'],
 
     // --- ERC-721 ----------------------------------------------------------------------------
-    ['ownerOf(uint256)', 'view'],
-    ['safeTransferFrom(address,address,uint256)', 'nonpayable'],
-    ['safeTransferFrom(address,address,uint256,bytes)', 'nonpayable'],
-    ['setApprovalForAll(address,bool)', 'nonpayable'],
-    ['getApproved(uint256)', 'view'],
-    ['isApprovedForAll(address,address)', 'view'],
-    ['tokenURI(uint256)', 'view'],
-    ['tokenOfOwnerByIndex(address,uint256)', 'view'],
-    ['tokenByIndex(uint256)', 'view'],
-    ['safeMint(address,uint256)', 'nonpayable'],
-    ['safeMint(address,string)', 'nonpayable'],
+    ['ownerOf(uint256)', 'view', 'address'],
+    ['safeTransferFrom(address,address,uint256)', 'nonpayable', ''],
+    ['safeTransferFrom(address,address,uint256,bytes)', 'nonpayable', ''],
+    ['setApprovalForAll(address,bool)', 'nonpayable', ''],
+    ['getApproved(uint256)', 'view', 'address'],
+    ['isApprovedForAll(address,address)', 'view', 'bool'],
+    ['tokenURI(uint256)', 'view', 'string'],
+    ['tokenOfOwnerByIndex(address,uint256)', 'view', 'uint256'],
+    ['tokenByIndex(uint256)', 'view', 'uint256'],
+    ['safeMint(address,uint256)', 'nonpayable', ''],
+    ['safeMint(address,string)', 'nonpayable', ''],
 
     // --- ERC-1155 ---------------------------------------------------------------------------
-    ['balanceOf(address,uint256)', 'view'],
-    ['balanceOfBatch(address[],uint256[])', 'view'],
-    ['safeTransferFrom(address,address,uint256,uint256,bytes)', 'nonpayable'],
-    ['safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)', 'nonpayable'],
-    ['uri(uint256)', 'view'],
+    ['balanceOf(address,uint256)', 'view', 'uint256'],
+    ['balanceOfBatch(address[],uint256[])', 'view', 'uint256[]'],
+    ['safeTransferFrom(address,address,uint256,uint256,bytes)', 'nonpayable', ''],
+    ['safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)', 'nonpayable', ''],
+    ['uri(uint256)', 'view', 'string'],
 
     // --- Ownable ----------------------------------------------------------------------------
-    ['owner()', 'view'],
-    ['transferOwnership(address)', 'nonpayable'],
-    ['renounceOwnership()', 'nonpayable'],
-    ['pendingOwner()', 'view'],
-    ['acceptOwnership()', 'nonpayable'],
+    ['owner()', 'view', 'address'],
+    ['transferOwnership(address)', 'nonpayable', ''],
+    ['renounceOwnership()', 'nonpayable', ''],
+    ['pendingOwner()', 'view', 'address'],
+    ['acceptOwnership()', 'nonpayable', ''],
 
     // --- AccessControl ----------------------------------------------------------------------
-    ['hasRole(bytes32,address)', 'view'],
-    ['getRoleAdmin(bytes32)', 'view'],
-    ['grantRole(bytes32,address)', 'nonpayable'],
-    ['revokeRole(bytes32,address)', 'nonpayable'],
-    ['renounceRole(bytes32,address)', 'nonpayable'],
-    ['DEFAULT_ADMIN_ROLE()', 'view'],
-    ['getRoleMember(bytes32,uint256)', 'view'],
-    ['getRoleMemberCount(bytes32)', 'view'],
+    ['hasRole(bytes32,address)', 'view', 'bool'],
+    ['getRoleAdmin(bytes32)', 'view', 'bytes32'],
+    ['grantRole(bytes32,address)', 'nonpayable', ''],
+    ['revokeRole(bytes32,address)', 'nonpayable', ''],
+    ['renounceRole(bytes32,address)', 'nonpayable', ''],
+    ['DEFAULT_ADMIN_ROLE()', 'view', 'bytes32'],
+    ['getRoleMember(bytes32,uint256)', 'view', 'address'],
+    ['getRoleMemberCount(bytes32)', 'view', 'uint256'],
     // The role constants OpenZeppelin's own templates declare. They are getters like any other,
     // and a token that has one is a token somebody can mint, burn or pause.
-    ['MINTER_ROLE()', 'view'],
-    ['PAUSER_ROLE()', 'view'],
-    ['BURNER_ROLE()', 'view'],
-    ['UPGRADER_ROLE()', 'view'],
-    ['SNAPSHOT_ROLE()', 'view'],
-    ['OPERATOR_ROLE()', 'view'],
-    ['ADMIN_ROLE()', 'view'],
+    ['MINTER_ROLE()', 'view', 'bytes32'],
+    ['PAUSER_ROLE()', 'view', 'bytes32'],
+    ['BURNER_ROLE()', 'view', 'bytes32'],
+    ['UPGRADER_ROLE()', 'view', 'bytes32'],
+    ['SNAPSHOT_ROLE()', 'view', 'bytes32'],
+    ['OPERATOR_ROLE()', 'view', 'bytes32'],
+    ['ADMIN_ROLE()', 'view', 'bytes32'],
 
     // --- ERC-5805 / ERC-6372 (votes and the clock they count on) ----------------------------
-    ['delegate(address)', 'nonpayable'],
-    ['delegates(address)', 'view'],
-    ['getVotes(address)', 'view'],
-    ['getPastVotes(address,uint256)', 'view'],
-    ['getPastTotalSupply(uint256)', 'view'],
-    ['clock()', 'view'],
-    ['CLOCK_MODE()', 'view'],
+    ['delegate(address)', 'nonpayable', ''],
+    ['delegates(address)', 'view', 'address'],
+    ['getVotes(address)', 'view', 'uint256'],
+    ['getPastVotes(address,uint256)', 'view', 'uint256'],
+    ['getPastTotalSupply(uint256)', 'view', 'uint256'],
+    ['clock()', 'view', 'uint48'],
+    ['CLOCK_MODE()', 'view', 'string'],
 
     // --- Pausable ---------------------------------------------------------------------------
-    ['paused()', 'view'],
-    ['pause()', 'nonpayable'],
-    ['unpause()', 'nonpayable'],
+    ['paused()', 'view', 'bool'],
+    ['pause()', 'nonpayable', ''],
+    ['unpause()', 'nonpayable', ''],
 
     // --- Proxies and upgrades ---------------------------------------------------------------
-    ['implementation()', 'view'],
-    ['upgradeTo(address)', 'nonpayable'],
-    ['upgradeToAndCall(address,bytes)', 'payable'],
-    ['admin()', 'view'],
-    ['changeAdmin(address)', 'nonpayable'],
-    ['proxiableUUID()', 'view'],
-    ['initialize()', 'nonpayable'],
-    ['initialize(address)', 'nonpayable'],
-    ['initialize(string,string)', 'nonpayable'],
-    ['UPGRADE_INTERFACE_VERSION()', 'view'],
+    ['implementation()', 'view', 'address'],
+    ['upgradeTo(address)', 'nonpayable', ''],
+    ['upgradeToAndCall(address,bytes)', 'payable', ''],
+    ['admin()', 'view', 'address'],
+    ['changeAdmin(address)', 'nonpayable', ''],
+    ['proxiableUUID()', 'view', 'bytes32'],
+    ['initialize()', 'nonpayable', ''],
+    ['initialize(address)', 'nonpayable', ''],
+    ['initialize(string,string)', 'nonpayable', ''],
+    ['UPGRADE_INTERFACE_VERSION()', 'view', 'string'],
 
     // --- ERC-4626 (tokenised vault) ---------------------------------------------------------
-    ['asset()', 'view'],
-    ['totalAssets()', 'view'],
-    ['deposit(uint256,address)', 'nonpayable'],
-    ['mint(uint256,address)', 'nonpayable'],
-    ['withdraw(uint256,address,address)', 'nonpayable'],
-    ['redeem(uint256,address,address)', 'nonpayable'],
-    ['convertToShares(uint256)', 'view'],
-    ['convertToAssets(uint256)', 'view'],
-    ['previewDeposit(uint256)', 'view'],
-    ['previewRedeem(uint256)', 'view'],
-    ['maxDeposit(address)', 'view'],
-    ['maxRedeem(address)', 'view'],
+    ['asset()', 'view', 'address'],
+    ['totalAssets()', 'view', 'uint256'],
+    ['deposit(uint256,address)', 'nonpayable', 'uint256'],
+    ['mint(uint256,address)', 'nonpayable', 'uint256'],
+    ['withdraw(uint256,address,address)', 'nonpayable', 'uint256'],
+    ['redeem(uint256,address,address)', 'nonpayable', 'uint256'],
+    ['convertToShares(uint256)', 'view', 'uint256'],
+    ['convertToAssets(uint256)', 'view', 'uint256'],
+    ['previewDeposit(uint256)', 'view', 'uint256'],
+    ['previewRedeem(uint256)', 'view', 'uint256'],
+    ['maxDeposit(address)', 'view', 'uint256'],
+    ['maxRedeem(address)', 'view', 'uint256'],
 
     // --- Wrapped native -----------------------------------------------------------------------
-    ['deposit()', 'payable'],
-    ['withdraw(uint256)', 'nonpayable'],
+    ['deposit()', 'payable', ''],
+    ['withdraw(uint256)', 'nonpayable', ''],
 
     // --- Odds and ends every toolchain emits --------------------------------------------------
-    ['multicall(bytes[])', 'nonpayable'],
-    ['version()', 'view'],
-    ['VERSION()', 'view']
+    ['multicall(bytes[])', 'nonpayable', 'bytes[]'],
+    ['version()', 'view', 'string'],
+    ['VERSION()', 'view', 'string']
 ];
 
 /** Event signatures, for the 32-byte topics a dispatcher pushes before it logs. */
@@ -193,16 +203,19 @@ const EVENTS: readonly string[] = [
     'EIP712DomainChanged()'
 ];
 
+/** A comma-separated type list; '' is NO types, not one nameless one (''.split(',') is ['']). */
+function types(list: string): string[]
+{
+    return list === '' ? [] : list.split(',');
+}
+
 /** `transfer(address,uint256)` -> `['transfer', ['address', 'uint256']]`. */
 function split(signature: string): { name: string; inputs: string[] }
 {
     const open = signature.indexOf('(');
-    const body = signature.slice(open + 1, signature.lastIndexOf(')'));
     return {
         name: signature.slice(0, open),
-        // A signature with no arguments has an EMPTY body, and ''.split(',') is [''] - one
-        // argument of no type, which would print as `name()` taking a nameless parameter.
-        inputs: body === '' ? [] : body.split(',')
+        inputs: types(signature.slice(open + 1, signature.lastIndexOf(')')))
     };
 }
 
@@ -213,11 +226,11 @@ function split(signature: string): { name: string; inputs: string[] }
  * mislabels a function forever, and `toFunctionSelector` is the same keccak the compiler used.
  */
 export const FUNCTION_BY_SELECTOR: ReadonlyMap<string, KnownFunction> = new Map(
-    FUNCTIONS.map(([signature, mutability]) =>
+    FUNCTIONS.map(([signature, mutability, outputs]) =>
     {
         const { name, inputs } = split(signature);
         const selector = toFunctionSelector(signature);
-        return [selector, { selector, signature, name, inputs, mutability }] as const;
+        return [selector, { selector, signature, name, inputs, outputs: types(outputs), mutability }] as const;
     }));
 
 export const EVENT_BY_TOPIC: ReadonlyMap<string, KnownEvent> = new Map(
@@ -235,44 +248,50 @@ export function selectorOf(signature: string): string
 }
 
 /**
- * A zero-argument getter worth calling, and the type its answer decodes as.
+ * The getters worth calling on sight, in the order a reader wants to see them.
  *
- * Zero-argument ONLY, and only where the standard fixes the return type: a call with arguments
- * would need values this explorer does not have, and a return type it guessed at would print a
- * number that is not the number the contract holds.
+ * Zero-argument only: a call taking arguments needs values nobody has supplied yet, and those
+ * are offered on the page instead of guessed at here. The order is the point of the list - it
+ * is what an identity panel reads like, which alphabetical never is.
  */
+const IDENTITY: readonly string[] = [
+    'name()',
+    'symbol()',
+    'decimals()',
+    'totalSupply()',
+    'cap()',
+    'owner()',
+    'getOwner()',
+    'pendingOwner()',
+    'admin()',
+    'paused()',
+    'asset()',
+    'totalAssets()',
+    'implementation()',
+    'version()',
+    'VERSION()',
+    'UPGRADE_INTERFACE_VERSION()',
+    'DOMAIN_SEPARATOR()',
+    'DEFAULT_ADMIN_ROLE()'
+];
+
+/** One of {@link IDENTITY}, resolved against the table so the return type is stated once. */
 export interface ReadableCall
 {
     selector: string;
     signature: string;
     name: string;
-    type: 'string' | 'uint8' | 'uint256' | 'address' | 'bool' | 'bytes32';
+    type: string;
 }
 
-const READABLE: ReadonlyArray<readonly [string, ReadableCall['type']]> = [
-    ['name()', 'string'],
-    ['symbol()', 'string'],
-    ['decimals()', 'uint8'],
-    ['totalSupply()', 'uint256'],
-    ['owner()', 'address'],
-    ['getOwner()', 'address'],
-    ['pendingOwner()', 'address'],
-    ['paused()', 'bool'],
-    ['cap()', 'uint256'],
-    ['asset()', 'address'],
-    ['totalAssets()', 'uint256'],
-    ['implementation()', 'address'],
-    ['admin()', 'address'],
-    ['version()', 'string'],
-    ['VERSION()', 'string'],
-    ['UPGRADE_INTERFACE_VERSION()', 'string'],
-    ['DOMAIN_SEPARATOR()', 'bytes32'],
-    ['DEFAULT_ADMIN_ROLE()', 'bytes32']
-];
-
-export const READABLE_CALLS: readonly ReadableCall[] = READABLE.map(([signature, type]) => ({
-    selector: toFunctionSelector(signature),
-    signature,
-    name: split(signature).name,
-    type
-}));
+export const READABLE_CALLS: readonly ReadableCall[] = IDENTITY
+    .map((signature) => FUNCTION_BY_SELECTOR.get(toFunctionSelector(signature)))
+    // A single return value, because this panel prints one figure per row. Anything the table
+    // does not describe is simply not on the list - it cannot be, the lookup is the source.
+    .filter((entry): entry is KnownFunction => entry !== undefined && entry.outputs.length === 1)
+    .map((entry) => ({
+        selector: entry.selector,
+        signature: entry.signature,
+        name: entry.name,
+        type: entry.outputs[0]!
+    }));

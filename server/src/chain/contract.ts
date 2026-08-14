@@ -376,7 +376,7 @@ export function describeFunctions(selectors: readonly string[]): DescribedFuncti
     {
         const known = FUNCTION_BY_SELECTOR.get(selector);
         return known === undefined
-            ? { selector, signature: '', name: '', inputs: [], mutability: 'unknown', known: false }
+            ? { selector, signature: '', name: '', inputs: [], outputs: [], mutability: 'unknown', known: false }
             : { ...known, known: true };
     });
 
