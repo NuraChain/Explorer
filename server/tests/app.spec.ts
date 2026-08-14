@@ -2,13 +2,15 @@
 // only way to exercise the paths a live node will not reproduce on demand (a reorg, a receipt the
 // node never returned, an address with more rows than one page).
 import { describe, it, expect } from 'vitest';
+import { toFunctionSelector } from 'viem';
 
 import { buildApp } from '../src/app.ts';
+import { analyze, describeFunctions, detectStandards } from '../src/chain/contract.ts';
 import { syncOnce } from '../src/chain/indexer.ts';
 import { IndexStore } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/client.ts';
-import type { Account, BlockPage, SearchResult, Summary, TransactionPage } from '../src/schemas.ts';
+import type { Account, BlockPage, ContractDetail, SearchResult, Summary, TransactionPage } from '../src/schemas.ts';
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
@@ -37,8 +39,9 @@ function block(number: number, parentHash: string, hash: string, count = 1): Blo
 }
 
 /** A chain the test drives directly: `chain.blocks` IS the canonical chain. */
-function stubChain(blocks: BlockWithReceipts[]): ChainGateway
+function stubChain(blocks: BlockWithReceipts[], code: Record<string, string> = {}): ChainGateway
 {
+    const codeAt = (address: string): string => code[address.toLowerCase()] ?? '0x';
     return {
         env: ENV,
         head: async () => blocks[blocks.length - 1]?.number ?? 0,
@@ -47,16 +50,21 @@ function stubChain(blocks: BlockWithReceipts[]): ChainGateway
         blockHashAt: async number => blocks.find(entry => entry.number === number)?.hash ?? null,
         tokenMetadata: async () => null,
         balance: async () => 5n * 10n ** 18n,
-        isContract: async () => false
+        isContract: async address => codeAt(address) !== '0x',
+        code: async address => codeAt(address),
+        storageAt: async () => `0x${ '0'.repeat(64) }`,
+        // Every getter refuses. A contract that answers is exercised where that IS the subject -
+        // here it would only assert that the stub returns what the stub was told to.
+        call: async () => '0x'
     };
 }
 
 const silent = { info: () => undefined, warn: () => undefined, error: () => undefined, debug: () => undefined } as never;
 
-async function indexed(blocks: BlockWithReceipts[]): Promise<{ store: IndexStore; chain: ChainGateway }>
+async function indexed(blocks: BlockWithReceipts[], code: Record<string, string> = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
 {
     const store = new IndexStore(':memory:');
-    const chain = stubChain(blocks);
+    const chain = stubChain(blocks, code);
     store.ensureChain(await chain.genesisHash());
     await syncOnce(store, chain, silent);
     return { store, chain };
@@ -275,5 +283,131 @@ describe('the API over the index', () =>
         const get = await api();
         expect((await get('/api/blocks/999')).status).toBe(404);
         expect((await get(`/api/txs/0x${ 'f'.repeat(64) }`)).status).toBe(404);
+    });
+});
+
+describe('reading a contract off its bytecode', () =>
+{
+    const ERC20 = [
+        'totalSupply()',
+        'balanceOf(address)',
+        'transfer(address,uint256)',
+        'transferFrom(address,address,uint256)',
+        'approve(address,uint256)',
+        'allowance(address,address)'
+    ];
+
+    /** The dispatcher solc writes: DUP1, PUSH4 <selector>, EQ, PUSH2 <destination>, JUMPI. */
+    function dispatcher(signatures: readonly string[]): string
+    {
+        return signatures
+            .map((signature, index) => `8063${ toFunctionSelector(signature).slice(2) }1461${ String(index).padStart(4, '0') }57`)
+            .join('');
+    }
+
+    /** The CBOR trailer solc appends: a map of ipfs hash and compiler version, then its length. */
+    function metadata(multihash: string, version: readonly [number, number, number]): string
+    {
+        const blob = 'a2'
+            + '64' + Buffer.from('ipfs').toString('hex') + '5822' + multihash
+            + '64' + Buffer.from('solc').toString('hex') + '43' + version.map(part => part.toString(16).padStart(2, '0')).join('');
+        return blob + (blob.length / 2).toString(16).padStart(4, '0');
+    }
+
+    const MULTIHASH = `1220${ 'ab'.repeat(32) }`;
+    const TOKEN_CODE = `0x${ dispatcher(ERC20) }${ metadata(MULTIHASH, [0, 8, 24]) }`;
+
+    it('recovers the entry points from the dispatcher', () =>
+    {
+        const found = new Set(analyze(TOKEN_CODE).selectors);
+        for (const signature of ERC20)
+        {
+            expect(found.has(toFunctionSelector(signature))).toBe(true);
+        }
+        expect(found.size).toBe(ERC20.length);
+    });
+
+    it('ignores a four-byte constant that is not compared against the calldata', () =>
+    {
+        // PUSH4 followed by ADD is arithmetic on a constant, not a dispatcher entry. Without the
+        // comparison filter every mask and timestamp in a contract reads as a function.
+        const noise = `0x${ dispatcher(['transfer(address,uint256)']) }63deadbeef01`;
+        expect(analyze(noise).selectors).toEqual([toFunctionSelector('transfer(address,uint256)')]);
+    });
+
+    it('does not read the metadata trailer as code', () =>
+    {
+        // The trailer is data. Walked as opcodes it yields pushes that were never instructions,
+        // and a selector invented there would be printed as a function the contract does not have.
+        const bare = `0x${ dispatcher(['transfer(address,uint256)']) }`;
+        const stamped = `${ bare }${ metadata(MULTIHASH, [0, 8, 24]) }`;
+        expect(analyze(stamped).selectors).toEqual(analyze(bare).selectors);
+    });
+
+    it('reads the compiler and source pointer solc stamped in', () =>
+    {
+        const facts = analyze(TOKEN_CODE);
+        expect(facts.compiler).toBe('0.8.24');
+        // Base58 of a 0x12 0x20 multihash always lands on the familiar Qm prefix.
+        expect(facts.metadataUri.startsWith('ipfs://Qm')).toBe(true);
+    });
+
+    it('names the selectors it knows and leaves the rest as four bytes', () =>
+    {
+        const unknown = '0x12345678';
+        const described = describeFunctions([unknown, toFunctionSelector('transfer(address,uint256)')]);
+        expect(described[0]!.signature).toBe('transfer(address,uint256)');
+        expect(described[0]!.mutability).toBe('nonpayable');
+        // Named first, and the unnamed one is still listed - its count is the honest measure of
+        // what this page does not know.
+        expect(described[1]!.selector).toBe(unknown);
+        expect(described[1]!.signature).toBe('');
+    });
+
+    it('claims a standard only when every one of its functions is present', () =>
+    {
+        const full = ERC20.map(toFunctionSelector);
+        expect(detectStandards(full)).toContain('ERC-20');
+        expect(detectStandards(full.slice(1))).not.toContain('ERC-20');
+    });
+
+    it('follows an EIP-1167 clone to what it delegates to', () =>
+    {
+        const target = '0x1111111111111111111111111111111111111111';
+        const clone = `0x363d3d373d3d3d363d73${ target.slice(2) }5af43d82803e903d91602b57fd5bf3`;
+        expect(analyze(clone).minimalProxy).toBe(target);
+        expect(analyze(TOKEN_CODE).minimalProxy).toBeNull();
+    });
+
+    it('serves the contract with its functions and the deployment behind it', async () =>
+    {
+        const deployed = '0xdddddddddddddddddddddddddddddddddddddddd';
+        const creation = block(0, '0x00', '0xc0');
+        creation.transactions[0] = {
+            ...creation.transactions[0]!, to: null, value: 0n, inputSize: 120, contractAddress: deployed
+        };
+
+        const { store, chain } = await indexed([creation], { [deployed]: TOKEN_CODE });
+        const app = buildApp({ dev: false, store, chain });
+        const detail = (await (await app.handle(new Request(`http://local/api/address/${ deployed }/contract`))).json()) as ContractDetail;
+
+        expect(detail.isContract).toBe(true);
+        expect(detail.compiler).toBe('0.8.24');
+        expect(detail.standards).toContain('ERC-20');
+        expect(detail.functions.map(entry => entry.name)).toContain('transfer');
+        // The half no node can answer: which transaction put this code here, and who sent it.
+        expect(detail.creation?.deployer).toBe(ALICE);
+        expect(detail.creation?.blockNumber).toBe(0);
+    });
+
+    it('answers for an address that holds no code instead of failing', async () =>
+    {
+        const { store, chain } = await indexed(CHAIN);
+        const app = buildApp({ dev: false, store, chain });
+        const detail = (await (await app.handle(new Request(`http://local/api/address/${ BOB }/contract`))).json()) as ContractDetail;
+
+        expect(detail.isContract).toBe(false);
+        expect(detail.functions).toEqual([]);
+        expect(detail.creation).toBeNull();
     });
 });

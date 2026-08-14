@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_tx_block ON transactions (block_number DESC, tx_index ASC);
 CREATE INDEX IF NOT EXISTS idx_tx_from ON transactions (from_addr, block_number DESC);
 CREATE INDEX IF NOT EXISTS idx_tx_to ON transactions (to_addr, block_number DESC);
+-- Partial: only a deployment fills contract_address, so the index carries one row per contract
+-- on the chain rather than one per transaction, and "who deployed this" stays a single seek.
+CREATE INDEX IF NOT EXISTS idx_tx_contract ON transactions (contract_address) WHERE contract_address IS NOT NULL;
 CREATE TABLE IF NOT EXISTS token_transfers (
     tx_hash TEXT NOT NULL,
     log_index INTEGER NOT NULL,
@@ -522,6 +525,19 @@ export class IndexStore
             WHERE (from_addr = ? OR to_addr = ?) AND block_number >= ? AND block_number <= ? ${ narrowed }
             ORDER BY block_number ${ direction }, log_index ${ direction } LIMIT ? OFFSET ?`)
             .all(...bindings, limit, offset) as unknown as TransferRow[];
+    }
+
+    /**
+     * The transaction that DEPLOYED this contract - who put it there, and when.
+     *
+     * The chain does not answer this either: a receipt names the contract it created, but nothing
+     * maps a contract back to its receipt. It is here for the same reason address history is -
+     * the row was written down as the chain was read.
+     */
+    public contractCreation(address: string): TransactionRow | null
+    {
+        return (this.#stmt('SELECT * FROM transactions WHERE contract_address = ? LIMIT 1')
+            .get(normalize(address)) as TransactionRow | undefined) ?? null;
     }
 
     public transfersOfTransaction(hash: string): TransferRow[]

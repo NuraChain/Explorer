@@ -9,6 +9,7 @@ import Icon from '../icons/icon.component.azeroth';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import FlowLedger from '../components/chain/flow-ledger.component.azeroth';
+import ContractPanel from '../components/chain/contract-panel.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
@@ -23,7 +24,7 @@ export default component AddressPage()
     const locale = useLocale();
 
     state page = 1;
-    state tab: 'flow' | 'transfers' = 'flow';
+    state tab: 'flow' | 'transfers' | 'contract' = 'flow';
 
     derived address = params()['address'] ?? '';
 
@@ -46,10 +47,22 @@ export default component AddressPage()
         return client.address.transfers({ params: { address: value }, query: { page: Number(at), limit: 25 } });
     } with { source: tab === 'transfers' && address !== '' ? `${ address }|${ page }` : false };
 
+    /**
+     * The tab actually being drawn. An EOA has no contract tab, and the selection has to survive
+     * navigating from a contract to an ordinary address - otherwise the page renders no tab at
+     * all and reads as broken.
+     */
+    derived active = tab === 'contract' && account.data()?.isContract !== true ? 'flow' : tab;
+
+    // Fetched only when the tab is opened. Reading a contract costs the node a `getCode` and a
+    // round of calls, and most visitors to an address never ask what its code is.
+    resource contract = (value: string) => client.address.contract({ params: { address: value } })
+        with { source: active === 'contract' && address !== '' ? address : false };
+
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
 
-    const pick = (next: 'flow' | 'transfers'): void =>
+    const pick = (next: 'flow' | 'transfers' | 'contract'): void =>
     {
         tab = next;
         page = 1;
@@ -121,14 +134,14 @@ export default component AddressPage()
         }
         </Show>
 
-        <div class="flex items-center gap-2" role="tablist" aria-label={ locale.t('address.activity') }>
+        <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label={ locale.t('address.activity') }>
             <button
-                class={ tab === 'flow'
+                class={ active === 'flow'
                     ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
                     : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
                 type="button"
                 role="tab"
-                aria-selected={ tab === 'flow' }
+                aria-selected={ active === 'flow' }
                 onClick={ () => pick('flow') }
             >
                 { locale.t('address.tab.transactions') }
@@ -137,12 +150,12 @@ export default component AddressPage()
                 </Show>
             </button>
             <button
-                class={ tab === 'transfers'
+                class={ active === 'transfers'
                     ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
                     : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
                 type="button"
                 role="tab"
-                aria-selected={ tab === 'transfers' }
+                aria-selected={ active === 'transfers' }
                 onClick={ () => pick('transfers') }
             >
                 { locale.t('address.tab.transfers') }
@@ -150,9 +163,30 @@ export default component AddressPage()
                 { () => <span class="ms-1.5 text-[12px] tabular-nums opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
                 </Show>
             </button>
+            {/* Only where there is code to show. On an ordinary account the tab would open onto an
+                empty panel, which reads as a page that failed rather than as an account. */}
+            <Show when={ account.data()?.isContract === true }>
+                <button
+                    class={ active === 'contract'
+                        ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
+                        : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
+                    type="button"
+                    role="tab"
+                    aria-selected={ active === 'contract' }
+                    onClick={ () => pick('contract') }
+                >
+                    { locale.t('address.tab.contract') }
+                </button>
+            </Show>
         </div>
 
-        <Show when={ tab === 'flow' }>
+        <Show when={ active === 'contract' }>
+            <Show when={ contract.data() } let={ detail }>
+                <ContractPanel detail={ detail } />
+            </Show>
+        </Show>
+
+        <Show when={ active === 'flow' }>
             <div>
                 <FlowLedger
                     address={ address }
@@ -173,7 +207,7 @@ export default component AddressPage()
             </div>
         </Show>
 
-        <Show when={ tab === 'transfers' }>
+        <Show when={ active === 'transfers' }>
             <section class="panel overflow-hidden">
                 <ul class="divide-y divide-line">
                     <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>

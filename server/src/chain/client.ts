@@ -113,6 +113,18 @@ export interface ChainGateway
 
     /** Whether an address holds code (a contract) rather than being an EOA. */
     isContract(address: string): Promise<boolean>;
+
+    /** The deployed runtime bytecode at an address, or '0x' where there is none. */
+    code(address: string): Promise<string>;
+
+    /**
+     * One raw storage slot. A proxy keeps the address it delegates to in a slot rather than in a
+     * variable the code can be read for, so this is the only way to follow one to what it runs.
+     */
+    storageAt(address: string, slot: string): Promise<string>;
+
+    /** A read-only call, answered as the raw abi-encoded return data. */
+    call(address: string, data: string): Promise<string>;
 }
 
 /** One indexed block: the header, its transactions, and the receipt for each. */
@@ -237,8 +249,33 @@ export class ChainReader implements ChainGateway
 
     public async isContract(address: string): Promise<boolean>
     {
+        return (await this.code(address)) !== '0x';
+    }
+
+    public async code(address: string): Promise<string>
+    {
         const code = await this.#client.getCode({ address: address as `0x${ string }` });
-        return code !== undefined && code !== '0x';
+        return code ?? '0x';
+    }
+
+    public async storageAt(address: string, slot: string): Promise<string>
+    {
+        const word = await this.#client.getStorageAt({
+            address: address as `0x${ string }`,
+            slot: slot as `0x${ string }`
+        });
+        // A node that does not serve `eth_getStorageAt` and one whose slot is empty both mean the
+        // same thing to the caller: nothing was stored there.
+        return word ?? `0x${ '0'.repeat(64) }`;
+    }
+
+    public async call(address: string, data: string): Promise<string>
+    {
+        const result = await this.#client.call({
+            to: address as `0x${ string }`,
+            data: data as `0x${ string }`
+        });
+        return result.data ?? '0x';
     }
 
     /**

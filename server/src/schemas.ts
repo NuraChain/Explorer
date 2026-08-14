@@ -132,6 +132,73 @@ export const account = object({
 });
 export type Account = Infer<typeof account>;
 
+// --- Contracts ------------------------------------------------------------------------------
+// What a deployed contract can be asked about with standard JSON-RPC and nothing else. Names come
+// from a table of published signatures (see chain/signatures.ts), so a field left EMPTY means
+// "not known", never "not there" - the difference matters to someone about to call one of these.
+
+export const MUTABILITY = ['view', 'pure', 'nonpayable', 'payable', 'unknown'] as const;
+
+export const contractFunction = object({
+    selector: string(),
+    /** '' when no published standard claims this selector - then the selector IS the name. */
+    signature: string(),
+    name: string(),
+    inputs: array(string()),
+    mutability: enumOf(MUTABILITY)
+});
+export type ContractFunction = Infer<typeof contractFunction>;
+
+export const contractEvent = object({
+    topic: string(),
+    signature: string(),
+    name: string(),
+    inputs: array(string())
+});
+export type ContractEvent = Infer<typeof contractEvent>;
+
+/** The answer a zero-argument getter gave, as text - a uint256 does not survive a double. */
+export const contractRead = object({
+    name: string(),
+    signature: string(),
+    type: string(),
+    value: string()
+});
+export type ContractRead = Infer<typeof contractRead>;
+
+export const PROXY_KINDS = ['eip1967', 'beacon', 'eip1822', 'eip1167'] as const;
+export type ProxyKind = (typeof PROXY_KINDS)[number];
+
+export const contractDetail = object({
+    address: string(),
+    isContract: boolean(),
+    /** The runtime bytecode at THIS address; '0x' for an account that holds no code. */
+    bytecode: string(),
+    codeSize: number({ int: true, min: 0 }),
+    /** What solc stamped into its metadata trailer. Not verification - see chain/contract.ts. */
+    compiler: string(),
+    metadataUri: string(),
+    standards: array(string()),
+    functions: array(contractFunction),
+    events: array(contractEvent),
+    reads: array(contractRead),
+    proxy: object({ kind: enumOf(PROXY_KINDS), implementation: string() }).nullable(),
+    /**
+     * True when the functions above were read off the IMPLEMENTATION rather than this address. A
+     * proxy's own code answers nothing; listing its two forwarding selectors would say the
+     * contract does nothing, which is the opposite of true.
+     */
+    fromImplementation: boolean(),
+    /** Who deployed it, and when. Null when the deployment is below `START_BLOCK`. */
+    creation: object({
+        txHash: string(),
+        deployer: string(),
+        blockNumber: number({ int: true, min: 0 }),
+        at: string()
+    }).nullable()
+});
+export type ContractDetail = Infer<typeof contractDetail>;
+
 export const blockDetail = object({ block, transactions: array(transaction), total: number(), page: number(), pages: number() });
 export type BlockDetail = Infer<typeof blockDetail>;
 

@@ -19,7 +19,7 @@
 A self-hosted explorer for any EVM-compatible chain. Point it at a JSON-RPC endpoint and it
 indexes the chain into a local SQLite file, then serves six pages over that index: a live
 overview, blocks, transactions, block and transaction detail, and an address page with a flow
-ledger showing value in and out.
+ledger showing value in and out - plus, when the address holds code, what that code can do.
 
 It speaks **standard Ethereum JSON-RPC** and nothing else - no vendor API, no hosted service, no
 tracing extensions. It runs against NuraChain, a local Hardhat or Anvil node, or any other EVM
@@ -36,6 +36,32 @@ its own index rather than from the node. So does this one.
 
 The index is a **cache, not a source of truth**. Delete `.data/index.db` and it replays from
 `START_BLOCK`.
+
+### What a contract address shows
+
+A deployed contract keeps no names. `eth_getCode` returns runtime bytecode - no ABI, no source,
+no argument names - so an explorer either verifies source or reads the bytes. This one reads the
+bytes, and says so on the page:
+
+- **Entry points.** The dispatcher compares the first four bytes of every call against the
+  selectors it answers to. Walking the opcodes recovers that list, and a table of published
+  signatures gives most of them their names back. A selector no standard claims is printed as
+  four bytes rather than labelled with a plausible guess.
+- **Interfaces.** ERC-20, 721, 1155, 165, 2612, 4626, Ownable, AccessControl, Pausable - claimed
+  only when every selector of that interface is present, so the badge means the contract answers
+  them, not that it says it does.
+- **Current values.** The zero-argument getters it actually has (`name`, `symbol`, `decimals`,
+  `totalSupply`, `owner`, `paused`, ...), called live and decoded.
+- **Compiler and source metadata.** solc appends a CBOR trailer naming its version and an IPFS
+  hash of the metadata. That is what the deployer stamped, not proof of anything - but it says
+  which compiler to point at the source if you want to verify it.
+- **Proxies.** EIP-1967, beacon, EIP-1822 and EIP-1167 clones are followed to their
+  implementation, and the functions come from there. A proxy's own code answers nothing.
+- **Deployment.** Who deployed it, in which transaction and block. This half comes from the
+  index - the chain cannot map a contract back to the receipt that created it.
+
+Source verification is **not** implemented: nothing here compiles source or checks it against the
+deployed code, and the page says as much above everything it shows.
 
 ---
 
@@ -196,6 +222,9 @@ server/                         the API and the indexer
   src/chain/client.ts           the JSON-RPC gateway
   src/chain/indexer.ts          catch-up, follow, reorg rollback, transfer decoding
   src/chain/store.ts            the SQLite index
+  src/chain/contract.ts         bytecode -> selectors, event topics, compiler metadata
+  src/chain/signatures.ts       the selector -> signature table that gives them names back
+  src/inspect.ts                one contract, from the node and the index together
 ```
 
 The API is declared once in `server/src/app.ts`, and the browser gets a typed client from that

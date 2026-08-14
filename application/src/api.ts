@@ -14,6 +14,8 @@ export type {
     BlockDetail,
     BlockPage,
     ChainInfo,
+    ContractDetail,
+    ContractFunction,
     SearchResult,
     Summary,
     Transaction,

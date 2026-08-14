@@ -132,9 +132,40 @@ export const en = {
     'address.fees': 'Fees paid',
     'address.tab.transactions': 'Transactions',
     'address.tab.transfers': 'Token transfers',
+    'address.tab.contract': 'Contract',
     'address.transfers.empty.title': 'No token transfers',
     'address.transfers.empty.hint': 'ERC-20, 721 and 1155 movements for this address appear here.',
     'address.transfers.token': 'Token',
+
+    // --- Contract -----------------------------------------------------------------------------
+    // Read off the deployed bytecode, which is all the chain keeps. Names come from a table of
+    // published signatures, so `contract.notice` is not a disclaimer to be trimmed: it is the
+    // difference between "this is what the source says" and "this is what the bytes say".
+    'contract.notice': 'No source is published for this contract. Everything below is read from the bytecode deployed on chain.',
+    'contract.compiler': 'Compiler',
+    'contract.size': 'Code size',
+    'contract.deployer': 'Deployed by',
+    'contract.deployedAt': 'Deployed in',
+    'contract.metadata': 'Source metadata',
+    'contract.standards': 'Interfaces',
+    'contract.proxy': 'Proxy',
+    'contract.viaImplementation': 'These are the functions of the implementation this address forwards to, not of its own code.',
+    'contract.reads': 'Current values',
+    'contract.functions': 'Functions',
+    'contract.functions.named': '{named} of {total} named',
+    'contract.functions.empty.title': 'No entry points found',
+    'contract.functions.empty.hint': 'Nothing in this bytecode is compared against a function selector. It may be a proxy, a clone, or hand-written assembly.',
+    'contract.events': 'Events',
+    'contract.bytecode': 'Bytecode',
+    'contract.bytecode.show': 'Show',
+    'contract.bytecode.hide': 'Hide',
+    'contract.unnamed': 'unnamed function',
+    /** Whether a call can CHANGE anything - the one thing to know before making one. */
+    'contract.mutability.view': 'read',
+    'contract.mutability.pure': 'pure',
+    'contract.mutability.nonpayable': 'write',
+    'contract.mutability.payable': 'payable',
+    'contract.mutability.unknown': 'unknown',
 
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Flow',

@@ -5,11 +5,13 @@ import { mountPages, type KitOptions } from '@azerothjs/kit';
 import type { ChainGateway } from './chain/client.ts';
 import { normalize, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
+import { inspectContract } from './inspect.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
 import {
     account,
     blockDetail,
     blockPage,
+    contractDetail,
     pageQuery,
     searchQuery,
     searchResult,
@@ -193,7 +195,14 @@ function build({ store, chain }: ApiDeps)
                 const { limit, offset, page } = paging(query);
                 const { rows, total } = store.transfersOfAddress(params.address, limit, offset);
                 return { rows: withTokens(rows), total, page, pages: pageCount(total, limit) };
-            })
+            }),
+
+            // The one read that is mostly NOT from the index: a contract's code, what its getters
+            // answer right now, and what it delegates to are all live facts, and a cached copy of
+            // any of them would describe a contract that no longer exists in that form. Only the
+            // deployment - who put it there - comes from the index, because the chain cannot say.
+            contract: routes.get('/:address/contract', { output: contractDetail }, async ({ params }) =>
+                inspectContract({ store, chain }, params.address))
         })),
 
         search: feature('/search', (routes) => ({

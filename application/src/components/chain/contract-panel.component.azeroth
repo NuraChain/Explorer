@@ -1,0 +1,248 @@
+import { Link } from 'azerothjs';
+
+import type { ContractDetail, ContractFunction } from '../../api.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+import HashLink from './hash-link.component.azeroth';
+import Badge from '../ui/badge.component.azeroth';
+import EmptyState from '../ui/empty-state.component.azeroth';
+import Tooltip from '../ui/tooltip.component.azeroth';
+
+import type { Tone } from '../ui/variants.ts';
+
+// What a deployed contract is, for a reader who has only its address.
+//
+// Everything on this panel is read from the bytecode the chain returns - there is no verified
+// source behind it, and the panel says so at the top rather than letting a named function imply
+// one. That distinction is the whole honesty of the page: `transfer(address,uint256)` is named
+// because its selector is a published constant, while `0x7c88e3d9` is printed as four bytes
+// because nobody has published what it means. Both are shown. Only one is named.
+//
+// Mutability is the other thing worth reading here: whether a call can CHANGE anything is what
+// someone about to make one needs to know, so it is a badge rather than a footnote.
+const MUTABILITY_TONE: Record<string, Tone> = {
+    view: 'neutral',
+    pure: 'neutral',
+    nonpayable: 'accent',
+    payable: 'success',
+    unknown: 'neutral'
+};
+
+export default component ContractPanel(props: { detail: ContractDetail })
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+
+    state showBytecode = false;
+
+    derived named = props.detail.functions.filter((entry) => entry.signature !== '').length;
+
+    /** The arguments a function takes, printed as the signature declares them. */
+    const args = (entry: ContractFunction): string => entry.inputs.join(', ');
+
+    const copyBytecode = async (): Promise<void> =>
+    {
+        try
+        {
+            await navigator.clipboard.writeText(props.detail.bytecode);
+            toasts.push('success', locale.t('copy.done'), 'check');
+        }
+        catch
+        {
+            toasts.push('error', locale.t('copy.blocked'), 'alert');
+        }
+    };
+
+    <div class="flex flex-col gap-4">
+        {/* Said first, not last: every name below comes from matching a selector against a table
+            of published signatures, and a reader who thinks they are looking at verified source
+            would trust the unnamed ones less than they should. */}
+        <p class="flex items-start gap-2 rounded-lg border border-line bg-raised px-4 py-3 text-[12px] text-muted">
+            <Icon name="help" size={ 14 } class="mt-0.5 shrink-0" />
+            { locale.t('contract.notice') }
+        </p>
+
+        <dl class="panel divide-y divide-line">
+            <Show when={ props.detail.compiler !== '' }>
+                <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.compiler') }</dt>
+                    <dd class="data flex-1 text-[13px]">solc { props.detail.compiler }</dd>
+                </div>
+            </Show>
+            <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.size') }</dt>
+                <dd class="flex-1 text-[13px]"><span class="amount">{ locale.bytes(props.detail.codeSize) }</span></dd>
+            </div>
+            <Show when={ props.detail.creation } let={ creation }>
+                <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.deployer') }</dt>
+                    <dd class="min-w-0 flex-1">
+                        <HashLink value={ creation.deployer } to={ `/address/${ creation.deployer }` } lead={ 16 } tail={ 10 } />
+                    </dd>
+                </div>
+                <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.deployedAt') }</dt>
+                    <dd class="min-w-0 flex-1 text-[13px]">
+                        <Link to={ `/block/${ creation.blockNumber }` } class="data text-beam no-underline hover:underline">
+                            #{ creation.blockNumber }
+                        </Link>
+                        <Tooltip label={ locale.dateTime(creation.at) } class="ms-2 inline-flex">
+                            <span class="text-[12px] text-muted">{ locale.ago(creation.at) }</span>
+                        </Tooltip>
+                        <span class="ms-2 inline-flex align-middle">
+                            <HashLink value={ creation.txHash } to={ `/tx/${ creation.txHash }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } />
+                        </span>
+                    </dd>
+                </div>
+            </Show>
+            <Show when={ props.detail.proxy } let={ proxy }>
+                <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                    {/* The EIP number is an identifier, so it stays as it is written everywhere
+                        else - translating it would make the page disagree with the standard. */}
+                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.proxy') }</dt>
+                    <dd class="min-w-0 flex-1 text-[13px]">
+                        <span class="data text-[12px] uppercase text-muted">{ proxy.kind }</span>
+                        <span class="ms-2 inline-flex align-middle">
+                            <HashLink value={ proxy.implementation } to={ `/address/${ proxy.implementation }` } lead={ 16 } tail={ 10 } />
+                        </span>
+                    </dd>
+                </div>
+            </Show>
+            <Show when={ props.detail.metadataUri !== '' }>
+                <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
+                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.metadata') }</dt>
+                    <dd class="hash min-w-0 flex-1 text-[12px] text-muted">{ props.detail.metadataUri }</dd>
+                </div>
+            </Show>
+        </dl>
+
+        <Show when={ props.detail.standards.length > 0 }>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[12px] uppercase tracking-[0.14em] text-muted">{ locale.t('contract.standards') }</span>
+                <For each={ props.detail.standards } key={ (entry) => String(entry) } let={ entry }>
+                    <span class="inline-flex"><Badge tone="accent">{ entry }</Badge></span>
+                </For>
+            </div>
+        </Show>
+
+        {/* Live, from the node, on every load. These are the answers the contract gives RIGHT
+            NOW - a cached total supply is a wrong total supply. */}
+        <Show when={ props.detail.reads.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="layers" size={ 14 } /> { locale.t('contract.reads') }
+                </h2>
+                <dl class="divide-y divide-line">
+                    <For each={ props.detail.reads } key={ (row) => row.signature } let={ row }>
+                        <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5">
+                            <dt class="data w-40 shrink-0 text-[12px] text-muted">{ row.name }()</dt>
+                            <dd class="min-w-0 flex-1 text-[13px]"><span class="amount">{ row.value }</span></dd>
+                        </div>
+                    </For>
+                </dl>
+            </section>
+        </Show>
+
+        <section class="panel overflow-hidden">
+            <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
+                <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="contract" size={ 14 } /> { locale.t('contract.functions') }
+                </span>
+                <Show when={ props.detail.functions.length > 0 }>
+                    <span class="text-[12px] text-muted">
+                        { locale.t('contract.functions.named', { named: locale.n(named), total: locale.n(props.detail.functions.length) }) }
+                    </span>
+                </Show>
+            </h2>
+            <Show
+                when={ props.detail.functions.length > 0 }
+                fallback={ <EmptyState icon="contract" title={ locale.t('contract.functions.empty.title') } hint={ locale.t('contract.functions.empty.hint') } /> }
+            >
+                {/* Capped in HEIGHT rather than in count: a contract with two hundred entry points
+                    has two hundred entry points, and paging them would hide the ones a reader is
+                    scrolling to find. */}
+                <ul class="max-h-[26rem] divide-y divide-line overflow-y-auto">
+                    <For each={ props.detail.functions } key={ (row) => row.selector } let={ row }>
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                            <span class="data w-24 shrink-0 text-[12px] text-muted">{ row.selector }</span>
+                            <span class="min-w-0 flex-1">
+                                <Show
+                                    when={ row.signature !== '' }
+                                    fallback={ <span class="text-[13px] italic text-muted">{ locale.t('contract.unnamed') }</span> }
+                                >
+                                    <span class="hash text-[13px]">
+                                        <span class="font-semibold">{ row.name }</span>(<span class="text-muted">{ args(row) }</span>)
+                                    </span>
+                                </Show>
+                            </span>
+                            <Show when={ row.mutability !== 'unknown' }>
+                                <Badge tone={ MUTABILITY_TONE[row.mutability] ?? 'neutral' }>
+                                    { locale.t(`contract.mutability.${ row.mutability }`) }
+                                </Badge>
+                            </Show>
+                        </li>
+                    </For>
+                </ul>
+            </Show>
+            <Show when={ props.detail.fromImplementation }>
+                <p class="border-t border-line px-4 py-2.5 text-[12px] text-muted">{ locale.t('contract.viaImplementation') }</p>
+            </Show>
+        </section>
+
+        <Show when={ props.detail.events.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="activity" size={ 14 } /> { locale.t('contract.events') }
+                </h2>
+                <ul class="divide-y divide-line">
+                    <For each={ props.detail.events } key={ (row) => row.topic } let={ row }>
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                            <span class="hash min-w-0 flex-1 text-[13px]">
+                                <span class="font-semibold">{ row.name }</span>(<span class="text-muted">{ row.inputs.join(', ') }</span>)
+                            </span>
+                            <HashLink value={ row.topic } tone="muted" lead={ 10 } tail={ 6 } copy={ false } />
+                        </li>
+                    </For>
+                </ul>
+            </section>
+        </Show>
+
+        <section class="panel overflow-hidden">
+            <h2 class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+                <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="hash" size={ 14 } /> { locale.t('contract.bytecode') }
+                </span>
+                <span class="flex items-center gap-1">
+                    <button
+                        class="cursor-pointer rounded-lg border border-line px-3 py-1 text-[12px] text-muted transition-colors duration-150 hover:text-text"
+                        type="button"
+                        aria-expanded={ showBytecode }
+                        onClick={ () => showBytecode = !showBytecode }
+                    >
+                        { showBytecode ? locale.t('contract.bytecode.hide') : locale.t('contract.bytecode.show') }
+                    </button>
+                    <button
+                        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:text-nur"
+                        type="button"
+                        aria-label={ locale.t('copy.action', { value: locale.t('contract.bytecode') }) }
+                        onClick={ () => void copyBytecode() }
+                    >
+                        <Icon name="copy" size={ 13 } />
+                    </button>
+                </span>
+            </h2>
+            {/* Collapsed by default. This is up to 24KB of hex - printing it unasked pushes every
+                readable thing on the page off the screen. */}
+            <Show when={ showBytecode }>
+                {/* `whitespace-pre-wrap` because a <pre> otherwise holds 13000 characters on one
+                    line, and the horizontal scrollbar that follows drags the whole page sideways.
+                    `hash` lets it break between characters - it is hex, so every point is one. */}
+                <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[11px] leading-relaxed text-muted">{ props.detail.bytecode }</pre>
+            </Show>
+        </section>
+    </div>
+}
