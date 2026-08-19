@@ -2,13 +2,11 @@ import { BadRequestError } from '@azerothjs/http';
 
 import type { ChainGateway } from './chain/client.ts';
 import { analyze, describeEvents, describeFunctions, detectStandards } from './chain/contract.ts';
-import { EVENT_BY_TOPIC, FUNCTION_BY_SELECTOR, READABLE_CALLS, selectorOf, type KnownEvent, type KnownFunction } from './chain/signatures.ts';
+import { FUNCTION_BY_SELECTOR, READABLE_CALLS, selectorOf, type KnownFunction } from './chain/signatures.ts';
 import { normalize, type IndexStore } from './chain/store.ts';
 import { ArgumentError, decodeReturn, encodeCall } from './chain/values.ts';
 import { iso } from './present.ts';
-import { eventsOfAbi, functionsOfAbi } from './verify/abi.ts';
-import { sourcesOf, type SourceStore, type VerifiedRow } from './verify/store.ts';
-import type { ContractCallResult, ContractDetail, ContractRead, ContractSource, ProxyKind, VerifiedSummary } from './schemas.ts';
+import type { ContractCallResult, ContractDetail, ContractRead, ProxyKind } from './schemas.ts';
 
 // One contract, described from the node and the index together.
 //
@@ -101,33 +99,9 @@ function decodeRead(type: string, data: string): string | null
  * does not have reaches its fallback, and a fallback is free to return whatever it likes - which
  * is how an explorer ends up printing a total supply for a contract that has none.
  */
-async function readValues(
-    chain: ChainGateway,
-    address: string,
-    selectors: ReadonlySet<string>,
-    declared: ReadonlyMap<string, KnownFunction> | null
-): Promise<ContractRead[]>
+async function readValues(chain: ChainGateway, address: string, selectors: ReadonlySet<string>): Promise<ContractRead[]>
 {
-    const identity = READABLE_CALLS.filter((entry) => selectors.has(entry.selector));
-
-    // A verified contract's OWN zero-argument getters, after the curated ones. Without an ABI
-    // this list cannot exist - a getter nobody published is four bytes and an unknown return type
-    // - so this is the one place where verification changes what the panel can even ask for.
-    // Tuples are left out: this panel prints one figure per row, and a struct is not one figure.
-    const extra = declared === null
-        ? []
-        : [...declared.values()]
-            .filter((entry) =>
-                selectors.has(entry.selector)
-                && (entry.mutability === 'view' || entry.mutability === 'pure')
-                && entry.inputs.length === 0
-                && entry.outputs.length === 1
-                && !entry.outputs[0]!.startsWith('(')
-                && !identity.some((known) => known.selector === entry.selector))
-            .sort((left, right) => left.name.localeCompare(right.name))
-            .map((entry) => ({ selector: entry.selector, signature: entry.signature, name: entry.name, type: entry.outputs[0]! }));
-
-    const wanted = [...identity, ...extra].slice(0, MAX_READS);
+    const wanted = READABLE_CALLS.filter((entry) => selectors.has(entry.selector)).slice(0, MAX_READS);
     const answers = await Promise.all(wanted.map(async (entry): Promise<ContractRead | null> =>
     {
         const data = await chain.call(address, entry.selector).catch(() => '0x');
@@ -138,85 +112,19 @@ async function readValues(
 }
 
 /**
- * Parsed ABIs, keyed by the row that produced them.
- *
- * An ABI is JSON, and a large one is fifty kilobytes of it. Every contract page and every call
- * would re-parse the same text and re-hash every selector in it, so the result is kept - keyed on
- * the address AND the verification time, which is what makes a re-verified contract miss rather
- * than serve the ABI it used to have.
- */
-const PARSED = new Map<string, { functions: Map<string, KnownFunction>; events: Map<string, KnownEvent> }>();
-
-/** Enough for every contract a page is likely to touch; small enough to never be the problem. */
-const PARSED_LIMIT = 64;
-
-function parseAbi(row: VerifiedRow): { functions: Map<string, KnownFunction>; events: Map<string, KnownEvent> }
-{
-    const key = `${ row.address }:${ row.verified_at }`;
-    const cached = PARSED.get(key);
-    if (cached !== undefined)
-    {
-        return cached;
-    }
-    const parsed = { functions: functionsOfAbi(row.abi), events: eventsOfAbi(row.abi) };
-    if (PARSED.size >= PARSED_LIMIT)
-    {
-        // Oldest insertion out. A Map iterates in insertion order, so its first key is the one
-        // that has been here longest - which is as much eviction policy as this needs.
-        const oldest = PARSED.keys().next().value;
-        if (oldest !== undefined)
-        {
-            PARSED.delete(oldest);
-        }
-    }
-    PARSED.set(key, parsed);
-    return parsed;
-}
-
-/**
  * The function a call names, or a refusal.
  *
- * Three places are asked, in the order of what they can prove. A VERIFIED ABI at this address is
- * the author's own declaration, checked against the deployed bytes. The built-in table is a
- * published standard that claims the selector. And behind a proxy, the implementation's ABI is
- * the one that describes what the call will actually reach - looked up last because it costs
- * storage reads, and only when the first two came up empty, which is exactly the case where a
- * proxy is forwarding to something custom.
- *
- * A selector none of them names is a selector whose arguments cannot be encoded at all - there is
- * no ABI behind it - so the refusal is the honest answer rather than a best effort.
+ * A selector this server cannot name is a selector it cannot encode arguments for either - there
+ * is no ABI behind it - so the refusal is the honest answer rather than a best effort.
  */
-async function resolve(deps: InspectDeps, target: string, selector: string): Promise<KnownFunction>
+function resolve(selector: string): KnownFunction
 {
-    const key = selector.toLowerCase();
-    const address = normalize(target);
-
-    const own = deps.sources.find(address);
-    const verified = own === null ? undefined : parseAbi(own).functions.get(key);
-    if (verified !== undefined)
+    const entry = FUNCTION_BY_SELECTOR.get(selector.toLowerCase());
+    if (entry === undefined)
     {
-        return verified;
+        throw new BadRequestError(`No published signature is known for ${ selector }, so its arguments cannot be encoded.`);
     }
-
-    const published = FUNCTION_BY_SELECTOR.get(key);
-    if (published !== undefined)
-    {
-        return published;
-    }
-
-    const code = await deps.chain.code(address).catch(() => '0x');
-    if (code !== '0x')
-    {
-        const proxy = await findProxy(deps.chain, address, code);
-        const behind = proxy === null ? null : deps.sources.find(proxy.implementation);
-        const forwarded = behind === null ? undefined : parseAbi(behind).functions.get(key);
-        if (forwarded !== undefined)
-        {
-            return forwarded;
-        }
-    }
-
-    throw new BadRequestError(`No published signature is known for ${ selector }, so its arguments cannot be encoded.`);
+    return entry;
 }
 
 /** Turns a rejected argument into the 400 the field that produced it can be pointed at. */
@@ -237,9 +145,9 @@ function asBadRequest(error: unknown): never
  * the wallet's owner decides. That is also why this stays a pure function of its input - an
  * explorer that could send transactions would be a very different thing to run.
  */
-export async function calldataFor(deps: InspectDeps, target: string, selector: string, args: readonly string[]): Promise<string>
+export function calldataFor(selector: string, args: readonly string[]): string
 {
-    const entry = await resolve(deps, target, selector);
+    const entry = resolve(selector);
     try
     {
         return encodeCall(entry, args);
@@ -259,13 +167,13 @@ export async function calldataFor(deps: InspectDeps, target: string, selector: s
  * refused here on purpose - it belongs to a wallet, which pays for it and asks first.
  */
 export async function readContract(
-    deps: InspectDeps,
+    { chain }: InspectDeps,
     target: string,
     selector: string,
     args: readonly string[]
 ): Promise<ContractCallResult>
 {
-    const entry = await resolve(deps, target, selector);
+    const entry = resolve(selector);
     if (entry.mutability !== 'view' && entry.mutability !== 'pure')
     {
         throw new BadRequestError(`${ entry.signature } changes state; send it from a wallet rather than reading it here.`);
@@ -283,8 +191,8 @@ export async function readContract(
 
     try
     {
-        const returned = await deps.chain.call(normalize(target), data);
-        return { values: decodeReturn(entry.outputs, returned, entry.outputParams), error: '' };
+        const returned = await chain.call(normalize(target), data);
+        return { values: decodeReturn(entry.outputs, returned), error: '' };
     }
     catch (error)
     {
@@ -309,47 +217,9 @@ export interface InspectDeps
 {
     store: IndexStore;
     chain: ChainGateway;
-
-    /** Published source, kept apart from the index because nothing can replay it. */
-    sources: SourceStore;
 }
 
-/**
- * The verified row that describes what this page is about to list.
- *
- * Two addresses can hold the answer. A plain contract's source is its own; a proxy's functions
- * come from the implementation, so the source that names them is the implementation's - and a
- * reader looking at the proxy's page still wants those names. Whichever it is, `viaImplementation`
- * says so, because "this address is verified" and "the code it runs is verified" are different
- * claims and only one of them is being made.
- */
-function verifiedFor(
-    sources: SourceStore,
-    address: string,
-    implementation: string | null
-): { row: VerifiedRow; viaImplementation: boolean } | null
-{
-    const own = sources.find(address);
-    if (own !== null)
-    {
-        return { row: own, viaImplementation: false };
-    }
-    const behind = implementation === null ? null : sources.find(implementation);
-    return behind === null ? null : { row: behind, viaImplementation: true };
-}
-
-function summarize(found: { row: VerifiedRow; viaImplementation: boolean }): VerifiedSummary
-{
-    return {
-        name: found.row.name,
-        compiler: found.row.compiler,
-        match: found.row.match_kind === 'full' ? 'full' : 'partial',
-        at: iso(found.row.verified_at),
-        viaImplementation: found.viaImplementation
-    };
-}
-
-export async function inspectContract({ store, chain, sources }: InspectDeps, target: string): Promise<ContractDetail>
+export async function inspectContract({ store, chain }: InspectDeps, target: string): Promise<ContractDetail>
 {
     const address = normalize(target);
     const code = await chain.code(address).catch(() => '0x');
@@ -383,8 +253,7 @@ export async function inspectContract({ store, chain, sources }: InspectDeps, ta
             reads: [],
             proxy: null,
             fromImplementation: false,
-            creation: deployment,
-            verified: null
+            creation: deployment
         };
     }
 
@@ -397,30 +266,10 @@ export async function inspectContract({ store, chain, sources }: InspectDeps, ta
     const fromImplementation = behind !== '0x';
     const effective = fromImplementation ? analyze(behind) : facts;
 
-    const found = verifiedFor(sources, address, fromImplementation && proxy !== null ? proxy.implementation : null);
-    const abi = found === null ? null : parseAbi(found.row);
-
-    // The ABI's functions are UNIONED with the scanned ones, not substituted for them. The scan
-    // reads a dispatcher and can miss an entry a hand-written one hides; the ABI is the complete
-    // list but describes the source, not this deployment. Together they are both.
-    const selectorList = abi === null
-        ? effective.selectors
-        : [...new Set([...effective.selectors, ...abi.functions.keys()])];
-    const topicList = abi === null
-        ? effective.topics
-        : [...new Set([...effective.topics, ...abi.events.keys()])];
-
-    const functionTable = abi === null
-        ? FUNCTION_BY_SELECTOR
-        : new Map([...FUNCTION_BY_SELECTOR, ...abi.functions]);
-    const eventTable = abi === null
-        ? EVENT_BY_TOPIC
-        : new Map([...EVENT_BY_TOPIC, ...abi.events]);
-
-    const selectors = new Set(selectorList);
+    const selectors = new Set(effective.selectors);
     // Read the values from THIS address, not from the implementation: a proxy holds the storage,
     // and the implementation's own copy of it is empty.
-    const reads = await readValues(chain, address, selectors, abi === null ? null : abi.functions);
+    const reads = await readValues(chain, address, selectors);
 
     return {
         address,
@@ -429,68 +278,12 @@ export async function inspectContract({ store, chain, sources }: InspectDeps, ta
         codeSize: facts.size,
         compiler: facts.compiler === '' && fromImplementation ? effective.compiler : facts.compiler,
         metadataUri: facts.metadataUri === '' && fromImplementation ? effective.metadataUri : facts.metadataUri,
-        // Detected from the SCANNED selectors alone. An interface badge means "this deployment
-        // answers all six of those calls", and taking the list from a verified ABI instead would
-        // quietly change it into "the source says it does".
         standards: detectStandards(effective.selectors),
-        functions: describeFunctions(selectorList, functionTable),
-        events: describeEvents(topicList, eventTable),
+        functions: describeFunctions(effective.selectors),
+        events: describeEvents(effective.topics),
         reads,
         proxy,
         fromImplementation,
-        creation: deployment,
-        verified: found === null ? null : summarize(found)
-    };
-}
-
-/**
- * The published source for an address, or the answer that there is none.
- *
- * Separate from the contract detail above because of SIZE: source is measured in tens of
- * kilobytes and only matters to a reader who asked to see it, while the detail is fetched by
- * anyone who opens the tab.
- */
-export async function contractSourceOf(deps: InspectDeps, target: string): Promise<ContractSource>
-{
-    const address = normalize(target);
-
-    // The proxy hop is taken only when this address has nothing of its own, and it is worth the
-    // two storage reads: a reader on a proxy's page is looking at the implementation's functions
-    // already, and offering them without the source that names them would be half an answer.
-    let implementation: string | null = null;
-    if (!deps.sources.isVerified(address))
-    {
-        const code = await deps.chain.code(address).catch(() => '0x');
-        const proxy = code === '0x' ? null : await findProxy(deps.chain, address, code);
-        implementation = proxy?.implementation ?? null;
-    }
-
-    const found = verifiedFor(deps.sources, address, implementation);
-
-    if (found === null)
-    {
-        return {
-            verified: false,
-            address,
-            summary: null,
-            optimizer: false,
-            runs: 0,
-            evmVersion: '',
-            license: '',
-            files: [],
-            abi: ''
-        };
-    }
-
-    return {
-        verified: true,
-        address: found.row.address,
-        summary: summarize(found),
-        optimizer: found.row.optimizer === 1,
-        runs: found.row.runs,
-        evmVersion: found.row.evm_version,
-        license: found.row.license,
-        files: sourcesOf(found.row.input),
-        abi: found.row.abi
+        creation: deployment
     };
 }

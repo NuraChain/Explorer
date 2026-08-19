@@ -1,4 +1,4 @@
-import { toEventSelector, toFunctionSelector, type AbiParameter } from 'viem';
+import { toEventSelector, toFunctionSelector } from 'viem';
 
 import { splitTypes } from './values.ts';
 
@@ -33,17 +33,6 @@ export interface KnownFunction
      */
     outputs: string[];
     mutability: Mutability;
-
-    /**
-     * The parameters exactly as an ABI declares them, where one exists.
-     *
-     * Set only by a verified ABI. Absent, the encoder reads the same shapes back out of the type
-     * strings above (`parseType` in values.ts), which handles everything a signature can spell -
-     * so the table can describe a struct too. What it cannot carry is the NAMES of a struct's
-     * fields, because a signature has nowhere to put them; that is the whole of the difference.
-     */
-    inputParams?: readonly AbiParameter[];
-    outputParams?: readonly AbiParameter[];
 }
 
 export interface KnownEvent

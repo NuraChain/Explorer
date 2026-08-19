@@ -171,111 +171,6 @@ export type ContractRead = Infer<typeof contractRead>;
 export const PROXY_KINDS = ['eip1967', 'beacon', 'eip1822', 'eip1167'] as const;
 export type ProxyKind = (typeof PROXY_KINDS)[number];
 
-// --- Verified source ------------------------------------------------------------------------
-// Published source, recompiled by this server and compared against the code on the chain. The
-// distinction the rest of the contract schemas make - "not known" versus "not there" - stops
-// applying to a contract that has one of these: the ABI came from the source that produced the
-// deployed bytes, so a name here is the author's name for it and not a table's guess.
-
-/**
- * How exactly the recompiled bytecode lined up with the chain.
- *
- * `full` - identical, metadata trailer included. `partial` - identical everywhere the EVM
- * executes, differing only in the trailer, which is a hash of comments, file paths and settings.
- * A partial match proves the CODE; it cannot prove that a comment in the published source
- * describes the deployed one. The page says which it has, rather than showing one badge for both.
- */
-export const MATCH_KINDS = ['full', 'partial'] as const;
-
-export const verifiedSummary = object({
-    /** The contract in the sources whose bytecode matched. */
-    name: string(),
-    /** The long version, `0.8.24+commit.e11b9ed9` - a bare release does not pin solc's output. */
-    compiler: string(),
-    match: enumOf(MATCH_KINDS),
-    at: string(),
-    /**
-     * True when the source belongs to the IMPLEMENTATION behind a proxy rather than to this
-     * address. The functions listed come from there too, so the two facts have to travel together.
-     */
-    viaImplementation: boolean()
-});
-export type VerifiedSummary = Infer<typeof verifiedSummary>;
-
-export const contractSource = object({
-    /** False for every address nobody has published source for - the ordinary case. */
-    verified: boolean(),
-    /** Which address the source belongs to: this one, or the implementation behind it. */
-    address: string(),
-    summary: verifiedSummary.nullable(),
-    optimizer: boolean(),
-    runs: number({ int: true, min: 0 }),
-    /** '' when the submission left this to the compiler's default. */
-    evmVersion: string(),
-    license: string(),
-    files: array(object({ path: string(), content: string() })),
-    /** The ABI as the compiler emitted it, for anyone who wants to script against the contract. */
-    abi: string()
-});
-export type ContractSource = Infer<typeof contractSource>;
-
-/** One solc build the verification form can offer. */
-export const compilerOption = object({
-    version: string(),
-    longVersion: string(),
-    /** True when the build is already on this server's disk, so choosing it downloads nothing. */
-    local: boolean()
-});
-export type CompilerOption = Infer<typeof compilerOption>;
-
-export const compilerList = object({
-    versions: array(compilerOption),
-    /**
-     * True when the binaries host could not be reached. Not an error: a deployment with no
-     * outbound access verifies against whatever the operator put in SOLC_DIR, and the form has to
-     * say so rather than show an empty list that looks broken.
-     */
-    offline: boolean()
-});
-export type CompilerList = Infer<typeof compilerList>;
-
-export const SUBMISSION_KINDS = ['single', 'json'] as const;
-
-/**
- * A verification submission. Nothing in it is believed.
- *
- * Every field is a claim - which compiler, which settings, which contract - and the server checks
- * all of them at once by running that compiler over that source and comparing the result against
- * the bytes already on the chain. That is why this endpoint needs no credential: a submission
- * that does not reproduce the deployed code is refused, and one that does cannot be wrong.
- */
-export const verifyInput = object({
-    /** `single` wraps one file; `json` is a solc standard-json document, taken as it is. */
-    kind: enumOf(SUBMISSION_KINDS),
-    compiler: string(),
-    /** Which contract to expect. '' tries every contract the sources declare. */
-    name: string(),
-    /** The name to compile the single file under; it appears in the metadata hash. */
-    fileName: string(),
-    source: string(),
-    optimizer: boolean(),
-    runs: number({ int: true, min: 0, max: 100_000_000 }),
-    evmVersion: string(),
-    license: string()
-});
-export type VerifyInput = Infer<typeof verifyInput>;
-
-export const verifyResult = object({
-    ok: boolean(),
-    /** 'none' whenever `ok` is false - there is no third outcome to report. */
-    match: enumOf(['full', 'partial', 'none'] as const),
-    name: string(),
-    message: string(),
-    /** The compiler's own fatal diagnostics, verbatim. Empty when the source compiled. */
-    errors: array(string())
-});
-export type VerifyResult = Infer<typeof verifyResult>;
-
 export const contractDetail = object({
     address: string(),
     isContract: boolean(),
@@ -302,16 +197,7 @@ export const contractDetail = object({
         deployer: string(),
         blockNumber: number({ int: true, min: 0 }),
         at: string()
-    }).nullable(),
-
-    /**
-     * Set when source has been published for this contract AND recompiled to the deployed bytes.
-     *
-     * Null is the ordinary case and the one the page is designed around: without this, every name
-     * below comes from a table of published signatures, and an unnamed selector is four bytes.
-     * With it, the names are the ones the author wrote.
-     */
-    verified: verifiedSummary.nullable()
+    }).nullable()
 });
 export type ContractDetail = Infer<typeof contractDetail>;
 
