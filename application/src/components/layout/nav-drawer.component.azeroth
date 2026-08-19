@@ -87,7 +87,7 @@ export default component NavDrawer()
                         <div class="mb-2 flex items-center justify-between">
                             <span class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('nav.menu') }</span>
                             <button
-                                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:text-text"
+                                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text"
                                 type="button"
                                 aria-label={ locale.t('nav.close') }
                                 onClick={ close }

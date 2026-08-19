@@ -142,7 +142,7 @@ export default component LanguageSwitch(props: { labelled?: boolean })
                         <div class="mb-1 flex shrink-0 items-center justify-between gap-2">
                             <h2 class="text-[15px] font-semibold text-text">{ locale.t('language.label') }</h2>
                             <button
-                                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:text-text"
+                                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text"
                                 type="button"
                                 aria-label={ locale.t('nav.close') }
                                 onClick={ close }
