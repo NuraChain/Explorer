@@ -53,6 +53,13 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
     };
 
     <div class="flex flex-col gap-4">
+        {/* `text-left` and not `text-start`, in the one place in this app where the physical side
+            is the right answer. Every value in this list is chain data - a version, a byte size,
+            an address, a height - and the `data`/`amount`/`hash` utilities already pin each of
+            them left to right inside its own box. Left as the START would put those boxes on the
+            far side in a mirrored layout while the compiler row, whose `data` sets the direction
+            on the cell itself, stayed where it was: one column, two edges, for no reason a reader
+            could see. Pinned left, the values line up under each other in every language. */}
         <dl class="panel divide-y divide-line">
             <Show when={ props.detail.compiler !== '' }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
@@ -62,18 +69,18 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             </Show>
             <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                 <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.size') }</dt>
-                <dd class="flex-1 text-[14px]"><span class="amount">{ locale.bytes(props.detail.codeSize) }</span></dd>
+                <dd class="flex-1 text-left text-[14px]"><span class="amount">{ locale.bytes(props.detail.codeSize) }</span></dd>
             </div>
             <Show when={ props.detail.creation } let={ creation }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.deployer') }</dt>
-                    <dd class="min-w-0 flex-1">
+                    <dd class="min-w-0 flex-1 text-left">
                         <HashLink value={ creation.deployer } to={ `/address/${ creation.deployer }` } lead={ 16 } tail={ 10 } />
                     </dd>
                 </div>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.deployedAt') }</dt>
-                    <dd class="min-w-0 flex-1 text-[14px]">
+                    <dd class="min-w-0 flex-1 text-left text-[14px]">
                         <Link to={ `/block/${ creation.blockNumber }` } class="data text-beam no-underline hover:underline">
                             #{ creation.blockNumber }
                         </Link>
@@ -91,7 +98,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                     {/* The EIP number is an identifier, so it stays as it is written everywhere
                         else - translating it would make the page disagree with the standard. */}
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.proxy') }</dt>
-                    <dd class="min-w-0 flex-1 text-[14px]">
+                    <dd class="min-w-0 flex-1 text-left text-[14px]">
                         <span class="data text-[13px] uppercase text-muted">{ proxy.kind }</span>
                         <span class="ms-2 inline-flex align-middle">
                             <HashLink value={ proxy.implementation } to={ `/address/${ proxy.implementation }` } lead={ 16 } tail={ 10 } />
@@ -102,7 +109,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             <Show when={ props.detail.metadataUri !== '' }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.metadata') }</dt>
-                    <dd class="hash min-w-0 flex-1 text-[13px] text-muted">{ props.detail.metadataUri }</dd>
+                    <dd class="hash min-w-0 flex-1 text-left text-[13px] text-muted">{ props.detail.metadataUri }</dd>
                 </div>
             </Show>
         </dl>
@@ -116,8 +123,9 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             </div>
         </Show>
 
-        {/* Live, from the node, on every load. These are the answers the contract gives RIGHT
-            NOW - a cached total supply is a wrong total supply. */}
+        {/* Live, from the node. These are the answers the contract gives RIGHT NOW - the server
+            holds one for a couple of seconds so a burst of readers is one call rather than a
+            hundred, and no longer, because a cached total supply is a wrong total supply. */}
         <Show when={ props.detail.reads.length > 0 }>
             <section class="panel overflow-hidden">
                 <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -127,7 +135,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                     <For each={ props.detail.reads } key={ (row) => row.signature } let={ row }>
                         <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5">
                             <dt class="data w-40 shrink-0 text-[13px] text-muted">{ row.name }()</dt>
-                            <dd class="min-w-0 flex-1 text-[14px]"><span class="amount">{ row.value }</span></dd>
+                            <dd class="min-w-0 flex-1 text-left text-[14px]"><span class="amount">{ row.value }</span></dd>
                         </div>
                     </For>
                 </dl>
