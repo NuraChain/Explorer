@@ -22,7 +22,12 @@
      * on a Windows, macOS or Linux desktop, so a reader who somehow gets neither still sees
      * correct Persian shaping rather than tofu.
      */
-    --font-display: Archivo, 'Vazirmatn Variable', Vazirmatn, 'Segoe UI', Tahoma, 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
+    /* `Vazirmatn Latin` sits between the two on purpose: it IS Vazirmatn, re-declared in
+       styles.css with metrics that centre Latin rather than Persian. It carries only the Latin
+       subsets, so anything outside them - Cyrillic, Devanagari, CJK - falls straight through to
+       the family after it, and Persian never reaches it at all because `html:lang(fa)` below
+       switches to --font-persian. */
+    --font-display: Archivo, 'Vazirmatn Latin', 'Vazirmatn Variable', Vazirmatn, 'Segoe UI', Tahoma, 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
 
     /* Persian leads with the shipped face instead of Archivo - see `html:lang(fa)` in base.css. */
     --font-persian: 'Vazirmatn Variable', Vazirmatn, 'Segoe UI', Tahoma, 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
