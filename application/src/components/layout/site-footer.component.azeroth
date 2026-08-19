@@ -35,10 +35,10 @@ export default component SiteFooter()
                     </span>
                     <BrandMark class="text-[14px]" />
                 </span>
+                <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
                 <p class="mt-1 text-[11px] text-muted">
                     { locale.t('footer.version') }{ ' ' }<span class="data">{ APP_VERSION }</span>
                 </p>
-                <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
             </div>
 
             <nav class="text-center" aria-label={ locale.t('footer.explore') }>
