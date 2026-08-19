@@ -77,7 +77,7 @@ export default component Pagination(props: {
                             // the rest of the control stayed in the UI font.
                             <button
                                 class={ item.value === props.page
-                                    ? 'flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[14px] font-semibold tabular-nums text-nur'
+                                    ? 'flex h-9 min-w-9 shrink-0 cursor-default items-center justify-center rounded-md border border-nur bg-raised px-2 text-[14px] font-semibold tabular-nums text-nur'
                                     : 'flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[14px] tabular-nums text-muted transition-colors duration-150 hover:border-line hover:text-text' }
                                 type="button"
                                 aria-label={ locale.t('pagination.page', { number: locale.n(item.value as number) }) }

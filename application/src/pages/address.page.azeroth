@@ -159,7 +159,7 @@ export default component AddressPage()
         <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label={ locale.t('address.activity') }>
             <button
                 class={ active === 'flow'
-                    ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
+                    ? 'cursor-default rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
                     : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[14px] text-muted transition-colors duration-150 hover:text-text' }
                 type="button"
                 role="tab"
@@ -173,7 +173,7 @@ export default component AddressPage()
             </button>
             <button
                 class={ active === 'transfers'
-                    ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
+                    ? 'cursor-default rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
                     : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[14px] text-muted transition-colors duration-150 hover:text-text' }
                 type="button"
                 role="tab"
@@ -190,7 +190,7 @@ export default component AddressPage()
             <Show when={ account.data()?.isContract === true }>
                 <button
                     class={ active === 'contract'
-                        ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
+                        ? 'cursor-default rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
                         : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[14px] text-muted transition-colors duration-150 hover:text-text' }
                     type="button"
                     role="tab"

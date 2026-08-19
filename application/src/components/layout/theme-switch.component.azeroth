@@ -17,9 +17,9 @@ export default component ThemeSwitch(props: { labelled?: boolean })
         <For each={ THEMES } key={ (name) => name } let={ name }>
             <button
                 class={ [
-                    'flex cursor-pointer items-center justify-center gap-2 rounded-md transition-colors duration-150',
+                    'flex items-center justify-center gap-2 rounded-md transition-colors duration-150',
                     props.labelled === true ? 'h-9 flex-1 text-[15px]' : 'h-7 w-7',
-                    theme.theme() === name ? 'bg-raised text-nur' : 'text-muted hover:text-text'
+                    theme.theme() === name ? 'cursor-default bg-raised text-nur' : 'cursor-pointer text-muted hover:text-text'
                 ].join(' ') }
                 type="button"
                 title={ locale.t(THEME_LABEL[name]) }
