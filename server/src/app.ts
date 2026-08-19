@@ -5,16 +5,21 @@ import { mountPages, type KitOptions } from '@azerothjs/kit';
 import type { ChainGateway } from './chain/client.ts';
 import { normalize, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
-import { calldataFor, inspectContract, readContract } from './inspect.ts';
+import { calldataFor, contractSourceOf, inspectContract, readContract } from './inspect.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
+import type { CompilerSupply } from './verify/compilers.ts';
+import type { SourceStore } from './verify/store.ts';
+import type { Verifier } from './verify/verify.ts';
 import {
     account,
     blockDetail,
     blockPage,
+    compilerList,
     contractCalldata,
     contractCallInput,
     contractCallResult,
     contractDetail,
+    contractSource,
     pageQuery,
     searchQuery,
     searchResult,
@@ -22,6 +27,8 @@ import {
     transactionDetail,
     transactionPage,
     transferPage,
+    verifyInput,
+    verifyResult,
     type Transfer
 } from './schemas.ts';
 
@@ -37,6 +44,15 @@ export interface ApiDeps
 {
     store: IndexStore;
     chain: ChainGateway;
+
+    /** Published source, in its own file - the index is a cache, and this is not. */
+    sources: SourceStore;
+
+    /** Which solc builds this server can run, and where they come from. */
+    supply: CompilerSupply;
+
+    /** Compiles a submission and compares it against the chain. One at a time. */
+    verifier: Verifier;
 }
 
 const DEFAULT_LIMIT = 25;
@@ -47,8 +63,11 @@ export function createApi(deps: ApiDeps): ReturnType<typeof build>
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- the route literal IS the type; naming it would erase per-route inference
-function build({ store, chain }: ApiDeps)
+function build({ store, chain, sources, supply, verifier }: ApiDeps)
 {
+    /** What the contract reads need: the chain, the index, and whatever source was published. */
+    const inspect = { store, chain, sources };
+
     /** Attaches the token metadata each transfer row needs, reading each token at most once. */
     const withTokens = (rows: ReturnType<IndexStore['transfersOfAddress']>['rows']): Transfer[] =>
     {
@@ -205,7 +224,20 @@ function build({ store, chain }: ApiDeps)
             // any of them would describe a contract that no longer exists in that form. Only the
             // deployment - who put it there - comes from the index, because the chain cannot say.
             contract: routes.get('/:address/contract', { output: contractDetail }, async ({ params }) =>
-                inspectContract({ store, chain }, params.address)),
+                inspectContract(inspect, params.address)),
+
+            // Kept off the detail above because of size: source is tens of kilobytes and matters
+            // only to a reader who asked to read it, while the detail is fetched by everyone who
+            // opens the tab.
+            source: routes.get('/:address/source', { output: contractSource }, async ({ params }) =>
+                contractSourceOf(inspect, params.address)),
+
+            // The one endpoint on this server a stranger can make do real work: it runs a
+            // compiler. No credential is asked for and none is needed - a submission is accepted
+            // only if it reproduces the bytecode already on the chain, so the chain is the
+            // credential. Compiles are serialised and queued; see verify/verify.ts.
+            verify: routes.post('/:address/verify', { input: verifyInput, output: verifyResult }, async ({ params, input }) =>
+                verifier.submit(params.address, input)),
 
             // A read, executed against the node. POST rather than GET because the arguments are a
             // structured body, and rather than QUERY because this has to survive whatever reverse
@@ -216,12 +248,24 @@ function build({ store, chain }: ApiDeps)
             // can be named (see inspect.ts), so the callable surface is a fixed list of published
             // getters. Writes never come through here at all.
             call: routes.post('/:address/call', { input: contractCallInput, output: contractCallResult }, async ({ params, input }) =>
-                readContract({ store, chain }, params.address, input.selector, input.args)),
+                readContract(inspect, params.address, input.selector, input.args)),
 
             // Encoding only - no node, no signing, no sending. The browser hands the bytes to a
             // wallet, and the wallet's owner decides whether they become a transaction.
-            calldata: routes.post('/:address/calldata', { input: contractCallInput, output: contractCalldata }, ({ input }) =>
-                ({ data: calldataFor(input.selector, input.args) }))
+            //
+            // Address-scoped now, where it used to be a pure function of the selector: a verified
+            // contract's own ABI names functions no standard claims, and which ABI applies is a
+            // question only the address can answer.
+            calldata: routes.post('/:address/calldata', { input: contractCallInput, output: contractCalldata }, async ({ params, input }) =>
+                ({ data: await calldataFor(inspect, params.address, input.selector, input.args) }))
+        })),
+
+        // Which solc builds a submission may name. Read by the verification form and by nothing
+        // else, so it is allowed to be slow the first time and is cached for hours after. An
+        // unreachable binaries host is reported as `offline` rather than as an error: a
+        // deployment with no outbound access still verifies against whatever is in SOLC_DIR.
+        compilers: feature('/compilers', (routes) => ({
+            list: routes.get('/', { output: compilerList }, async () => supply.options())
         })),
 
         search: feature('/search', (routes) => ({

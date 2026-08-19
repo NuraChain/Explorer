@@ -130,9 +130,9 @@ export function coerce(type: string, text: string, at = 0): unknown
 /**
  * A struct argument, from the JSON a reader typed into the field.
  *
- * A struct is a `tuple` parameter with its fields hanging off `components` - read back out of the
- * type string a signature spells it with (see {@link parseType}), or taken from an ABI that
- * declares one. Both arrive here as the same shape, and both are encoded the same way.
+ * Only reachable for a VERIFIED contract: a struct is `tuple` in the ABI with its fields hanging
+ * off `components`, and the built-in table of published signatures holds strings, which cannot
+ * carry components. So this path exists exactly where the ABI does.
  *
  * Positional JSON - `["0xabc...", "5"]` - because the field names in an ABI are optional and a
  * contract compiled without them would have no keys to match against. Every leaf still goes
@@ -311,7 +311,9 @@ export function encodeCall(entry: KnownFunction, args: readonly string[]): strin
     {
         throw new ArgumentError(args.length, `${ entry.name } takes ${ entry.inputs.length } arguments`);
     }
-    const declared = parameters(entry.inputs);
+    // The ABI's own parameters where a verified contract supplied them, the printed types
+    // otherwise. They agree on everything except structs, which only the first form can express.
+    const declared = entry.inputParams ?? parameters(entry.inputs);
     const values = declared.map((parameter, at) => coerceParameter(parameter, args[at] ?? '', at));
     const encoded = declared.length === 0
         ? '0x'
@@ -319,13 +321,23 @@ export function encodeCall(entry: KnownFunction, args: readonly string[]): strin
     return `${ entry.selector }${ encoded.slice(2) }`;
 }
 
-/** Return data as one entry per declared output; empty when the function returns nothing. */
-export function decodeReturn(outputs: readonly string[], data: string): Array<{ type: string; value: string }>
+/**
+ * Return data as one entry per declared output; empty when the function returns nothing.
+ *
+ * `outputs` labels the rows and `declared` decodes them. They are the same thing for every
+ * published signature, and differ only where a verified ABI returns a struct: `(address,uint256)`
+ * is what a reader should see, and it is not something viem can decode - the components are.
+ */
+export function decodeReturn(
+    outputs: readonly string[],
+    data: string,
+    declared?: readonly AbiParameter[]
+): Array<{ type: string; value: string }>
 {
     if (outputs.length === 0 || data === '0x' || data === '')
     {
         return [];
     }
-    const decoded = decodeAbiParameters(parameters(outputs), data as `0x${ string }`);
+    const decoded = decodeAbiParameters(declared ?? parameters(outputs), data as `0x${ string }`);
     return outputs.map((type, at) => ({ type, value: stringify(decoded[at]) }));
 }

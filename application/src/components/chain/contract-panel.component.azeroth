@@ -1,6 +1,6 @@
 import { Link } from 'azerothjs';
 
-import type { ChainInfo, ContractDetail } from '../../api.ts';
+import type { ChainInfo, ContractDetail, ContractSource } from '../../api.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 import { useToasts } from '../../stores/toasts.store.ts';
@@ -16,17 +16,27 @@ import Tooltip from '../ui/tooltip.component.azeroth';
 
 // What a deployed contract is, for a reader who has only its address.
 //
-// Everything on this panel is read from the bytecode the chain returns - there is no verified
-// source behind it, and the panel says so at the top rather than letting a named function imply
-// one. That distinction is the whole honesty of the page: `transfer(address,uint256)` is named
-// because its selector is a published constant, while `0x7c88e3d9` is printed as four bytes
-// because nobody has published what it means. Both are shown. Only one is named.
+// This panel has two moods, and the line at the top says which one it is in. Without published
+// source, everything here is read from the bytecode the chain returns: `transfer(address,uint256)`
+// is named because its selector is a published constant, while `0x7c88e3d9` is printed as four
+// bytes because nobody has published what it means. Both are shown. Only one is named.
+//
+// With published source that this explorer RECOMPILED to the same bytes, that ceases to be the
+// situation: the names are the author's own, every selector has one, and the panel says so with
+// the same prominence it otherwise uses to admit the opposite. What it does not do is blur the
+// two - a verified badge is a claim about bytes, and the page states which bytes it checked.
 //
 // A named function can also be CALLED, which is the other half of this panel: the ones that only
 // read are answered through this explorer's node, and the ones that write are handed to the
 // reader's own wallet. Those two live in separate sections for the same reason they are described
 // differently - one is free and one spends money.
-export default component ContractPanel(props: { detail: ContractDetail; chain: ChainInfo })
+export default component ContractPanel(props: {
+    detail: ContractDetail;
+    chain: ChainInfo;
+
+    /** The published source, once the page has fetched it. Absent while it is still in flight. */
+    source?: ContractSource;
+})
 {
     const locale = useLocale();
     const toasts = useToasts();
@@ -40,11 +50,15 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
         entry.signature !== '' && (entry.mutability === 'nonpayable' || entry.mutability === 'payable'));
     derived unnamed = props.detail.functions.filter((entry) => entry.signature === '');
 
-    const copyBytecode = async (): Promise<void> =>
+    derived verified = props.detail.verified;
+    derived files = props.source?.verified === true ? props.source.files : [];
+
+    /** One copier for every button on this panel - each of them puts text on a clipboard. */
+    const copy = async (value: string): Promise<void> =>
     {
         try
         {
-            await navigator.clipboard.writeText(props.detail.bytecode);
+            await navigator.clipboard.writeText(value);
             toasts.push('success', locale.t('copy.done'), 'check');
         }
         catch
@@ -54,13 +68,50 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
     };
 
     <div class="flex flex-col gap-4">
-        {/* Said first, not last: every name below comes from matching a selector against a table
-            of published signatures, and a reader who thinks they are looking at verified source
-            would trust the unnamed ones less than they should. */}
-        <p class="flex items-start gap-2 rounded-lg border border-line bg-raised px-4 py-3 text-[12px] text-muted">
-            <Icon name="help" size={ 14 } class="mt-0.5 shrink-0" />
-            { locale.t('contract.notice') }
-        </p>
+        {/* Said first, not last, either way. A reader who thinks they are looking at verified
+            source trusts the unnamed selectors less than they should; a reader who does not know
+            the source WAS checked reads the author's own names as somebody's guess. */}
+        <Show
+            when={ verified }
+            fallback={
+                <p class="flex flex-wrap items-start gap-2 rounded-lg border border-line bg-raised px-4 py-3 text-[12px] text-muted">
+                    <Icon name="help" size={ 14 } class="mt-0.5 shrink-0" />
+                    <span class="min-w-0 flex-1">{ locale.t('contract.notice') }</span>
+                    {/* The way out of that state, next to the statement of it. Anyone may take
+                        it: a submission is accepted only if it reproduces these exact bytes. */}
+                    <Link
+                        to={ `/verify/${ props.detail.address }` }
+                        class="shrink-0 font-semibold text-beam no-underline hover:underline"
+                    >
+                        { locale.t('verify.cta') }
+                    </Link>
+                </p>
+            }
+            let={ mark }
+        >
+            <div class="flex flex-col gap-1.5 rounded-lg border border-inflow bg-raised px-4 py-3">
+                <p class="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-inflow">
+                    <Icon name="verified" size={ 15 } class="shrink-0" />
+                    { locale.t(mark.match === 'full' ? 'contract.verified.full' : 'contract.verified.partial') }
+                </p>
+                <p class="text-[12px] text-muted">
+                    { locale.t('contract.verified.detail', { name: mark.name, compiler: mark.compiler }) }
+                    <Tooltip label={ locale.dateTime(mark.at) } class="ms-1.5 inline-flex">
+                        <span>&middot; { locale.ago(mark.at) }</span>
+                    </Tooltip>
+                </p>
+                {/* A partial match proves the CODE and nothing about the comments around it. That
+                    is a smaller claim, and it is the one being made. */}
+                <Show when={ mark.match === 'partial' }>
+                    <p class="text-[12px] text-muted">{ locale.t('contract.verified.partial.hint') }</p>
+                </Show>
+                {/* The source belongs to the implementation, not to the address in the URL. The
+                    functions below come from there too, so the two facts belong together. */}
+                <Show when={ mark.viaImplementation }>
+                    <p class="text-[12px] text-muted">{ locale.t('contract.verified.viaImplementation') }</p>
+                </Show>
+            </div>
+        </Show>
 
         <dl class="panel divide-y divide-line">
             <Show when={ props.detail.compiler !== '' }>
@@ -238,6 +289,55 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             </section>
         </Show>
 
+        {/* The source itself, at the bottom with the bytecode rather than at the top with the
+            summary: this is the raw material a reader drops into when something above surprised
+            them, and it is measured in screens rather than in lines. */}
+        <Show when={ files.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="contract" size={ 14 } /> { locale.t('contract.source') }
+                    </span>
+                    <span class="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+                        <Show when={ props.source?.license !== undefined && props.source.license !== '' }>
+                            <span>{ props.source?.license }</span>
+                        </Show>
+                        <span>
+                            { props.source?.optimizer === true
+                                ? locale.t('contract.source.optimized', { runs: locale.n(props.source.runs) })
+                                : locale.t('contract.source.unoptimized') }
+                        </span>
+                        <button
+                            class="cursor-pointer rounded-lg border border-line px-3 py-1 text-[12px] text-muted transition-colors duration-150 hover:text-text"
+                            type="button"
+                            onClick={ () => void copy(props.source?.abi ?? '') }
+                        >
+                            { locale.t('contract.source.copyAbi') }
+                        </button>
+                    </span>
+                </h2>
+                <For each={ files } key={ (file) => file.path } let={ file }>
+                    <div class="border-b border-line last:border-b-0">
+                        <div class="flex flex-wrap items-center justify-between gap-2 bg-raised px-4 py-2">
+                            <span class="data min-w-0 flex-1 break-all text-[12px] text-muted">{ file.path }</span>
+                            <button
+                                class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:text-nur"
+                                type="button"
+                                aria-label={ locale.t('copy.action', { value: file.path }) }
+                                onClick={ () => void copy(file.content) }
+                            >
+                                <Icon name="copy" size={ 13 } />
+                            </button>
+                        </div>
+                        {/* `whitespace-pre` and its own scroller: source is written to a column
+                            width, and re-wrapping it destroys the indentation that carries the
+                            structure. The overflow is contained here so the page never slides. */}
+                        <pre class="data max-h-[32rem] overflow-auto whitespace-pre px-4 py-3 text-[12px] leading-relaxed">{ file.content }</pre>
+                    </div>
+                </For>
+            </section>
+        </Show>
+
         <section class="panel overflow-hidden">
             <h2 class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
                 <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -256,7 +356,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                         class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:text-nur"
                         type="button"
                         aria-label={ locale.t('copy.action', { value: locale.t('contract.bytecode') }) }
-                        onClick={ () => void copyBytecode() }
+                        onClick={ () => void copy(props.detail.bytecode) }
                     >
                         <Icon name="copy" size={ 13 } />
                     </button>

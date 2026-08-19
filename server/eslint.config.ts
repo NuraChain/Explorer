@@ -11,7 +11,11 @@ const config: ReturnType<typeof defineConfig> = defineConfig([
     globalIgnores([
         '**/dist/**',
         '**/node_modules/**',
-        '**/build/**'
+        '**/build/**',
+        // Runtime state, not source: the sqlite files and the solc builds cached for source
+        // verification. A soljson build is ten megabytes of minified Emscripten output, and
+        // linting it produces six thousand complaints about somebody else's generated code.
+        '**/.data/**'
     ]),
     js.configs.recommended,
     tseslint.configs.recommended,

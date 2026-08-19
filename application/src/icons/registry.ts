@@ -25,6 +25,7 @@ import {
     Play,
     Search,
     Send,
+    ShieldCheck,
     Sun,
     Wallet,
     X,
@@ -69,6 +70,7 @@ export const ICONS = {
     'theme-dark': Moon,
     'theme-light': Sun,
     'token': Coins,
+    'verified': ShieldCheck,
     'wallet': Wallet,
     'x': X
 } satisfies Record<string, IconNode>;

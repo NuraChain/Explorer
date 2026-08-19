@@ -73,6 +73,12 @@ export default component AddressPage()
     resource contract = (value: string) => client.address.contract({ params: { address: value } })
         with { source: active === 'contract' && address !== '' ? address : false };
 
+    // Published source, on the same trigger and as a SECOND request: it is tens of kilobytes of
+    // text where the detail above is a summary, and most contracts have none of it at all. The
+    // panel draws without it and fills the section in when it lands.
+    resource published = (value: string) => client.address.source({ params: { address: value } })
+        with { source: active === 'contract' && address !== '' ? address : false };
+
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
 
@@ -205,7 +211,7 @@ export default component AddressPage()
         {/* Both, or neither: the panel offers calls, and a call needs the chain id the wallet has
             to be on before one is sent. */}
         <Show when={ active === 'contract' && contract.data() !== undefined && stats.data() !== undefined }>
-        { () => <ContractPanel detail={ contract.data()! } chain={ stats.data()!.chain } /> }
+        { () => <ContractPanel detail={ contract.data()! } chain={ stats.data()!.chain } source={ published.data() } /> }
         </Show>
 
         <Show when={ active === 'flow' }>

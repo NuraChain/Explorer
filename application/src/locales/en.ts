@@ -180,6 +180,56 @@ export const en = {
     'contract.call.badAmount': 'That is not an amount this chain can send.',
     'contract.call.sent': 'Transaction sent',
     'contract.call.noReturn': 'The call returned nothing.',
+    // --- Verified source ----------------------------------------------------------------------
+    // The contract panel's other mood. A verified badge is a claim about BYTES: this server ran
+    // the published source through the compiler and got the deployed code back. `full` and
+    // `partial` are two DIFFERENT claims - one covers the source down to its comments, the other
+    // only the instructions - and neither is allowed to read as the other.
+    'contract.verified.full': 'Source verified',
+    'contract.verified.partial': 'Source verified - partial match',
+    'contract.verified.detail': '{name}, compiled with solc {compiler}',
+    'contract.verified.partial.hint': 'The deployed code matches; only the metadata trailer differs, and a moved comment or a different file path is enough to change that. The instructions are proven, the comments around them are not.',
+    'contract.verified.viaImplementation': 'The published source belongs to the implementation this address forwards to.',
+    'contract.source': 'Source code',
+    'contract.source.optimized': 'optimizer on, {runs} runs',
+    'contract.source.unoptimized': 'optimizer off',
+    'contract.source.copyAbi': 'Copy ABI',
+
+    // --- Publishing source --------------------------------------------------------------------
+    // Nothing on this form is believed, and `verify.intro` is where that is said. It is the reason
+    // the page needs no account: the compiler either reproduces the deployed bytes or it does not.
+    'verify.cta': 'Publish source',
+    'verify.title': 'Verify {short}',
+    'verify.heading': 'Publish and verify source',
+    'verify.intro': 'Nothing here is taken on trust. This explorer compiles what you submit and accepts it only if the result is the bytecode already deployed at this address - so there is no account to create and nobody to wait for.',
+    'verify.offline': 'The list of compilers could not be fetched, so only builds already on this server can be used. Ask whoever runs it to add the version you need.',
+    'verify.kind': 'Submission format',
+    'verify.kind.single': 'Single file',
+    'verify.kind.json': 'Standard JSON',
+    'verify.compiler': 'Compiler build',
+    'verify.compiler.hint': 'The exact build, not just the release - solc output changes between patch versions. A dot marks the builds already on this server.',
+    'verify.evmVersion': 'EVM version',
+    'verify.evmVersion.default': 'The compiler default',
+    'verify.evmVersion.hint': 'Leave this on the default unless the contract was built with it set. Naming the wrong one changes the opcodes.',
+    'verify.name': 'Contract name',
+    'verify.name.hint': 'Optional. Left empty, every contract in the source is tried.',
+    'verify.fileName': 'File name',
+    'verify.fileName.hint': 'The path the file was compiled under. It is hashed into the metadata, so the wrong one turns a full match into a partial one.',
+    'verify.optimizer': 'Optimizer',
+    'verify.optimizer.enabled': 'Enabled',
+    'verify.optimizer.hint': 'These have to match what the contract was deployed with, or the bytecode will not.',
+    'verify.runs': 'Optimizer runs',
+    'verify.license': 'License',
+    'verify.source': 'Solidity source',
+    'verify.source.placeholder': 'Paste the whole contract, imports included.',
+    'verify.json': 'Standard JSON input',
+    'verify.json.placeholder': 'Paste the solc standard-json input your build produced.',
+    'verify.json.hint': 'Its settings are used exactly as written - remappings, library addresses and viaIR included. Only the output selection is widened.',
+    'verify.submit': 'Verify and publish',
+    'verify.submit.hint': 'Compiling takes a few seconds, and one submission runs at a time.',
+    'verify.failed.hint': 'A mismatch is nearly always the compiler build, the optimizer setting or the number of runs. Check each against what the contract was deployed with.',
+    'verify.done.detail': 'The source for {name} is published on this contract now, and its functions are named and callable.',
+    'verify.done.open': 'Open the contract',
 
     // --- Flow ledger --------------------------------------------------------------------------
     'flow.title': 'Flow',

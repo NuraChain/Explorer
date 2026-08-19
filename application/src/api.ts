@@ -14,15 +14,20 @@ export type {
     BlockDetail,
     BlockPage,
     ChainInfo,
+    CompilerList,
+    CompilerOption,
     ContractDetail,
     ContractFunction,
+    ContractSource,
     SearchResult,
     Summary,
     Transaction,
     TransactionDetail,
     TransactionPage,
     Transfer,
-    TransferPage
+    TransferPage,
+    VerifiedSummary,
+    VerifyResult
 } from '../../server/src/schemas.ts';
 
 /**

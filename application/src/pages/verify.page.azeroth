@@ -1,0 +1,358 @@
+import { Link, useParams } from 'azerothjs';
+
+import { client, type VerifyResult } from '../api.ts';
+import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
+
+import Icon from '../icons/icon.component.azeroth';
+
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import Button from '../components/ui/button.component.azeroth';
+import Input from '../components/ui/input.component.azeroth';
+
+import { TONE_CLASS } from '../components/ui/variants.ts';
+
+// Publishing the source of a deployed contract.
+//
+// Nothing on this form is believed. Every field is a claim - which compiler, which settings, which
+// contract - and the server checks all of them at once by running that compiler over that source
+// and comparing the result against the bytes already on the chain. Which is why there is no
+// account, no key and no approval step: a submission that does not reproduce the deployed code is
+// refused, and one that does cannot be wrong about what the code is.
+//
+// The settings are the whole difficulty of the exercise, and the form says so rather than hiding
+// it. solc's output changes with the optimizer, with the number of runs and with the EVM version,
+// so a verification that fails is nearly always one of those three disagreeing with what the
+// deployer used - not a problem with the source.
+
+/**
+ * The EVM versions solc accepts, newest first, with the compiler's own default at the top.
+ *
+ * Identifiers, so they are not translated: these are the strings solc itself takes, and a
+ * localised one would simply not compile. The default matters more than the list - a contract
+ * built without naming a version must be verified without naming one either, because the
+ * compiler's default for THAT release is what shaped the bytes.
+ */
+const EVM_VERSIONS = [
+    'osaka',
+    'prague',
+    'cancun',
+    'shanghai',
+    'paris',
+    'london',
+    'berlin',
+    'istanbul',
+    'petersburg',
+    'constantinople',
+    'byzantium',
+    'spuriousDragon',
+    'tangerineWhistle',
+    'homestead'
+];
+
+/** The class recipe every field on this form shares, so nothing here invents a border. */
+const FIELD = 'w-full rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text outline-none focus:border-nur';
+
+export default component VerifyPage()
+{
+    const params = useParams();
+    const locale = useLocale();
+
+    derived address = params()['address'] ?? '';
+
+    state kind: 'single' | 'json' = 'single';
+    state compiler = '';
+    state name = '';
+    state fileName = 'Contract.sol';
+    state source = '';
+    state optimizer = true;
+    state runs = '200';
+    state evmVersion = '';
+    state license = 'MIT';
+
+    state busy = false;
+    state result: VerifyResult | null = null;
+    state failure = '';
+
+    // The one list this page cannot work without: solc's output is pinned to a BUILD, so a bare
+    // release is not enough and neither is a version this server has no way to obtain.
+    resource compilers = () => client.compilers.list();
+
+    derived versions = compilers.data()?.versions ?? [];
+    derived offline = compilers.data()?.offline === true;
+
+    const submit = async (): Promise<void> =>
+    {
+        busy = true;
+        result = null;
+        failure = '';
+        try
+        {
+            result = await client.address.verify({
+                params: { address },
+                input: {
+                    kind,
+                    compiler: compiler === '' ? (versions[0]?.longVersion ?? '') : compiler,
+                    name: name.trim(),
+                    fileName: fileName.trim(),
+                    source,
+                    optimizer,
+                    // The field holds text because every field does; a runs value that is not a
+                    // number is the compiler's default rather than a reason to refuse the form.
+                    runs: Number.isFinite(Number(runs)) ? Math.max(0, Math.trunc(Number(runs))) : 200,
+                    evmVersion,
+                    license: license.trim()
+                }
+            });
+        }
+        catch (error)
+        {
+            // A 400 from the server is a submission this page let through - it says which part.
+            failure = error instanceof Error ? error.message : String(error);
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    useTitle(() => locale.t('verify.title', { short: address.slice(0, 10) }));
+
+    <div class="flex flex-col gap-4 sm:gap-5">
+        <header class="panel px-4 py-4 sm:px-5">
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-raised text-nur">
+                    <Icon name="verified" size={ 19 } />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[12px] uppercase tracking-[0.14em] text-muted">{ locale.t('verify.heading') }</p>
+                    <p class="mt-0.5"><HashLink value={ address } to={ `/address/${ address }` } tone="text" class="text-[14px] font-semibold sm:text-[15px]" full /></p>
+                </div>
+            </div>
+            {/* The claim this page makes, stated before the form rather than after the result:
+                nothing here is taken on trust, and a reader should know that going in. */}
+            <p class="mt-3 text-[12px] text-muted">{ locale.t('verify.intro') }</p>
+        </header>
+
+        <Show when={ offline }>
+            <p class="flex items-start gap-2 rounded-lg border border-line bg-raised px-4 py-3 text-[12px] text-muted">
+                <Icon name="alert" size={ 14 } class="mt-0.5 shrink-0" />
+                { locale.t('verify.offline') }
+            </p>
+        </Show>
+
+        <section class="panel flex flex-col gap-4 px-4 py-4 sm:px-5">
+            {/* Two ways in, because there are two ways a contract exists. One file is what a
+                person has in an editor; a standard-json document is what a build tool emits, and
+                it is the only form that can carry remappings, library addresses and `viaIR` -
+                every one of which changes the bytes. */}
+            <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label={ locale.t('verify.kind') }>
+                <button
+                    class={ kind === 'single'
+                        ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
+                        : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
+                    type="button"
+                    role="tab"
+                    aria-selected={ kind === 'single' }
+                    onClick={ () => kind = 'single' }
+                >
+                    { locale.t('verify.kind.single') }
+                </button>
+                <button
+                    class={ kind === 'json'
+                        ? 'cursor-pointer rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[13px] font-semibold text-nur'
+                        : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:text-text' }
+                    type="button"
+                    role="tab"
+                    aria-selected={ kind === 'json' }
+                    onClick={ () => kind = 'json' }
+                >
+                    { locale.t('verify.kind.json') }
+                </button>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+                <label class="flex flex-col gap-1">
+                    <span class="text-[12px] text-muted">{ locale.t('verify.compiler') }</span>
+                    <select
+                        class={ `${ FIELD } data` }
+                        value={ compiler }
+                        onChange={ (event) => compiler = (event.target as HTMLSelectElement).value }
+                    >
+                        <For each={ versions } key={ (entry) => entry.longVersion } let={ entry }>
+                            {/* The build is what pins the output, so that is the value; the
+                                marker says which ones are already on this server's disk and so
+                                need no download before the compile starts. */}
+                            <option value={ entry.longVersion }>
+                                v{ entry.longVersion }{ entry.local ? ' ·' : '' }
+                            </option>
+                        </For>
+                    </select>
+                    <span class="text-[11px] text-muted">{ locale.t('verify.compiler.hint') }</span>
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-[12px] text-muted">{ locale.t('verify.evmVersion') }</span>
+                    <select
+                        class={ `${ FIELD } data` }
+                        value={ evmVersion }
+                        onChange={ (event) => evmVersion = (event.target as HTMLSelectElement).value }
+                    >
+                        <option value="">{ locale.t('verify.evmVersion.default') }</option>
+                        <For each={ EVM_VERSIONS } key={ (entry) => entry } let={ entry }>
+                            <option value={ entry }>{ entry }</option>
+                        </For>
+                    </select>
+                    <span class="text-[11px] text-muted">{ locale.t('verify.evmVersion.hint') }</span>
+                </label>
+
+                <div class="flex flex-col gap-1">
+                    <span class="text-[12px] text-muted">{ locale.t('verify.name') }</span>
+                    <Input
+                        label={ locale.t('verify.name') }
+                        placeholder="Token"
+                        size="sm"
+                        prose
+                        value={ name }
+                        onInput={ (value) => name = value }
+                    />
+                    <span class="text-[11px] text-muted">{ locale.t('verify.name.hint') }</span>
+                </div>
+
+                <Show when={ kind === 'single' }>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[12px] text-muted">{ locale.t('verify.fileName') }</span>
+                        <Input
+                            label={ locale.t('verify.fileName') }
+                            placeholder="Contract.sol"
+                            size="sm"
+                            prose
+                            value={ fileName }
+                            onInput={ (value) => fileName = value }
+                        />
+                        {/* Not cosmetic: the path a file was compiled under is hashed into the
+                            metadata trailer, so the wrong one turns a full match into a partial. */}
+                        <span class="text-[11px] text-muted">{ locale.t('verify.fileName.hint') }</span>
+                    </div>
+                </Show>
+
+                <Show when={ kind === 'single' }>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[12px] text-muted">{ locale.t('verify.optimizer') }</span>
+                        <div class="flex items-center gap-3">
+                            <label class="flex cursor-pointer items-center gap-2 text-[13px]">
+                                <input
+                                    class="h-4 w-4 accent-nur"
+                                    type="checkbox"
+                                    checked={ optimizer }
+                                    onChange={ (event) => optimizer = (event.target as HTMLInputElement).checked }
+                                />
+                                { locale.t('verify.optimizer.enabled') }
+                            </label>
+                            <Show when={ optimizer }>
+                                <input
+                                    class={ `${ FIELD } data max-w-28` }
+                                    type="text"
+                                    inputmode="numeric"
+                                    aria-label={ locale.t('verify.runs') }
+                                    value={ runs }
+                                    onInput={ (event) => runs = (event.target as HTMLInputElement).value }
+                                />
+                            </Show>
+                        </div>
+                        <span class="text-[11px] text-muted">{ locale.t('verify.optimizer.hint') }</span>
+                    </div>
+                </Show>
+
+                <div class="flex flex-col gap-1">
+                    <span class="text-[12px] text-muted">{ locale.t('verify.license') }</span>
+                    <Input
+                        label={ locale.t('verify.license') }
+                        placeholder="MIT"
+                        size="sm"
+                        prose
+                        value={ license }
+                        onInput={ (value) => license = value }
+                    />
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <span class="text-[12px] text-muted">
+                    { locale.t(kind === 'single' ? 'verify.source' : 'verify.json') }
+                </span>
+                {/* A textarea rather than the shared Input, because this field is the one thing on
+                    the page measured in screens - and source read in a single-line box is not
+                    read at all. `spellcheck` off for the same reason it is off on every hash
+                    field here: this is code, and the red underlines are noise. */}
+                <textarea
+                    class={ `${ FIELD } data min-h-80 resize-y leading-relaxed` }
+                    aria-label={ locale.t(kind === 'single' ? 'verify.source' : 'verify.json') }
+                    placeholder={ locale.t(kind === 'single' ? 'verify.source.placeholder' : 'verify.json.placeholder') }
+                    spellcheck={ false }
+                    value={ source }
+                    onInput={ (event) => source = (event.target as HTMLTextAreaElement).value }
+                ></textarea>
+                <Show when={ kind === 'json' }>
+                    <span class="text-[11px] text-muted">{ locale.t('verify.json.hint') }</span>
+                </Show>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <Button
+                    variant="primary"
+                    size="md"
+                    icon="verified"
+                    busy={ busy }
+                    disabled={ source.trim() === '' || versions.length === 0 }
+                    onClick={ () => void submit() }
+                >
+                    { locale.t('verify.submit') }
+                </Button>
+                <span class="text-[12px] text-muted">{ locale.t('verify.submit.hint') }</span>
+            </div>
+        </section>
+
+        <Show when={ result } let={ answer }>
+            <Show
+                when={ answer.ok }
+                fallback={
+                    <section class="panel flex flex-col gap-2 px-4 py-4">
+                        <p class="flex items-center gap-2 text-[13px] font-semibold text-outflow">
+                            <Icon name="alert" size={ 15 } /> { answer.message }
+                        </p>
+                        {/* The compiler's own words, unedited. A paraphrase of a solc diagnostic
+                            is worth less than the line and column it came with. */}
+                        <Show when={ answer.errors.length > 0 }>
+                            <For each={ answer.errors } key={ (entry) => entry } let={ entry }>
+                                <pre class="data max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-field px-3 py-2 text-[12px] text-muted">{ entry }</pre>
+                            </For>
+                        </Show>
+                        <p class="text-[12px] text-muted">{ locale.t('verify.failed.hint') }</p>
+                    </section>
+                }
+            >
+                <section class="panel flex flex-col gap-2 px-4 py-4">
+                    <p class="flex items-center gap-2 text-[13px] font-semibold text-inflow">
+                        <Icon name="verified" size={ 15 } /> { answer.message }
+                    </p>
+                    <p class="text-[12px] text-muted">
+                        { locale.t('verify.done.detail', { name: answer.name }) }
+                    </p>
+                    <p>
+                        <Link to={ `/address/${ address }` } class="text-[13px] font-semibold text-beam no-underline hover:underline">
+                            { locale.t('verify.done.open') }
+                        </Link>
+                    </p>
+                </section>
+            </Show>
+        </Show>
+
+        <Show when={ failure !== '' }>
+            <p class={ `flex items-start gap-2 rounded-lg px-4 py-3 text-[12px] ${ TONE_CLASS.danger }` }>
+                <Icon name="alert" size={ 14 } class="mt-0.5 shrink-0" />
+                <span class="hash min-w-0">{ failure }</span>
+            </p>
+        </Show>
+    </div>
+}

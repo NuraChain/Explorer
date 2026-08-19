@@ -10,6 +10,9 @@ import { buildApp } from './app.ts';
 import { ChainReader, loadChainEnv } from './chain/client.ts';
 import { IndexStore } from './chain/store.ts';
 import { startIndexer } from './chain/indexer.ts';
+import { CompilerSupply } from './verify/compilers.ts';
+import { SourceStore } from './verify/store.ts';
+import { solcCompiler, Verifier } from './verify/verify.ts';
 
 try
 {
@@ -24,7 +27,14 @@ const config = loadConfig({
     port: num('PORT', { default: 3000 }),
     env: oneOf('NODE_ENV', ['development', 'production', 'test'], { default: 'development' }),
     clientDir: str('CLIENT_DIR', { default: '../application/dist' }),
-    ssrEntry: str('SSR_ENTRY', { default: '../application/dist-server/entry.server.js' })
+    ssrEntry: str('SSR_ENTRY', { default: '../application/dist-server/entry.server.js' }),
+    // Published source, in its OWN file. The index next to it is a cache the chain can replay;
+    // this one holds text somebody typed, and deleting it loses every verification on the
+    // deployment. Two files so that "delete the index and let it rebuild" stays safe advice.
+    sourcesDbPath: str('SOURCES_DB_PATH', { default: '.data/sources.db' }),
+    // Where solc builds are kept. Populate it by hand to verify without outbound network access;
+    // otherwise a missing build is fetched once from the official host and cached here.
+    solcDir: str('SOLC_DIR', { default: '.data/solc' })
 });
 const isProduction = config.env === 'production';
 
@@ -38,6 +48,12 @@ const chainEnv = loadChainEnv();
 const chain = new ChainReader(chainEnv);
 const store = new IndexStore(chainEnv.dbPath);
 const indexer = startIndexer(store, chain, log);
+
+// The verification half. It owns no timer and reads no blocks - it wakes up only when somebody
+// submits source, and then it costs a core for as long as solc takes.
+const sources = new SourceStore(config.sourcesDbPath);
+const supply = new CompilerSupply({ directory: config.solcDir });
+const verifier = new Verifier({ chain, sources, supply, compile: solcCompiler(supply) });
 
 log.info('indexing', { rpc: chainEnv.rpcUrl, chainId: chainEnv.chainId, from: chainEnv.startBlock });
 
@@ -53,6 +69,9 @@ const app = buildApp({
     observe: logRequests(log),
     store,
     chain,
+    sources,
+    supply,
+    verifier,
     pages: ssr === undefined ? undefined : { routes: ssr.routes, clientDir: config.clientDir, renderer: ssr.renderPage }
 });
 
@@ -72,6 +91,7 @@ process.on('exit', () =>
 {
     indexer.stop();
     store.close();
+    sources.close();
 });
 
 // The panel's Server tab connects here and mirrors the server's reactive graph: request roots,

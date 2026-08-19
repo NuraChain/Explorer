@@ -7,20 +7,28 @@ import { toFunctionSelector } from 'viem';
 import { buildApp } from '../src/app.ts';
 import { analyze, describeFunctions, detectStandards } from '../src/chain/contract.ts';
 import { encodeCall } from '../src/chain/values.ts';
+import { functionsOfAbi } from '../src/verify/abi.ts';
+import { compareDeployed, unlinkedLibraries } from '../src/verify/match.ts';
 import { syncOnce } from '../src/chain/indexer.ts';
 import { IndexStore, TRANSFER_TOPIC } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
+import { CompilerSupply } from '../src/verify/compilers.ts';
+import { SourceStore } from '../src/verify/store.ts';
+import { Verifier, type CompileFn } from '../src/verify/verify.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/client.ts';
 import type {
     Account,
     BlockPage,
+    CompilerList,
     ContractCalldata,
     ContractCallResult,
     ContractDetail,
+    ContractSource,
     SearchResult,
     Summary,
     TransactionPage,
-    TransferPage
+    TransferPage,
+    VerifyResult
 } from '../src/schemas.ts';
 
 const ENV: ChainEnv = {
@@ -98,6 +106,48 @@ function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): ChainGate
 }
 
 const silent = { info: () => undefined, warn: () => undefined, error: () => undefined, debug: () => undefined } as never;
+
+/**
+ * The verification half, wired to nothing.
+ *
+ * Most of this file is about the chain and the index, and neither knows that source verification
+ * exists - but the app is built from one set of dependencies, so these three have to be there.
+ * The supply is pointed at a fetch that always refuses, which is what an air-gapped deployment
+ * looks like and what a test must look like: no build is ever downloaded here.
+ */
+function verifying(
+    chain: ChainGateway,
+    compile: CompileFn = async () => '{"contracts":{}}',
+    supply: CompilerSupply = offlineSupply()
+): { sources: SourceStore; supply: CompilerSupply; verifier: Verifier }
+{
+    const sources = new SourceStore(':memory:');
+    return { sources, supply, verifier: new Verifier({ chain, sources, supply, compile }) };
+}
+
+/** A supply with nothing on disk and nothing reachable - an air-gapped host, and every test. */
+function offlineSupply(): CompilerSupply
+{
+    return new CompilerSupply({ directory: NO_BUILDS, fetchImpl: async () => new Response('', { status: 503 }) });
+}
+
+/** A supply that lists one release and can never download it - enough to name a build. */
+function listingSupply(): CompilerSupply
+{
+    const list = JSON.stringify({
+        builds: [{ path: 'solc-0.8.24.js', version: '0.8.24', longVersion: '0.8.24+commit.e11b9ed9', sha256: '0x00' }],
+        releases: { '0.8.24': 'solc-0.8.24.js' }
+    });
+    return new CompilerSupply({
+        directory: NO_BUILDS,
+        fetchImpl: async (target) => String(target).endsWith('list.json')
+            ? new Response(list, { status: 200 })
+            : new Response('', { status: 503 })
+    });
+}
+
+/** A directory that does not exist, so no test ever picks up a compiler somebody left lying about. */
+const NO_BUILDS = './.data/tests-have-no-compilers';
 
 async function indexed(blocks: BlockWithReceipts[], stub: ChainStub = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
 {
@@ -296,7 +346,7 @@ describe('the API over the index', () =>
     async function api(): Promise<(path: string) => Promise<Response>>
     {
         const { store, chain } = await indexed(CHAIN);
-        const app = buildApp({ dev: false, store, chain });
+        const app = buildApp({ dev: false, store, chain, ...verifying(chain) });
         return (path) => app.handle(new Request(`http://local${ path }`));
     }
 
@@ -335,7 +385,7 @@ describe('the API over the index', () =>
     it('serves a token contract its OWN transfers rather than an empty ledger', async () =>
     {
         const { store, chain } = await indexed([...CHAIN, tokenBlock(3, '0xb2', '0xb3')]);
-        const app = buildApp({ dev: false, store, chain });
+        const app = buildApp({ dev: false, store, chain, ...verifying(chain) });
         const at = (path: string): Promise<Response> => app.handle(new Request(`http://local${ path }`));
 
         // The tab's counter and the tab's contents have to agree - one of them reading 0 while
@@ -477,7 +527,7 @@ describe('reading a contract off its bytecode', () =>
         };
 
         const { store, chain } = await indexed([creation], { code: { [deployed]: TOKEN_CODE } });
-        const app = buildApp({ dev: false, store, chain });
+        const app = buildApp({ dev: false, store, chain, ...verifying(chain) });
         const detail = (await (await app.handle(new Request(`http://local/api/address/${ deployed }/contract`))).json()) as ContractDetail;
 
         expect(detail.isContract).toBe(true);
@@ -492,7 +542,7 @@ describe('reading a contract off its bytecode', () =>
     it('answers for an address that holds no code instead of failing', async () =>
     {
         const { store, chain } = await indexed(CHAIN);
-        const app = buildApp({ dev: false, store, chain });
+        const app = buildApp({ dev: false, store, chain, ...verifying(chain) });
         const detail = (await (await app.handle(new Request(`http://local/api/address/${ BOB }/contract`))).json()) as ContractDetail;
 
         expect(detail.isContract).toBe(false);
@@ -511,7 +561,7 @@ describe('calling a contract', () =>
     async function post(path: string, body: unknown, stub: ChainStub = {}): Promise<Response>
     {
         const { store, chain } = await indexed(CHAIN, stub);
-        const app = buildApp({ dev: false, store, chain });
+        const app = buildApp({ dev: false, store, chain, ...verifying(chain) });
         return app.handle(new Request(`http://local${ path }`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -602,6 +652,242 @@ describe('calling a contract', () =>
         expect(response.status).toBe(200);
         expect(result.values).toEqual([]);
         expect(result.error).toContain('nonexistent token');
+    });
+});
+
+describe('recompiling submitted source against the chain', () =>
+{
+    const DEPLOYED = '0xdddddddddddddddddddddddddddddddddddddddd';
+
+    /** A short runtime body, and the CBOR trailer solc appends after it. */
+    const CODE_BODY = '6080604052348015600e575f80fd5b50';
+    const TRAILER = `a2646970667358221220${ 'ab'.repeat(32) }64736f6c634300081800330035`;
+    const OTHER_TRAILER = `a2646970667358221220${ 'cd'.repeat(32) }64736f6c634300081800330035`;
+
+    /** The ABI of a function no published standard claims - the whole point of verifying. */
+    const ABI = [{
+        type: 'function',
+        name: 'mintTo',
+        inputs: [{ name: 'to', type: 'address' }],
+        outputs: [],
+        stateMutability: 'nonpayable'
+    }];
+
+    const MINT_TO = toFunctionSelector('mintTo(address)');
+
+    /** solc's standard output, with one contract whose deployed bytecode is `object`. */
+    function compiled(object: string, name = 'Token'): string
+    {
+        return JSON.stringify({
+            contracts: { 'Token.sol': { [name]: { abi: ABI, evm: { deployedBytecode: { object } } } } }
+        });
+    }
+
+    const SUBMISSION = {
+        kind: 'single',
+        compiler: '0.8.24',
+        name: 'Token',
+        fileName: 'Token.sol',
+        source: '// SPDX-License-Identifier: MIT\ncontract Token { }',
+        optimizer: true,
+        runs: 200,
+        evmVersion: '',
+        license: 'MIT'
+    };
+
+    /** An app whose compiler answers with `output`, over an index that holds this deployment. */
+    async function verifiable(output: string, onchain: string): Promise<ReturnType<typeof buildApp>>
+    {
+        const creation = block(0, '0x00', '0xc0');
+        creation.transactions[0] = {
+            ...creation.transactions[0]!, to: null, value: 0n, inputSize: 120, contractAddress: DEPLOYED
+        };
+        const { store, chain } = await indexed([creation], { code: { [DEPLOYED]: onchain } });
+        return buildApp({
+            dev: false,
+            store,
+            chain,
+            ...verifying(chain, async () => output, listingSupply())
+        });
+    }
+
+    function submit(app: ReturnType<typeof buildApp>, body: unknown = SUBMISSION, address = DEPLOYED): Promise<Response>
+    {
+        return app.handle(new Request(`http://local/api/address/${ address }/verify`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body)
+        }));
+    }
+
+    it('compares the RUNTIME code, so nothing has to supply constructor arguments', () =>
+    {
+        const code = `0x${ CODE_BODY }${ TRAILER }`;
+        expect(compareDeployed(code, code)).toBe('full');
+    });
+
+    it('calls it a partial match when only the metadata trailer differs', () =>
+    {
+        // Same instructions, different hash of the source's own description - a moved comment, a
+        // different file path. The code is the deployed code; the source is not proven identical.
+        expect(compareDeployed(`0x${ CODE_BODY }${ TRAILER }`, `0x${ CODE_BODY }${ OTHER_TRAILER }`)).toBe('partial');
+    });
+
+    it('ignores the bytes an immutable occupies, which the constructor writes', () =>
+    {
+        // solc emits zeros where an immutable goes and says exactly where; the chain holds the
+        // value the constructor put there. Comparing those bytes would fail every such contract.
+        const onchain = `0x${ CODE_BODY.slice(0, 8) }deadbeef${ CODE_BODY.slice(16) }${ TRAILER }`;
+        const output = `${ CODE_BODY.slice(0, 8) }00000000${ CODE_BODY.slice(16) }${ TRAILER }`;
+
+        expect(compareDeployed(onchain, output)).toBeNull();
+        expect(compareDeployed(onchain, output, { '7': [{ start: 4, length: 4 }] })).toBe('full');
+    });
+
+    it('refuses code that is simply a different contract', () =>
+    {
+        expect(compareDeployed(`0x${ CODE_BODY }${ TRAILER }`, `60006000${ CODE_BODY }${ TRAILER }`)).toBeNull();
+    });
+
+    it('spots a library placeholder the linker never filled in', () =>
+    {
+        // Blanking those twenty bytes would make it match, and would mean not checking the part a
+        // reader most wants checked - so they are reported and the submission is refused.
+        expect(unlinkedLibraries(`6080__$${ 'a'.repeat(34) }$__6040`)).toHaveLength(1);
+        expect(unlinkedLibraries(`0x${ CODE_BODY }`)).toEqual([]);
+    });
+
+    it('names a selector no standard claims, from the ABI the source produced', () =>
+    {
+        const functions = functionsOfAbi(JSON.stringify(ABI));
+
+        expect(functions.get(MINT_TO)?.signature).toBe('mintTo(address)');
+        // Not a guess about state: an ABI entry with no `stateMutability` is a write, and a wrong
+        // `view` would put a transaction behind a Query button.
+        expect(functions.get(MINT_TO)?.mutability).toBe('nonpayable');
+    });
+
+    it('encodes a struct argument from the components the ABI carries', () =>
+    {
+        const functions = functionsOfAbi(JSON.stringify([{
+            type: 'function',
+            name: 'pay',
+            stateMutability: 'nonpayable',
+            outputs: [],
+            inputs: [{
+                name: 'order',
+                type: 'tuple',
+                components: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }]
+            }]
+        }]));
+        const entry = functions.get(toFunctionSelector('pay((address,uint256))'))!;
+
+        // Printed the way a signature writes it; encoded from the components, because the printed
+        // form alone cannot be turned back into a tuple.
+        expect(entry.inputs).toEqual(['(address,uint256)']);
+        const data = encodeCall(entry, [JSON.stringify([BOB, '5'])]);
+        expect(data.slice(10, 74)).toBe(BOB.slice(2).padStart(64, '0'));
+        expect(BigInt(`0x${ data.slice(74) }`)).toBe(5n);
+    });
+
+    it('accepts source that reproduces the deployed bytecode, and names its functions after', async () =>
+    {
+        const code = `0x${ CODE_BODY }${ TRAILER }`;
+        const app = await verifiable(compiled(code), code);
+
+        const result = (await (await submit(app)).json()) as VerifyResult;
+        expect(result.ok).toBe(true);
+        expect(result.match).toBe('full');
+        expect(result.name).toBe('Token');
+
+        // The half that matters to a reader: the page now knows what this contract's own
+        // functions are called, which no table of published signatures could have told it.
+        const detail = (await (await app.handle(new Request(`http://local/api/address/${ DEPLOYED }/contract`))).json()) as ContractDetail;
+        expect(detail.verified?.name).toBe('Token');
+        expect(detail.verified?.match).toBe('full');
+        expect(detail.functions.map(entry => entry.name)).toContain('mintTo');
+    });
+
+    it('refuses source whose bytecode is not the one at the address', async () =>
+    {
+        const app = await verifiable(compiled(`0x6001${ CODE_BODY }${ TRAILER }`), `0x${ CODE_BODY }${ TRAILER }`);
+
+        const result = (await (await submit(app)).json()) as VerifyResult;
+        expect(result.ok).toBe(false);
+        expect(result.match).toBe('none');
+
+        // Nothing was stored, so the page still says no source has been published.
+        const detail = (await (await app.handle(new Request(`http://local/api/address/${ DEPLOYED }/contract`))).json()) as ContractDetail;
+        expect(detail.verified).toBeNull();
+    });
+
+    it('reports what the compiler said when the source does not compile', async () =>
+    {
+        const app = await verifiable(
+            JSON.stringify({ errors: [{ severity: 'error', formattedMessage: 'ParserError: expected ;' }] }),
+            `0x${ CODE_BODY }${ TRAILER }`);
+
+        const result = (await (await submit(app)).json()) as VerifyResult;
+        expect(result.ok).toBe(false);
+        expect(result.errors[0]).toContain('ParserError');
+    });
+
+    it('refuses an address that holds no code', async () =>
+    {
+        const app = await verifiable(compiled(`0x${ CODE_BODY }${ TRAILER }`), `0x${ CODE_BODY }${ TRAILER }`);
+        expect((await submit(app, SUBMISSION, BOB)).status).toBe(400);
+    });
+
+    it('will not encode a call it cannot name, and will once the source names it', async () =>
+    {
+        const code = `0x${ CODE_BODY }${ TRAILER }`;
+        const app = await verifiable(compiled(code), code);
+
+        const calldata = (): Promise<Response> => app.handle(new Request(`http://local/api/address/${ DEPLOYED }/calldata`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ selector: MINT_TO, args: [BOB] })
+        }));
+
+        // No published standard claims this selector, so before verification there is no way to
+        // know what arguments it takes - and a guess would become calldata somebody signs.
+        expect((await calldata()).status).toBe(400);
+
+        await submit(app);
+
+        const encoded = (await (await calldata()).json()) as ContractCalldata;
+        expect(encoded.data.slice(0, 10)).toBe(MINT_TO);
+        expect(encoded.data.slice(10)).toBe(BOB.slice(2).padStart(64, '0'));
+    });
+
+    it('serves the source it stored, and says plainly when there is none', async () =>
+    {
+        const code = `0x${ CODE_BODY }${ TRAILER }`;
+        const app = await verifiable(compiled(code), code);
+        const source = (): Promise<Response> => app.handle(new Request(`http://local/api/address/${ DEPLOYED }/source`));
+
+        expect(((await (await source()).json()) as ContractSource).verified).toBe(false);
+
+        await submit(app);
+
+        const published = (await (await source()).json()) as ContractSource;
+        expect(published.verified).toBe(true);
+        expect(published.license).toBe('MIT');
+        expect(published.optimizer).toBe(true);
+        expect(published.files[0]?.path).toBe('Token.sol');
+        expect(published.files[0]?.content).toContain('contract Token');
+    });
+
+    it('offers no compiler it cannot produce, and says the host was unreachable', async () =>
+    {
+        // An air-gapped deployment with an empty SOLC_DIR. `offline` is not an error - it is what
+        // the form has to say instead of showing an empty list that reads as broken.
+        const { store, chain } = await indexed(CHAIN);
+        const app = buildApp({ dev: false, store, chain, ...verifying(chain) });
+
+        const list = (await (await app.handle(new Request('http://local/api/compilers'))).json()) as CompilerList;
+        expect(list.versions).toEqual([]);
+        expect(list.offline).toBe(true);
     });
 });
 

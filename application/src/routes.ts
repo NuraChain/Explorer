@@ -9,6 +9,7 @@ import BlocksPage from './pages/blocks.page.azeroth';
 import Home from './pages/home.page.azeroth';
 import TransactionPage from './pages/tx.page.azeroth';
 import TransactionsPage from './pages/txs.page.azeroth';
+import VerifyPage from './pages/verify.page.azeroth';
 
 // Every page reads live chain state, so none is prerenderable: a static home would ship the block
 // height that was true at BUILD time. They SSR instead, which is also what makes a shared link to
@@ -19,5 +20,8 @@ export const routes: PageRoute[] = [
     { path: '/block/:number', component: BlockPage, render: 'server' },
     { path: '/txs', component: TransactionsPage, render: 'server' },
     { path: '/tx/:hash', component: TransactionPage, render: 'server' },
-    { path: '/address/:address', component: AddressPage, render: 'server' }
+    { path: '/address/:address', component: AddressPage, render: 'server' },
+    // A form, not a view of chain state - but it SSRs like the rest so that a link to it arrives
+    // as a usable page rather than as a shell that fills in a tick later.
+    { path: '/verify/:address', component: VerifyPage, render: 'server' }
 ];

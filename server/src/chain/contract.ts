@@ -312,6 +312,21 @@ function readMetadata(bytes: Uint8Array, start: number): { compiler: string; met
     };
 }
 
+/**
+ * The same code with solc's metadata trailer cut off, or unchanged when it has none.
+ *
+ * The trailer is a hash of the source's own description - file paths, comments, settings - so two
+ * builds of identical CODE differ there over a moved comment. Verification needs to be able to
+ * ask "same instructions?" separately from "same everything?", and this is the cut that separates
+ * them. It uses the same rule the scanner does, from the same place, so the two can never come to
+ * different conclusions about where a contract's code ends.
+ */
+export function withoutMetadata(code: string): string
+{
+    const bytes = bytesOf(code);
+    return hexOf(bytes, 0, metadataStart(bytes));
+}
+
 /** The body of an EIP-1167 minimal proxy, around the 20 address bytes it delegates to. */
 const MINIMAL_PROXY_HEAD = '363d3d373d3d3d363d73';
 const MINIMAL_PROXY_TAIL = '5af43d82803e903d91602b57fd5bf3';
@@ -369,12 +384,19 @@ export interface DescribedFunction extends KnownFunction
  * selector: a reader scanning for `transfer` should not have to walk past forty hex strings, and
  * the unnamed ones are still listed because their COUNT is the honest measure of what this page
  * does not know.
+ *
+ * `table` is that measure's other half. It defaults to the built-in signatures, which is the
+ * bytecode-only case this page was built for; a contract with verified source passes its own ABI
+ * instead, and then there is nothing left for the page not to know.
  */
-export function describeFunctions(selectors: readonly string[]): DescribedFunction[]
+export function describeFunctions(
+    selectors: readonly string[],
+    table: ReadonlyMap<string, KnownFunction> = FUNCTION_BY_SELECTOR
+): DescribedFunction[]
 {
     const described = selectors.map((selector): DescribedFunction =>
     {
-        const known = FUNCTION_BY_SELECTOR.get(selector);
+        const known = table.get(selector);
         return known === undefined
             ? { selector, signature: '', name: '', inputs: [], outputs: [], mutability: 'unknown', known: false }
             : { ...known, known: true };
@@ -392,10 +414,13 @@ export function describeFunctions(selectors: readonly string[]): DescribedFuncti
     });
 }
 
-export function describeEvents(topics: readonly string[]): KnownEvent[]
+export function describeEvents(
+    topics: readonly string[],
+    table: ReadonlyMap<string, KnownEvent> = EVENT_BY_TOPIC
+): KnownEvent[]
 {
     return topics
-        .map((topic) => EVENT_BY_TOPIC.get(topic))
+        .map((topic) => table.get(topic))
         .filter((event): event is KnownEvent => event !== undefined)
         .sort((left, right) => left.signature.localeCompare(right.signature));
 }
