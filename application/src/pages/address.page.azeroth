@@ -258,12 +258,13 @@ export default component AddressPage()
                                 </Show>
                                 <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                             </div>
-                            <div class="min-w-0 max-w-[45%] text-end">
-                                {/* `amount` on the span, so the paragraph inherits the reader's
-                                    direction and resolves the cell's `text-end` to the same edge
-                                    the hash below it lands on. The sign stays INSIDE the isolate:
-                                    a bare +/- is bidi-neutral and would swap to the far side of
-                                    its own digits in a mirrored line. */}
+                            <div class="min-w-0 max-w-[45%] text-center">
+                                {/* Centred in the cell, the figure over the hash, so the pair reads
+                                    as one stacked column rather than two ragged edges. `amount`
+                                    stays on the span so the paragraph inherits the reader's
+                                    direction and the centring lands the same way in both. The sign
+                                    stays INSIDE the isolate: a bare +/- is bidi-neutral and would
+                                    swap to the far side of its own digits in a mirrored line. */}
                                 <p class={ `text-[14px] font-semibold ${ FACE[way(row)].amount }` }>
                                     <span class="amount">{ FACE[way(row)].sign }{ formatAmount(row.value, row.tokenDecimals) }</span>
                                 </p>

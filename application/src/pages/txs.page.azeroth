@@ -46,7 +46,7 @@ export default component TransactionsPage()
                         </div>
                         <div class="min-w-0 max-w-[45%] text-end">
                             <p class="amount text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>
-                            <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
+                            <Tooltip label={ locale.dateTime(row.at) } class="flex justify-center"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                         </div>
                     </li>
                 </For>
