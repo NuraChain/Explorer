@@ -3,6 +3,7 @@ import { Link, onMount, Portal } from 'azerothjs';
 import Icon from '../../icons/icon.component.azeroth';
 
 import { useLocale } from '../../stores/locale.store.ts';
+import { lockBodyScroll, unlockBodyScroll } from '../../lib/body-lock.ts';
 
 import ThemeSwitch from './theme-switch.component.azeroth';
 import LanguageSwitch from './language-switch.component.azeroth';
@@ -34,11 +35,18 @@ export default component NavDrawer()
         return () => document.removeEventListener('keydown', onKey);
     });
 
+    // The body cannot scroll behind the sheet - a scrolling page under an open overlay is the
+    // single most common way a drawer feels broken. The counter in body-lock keeps this honest
+    // when the language dialog opens on top of the sheet.
     effect (open)
     {
-        if (typeof document !== 'undefined')
+        if (open)
         {
-            document.body.style.overflow = open ? 'hidden' : '';
+            lockBodyScroll();
+        }
+        else
+        {
+            unlockBodyScroll();
         }
     }
 
