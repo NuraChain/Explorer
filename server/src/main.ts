@@ -7,6 +7,7 @@ import { createLogger } from '@azerothjs/logger';
 import { fileStream } from '@azerothjs/logger/node';
 
 import { buildApp } from './app.ts';
+import { CachedChain, loadCacheOptions } from './chain/cache.ts';
 import { ChainReader, loadChainEnv } from './chain/client.ts';
 import { IndexStore } from './chain/store.ts';
 import { startIndexer } from './chain/indexer.ts';
@@ -39,6 +40,12 @@ const chain = new ChainReader(chainEnv);
 const store = new IndexStore(chainEnv.dbPath);
 const indexer = startIndexer(store, chain, log);
 
+// The API reads the node THROUGH a cache; the indexer above keeps the raw reader. Same node, two
+// appetites: the sync path reads each height once and must see a reorg the moment it happens,
+// while the API is asked for the same head, the same bytecode and the same balances by every
+// visitor at once. See chain/cache.ts for what is held and for how long.
+const reads = new CachedChain(chain, loadCacheOptions());
+
 log.info('indexing', { rpc: chainEnv.rpcUrl, chainId: chainEnv.chainId, from: chainEnv.startBlock });
 
 // In dev, vite serves the client and proxies /api here; in production this server serves
@@ -52,7 +59,7 @@ const app = buildApp({
     dev: !isProduction,
     observe: logRequests(log),
     store,
-    chain,
+    chain: reads,
     pages: ssr === undefined ? undefined : { routes: ssr.routes, clientDir: config.clientDir, renderer: ssr.renderPage }
 });
 
