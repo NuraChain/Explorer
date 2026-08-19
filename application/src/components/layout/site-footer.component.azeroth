@@ -75,7 +75,7 @@ export default component SiteFooter()
         <div class="border-t border-line">
             <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-[12px] text-faint sm:px-6">
                 <p>{ locale.t('footer.note') }</p>
-                <p class="shrink-0">
+                <p>
                     {/* Explicit: a literal text line before an element line collapses to a single
                         space, but an expression container does not, so the words would run together. */}
                     { locale.t('footer.builtWith') }{ ' ' }
@@ -84,12 +84,12 @@ export default component SiteFooter()
                         href="https://github.com/AzerothJS/AzerothJS"
                         target="_blank"
                         rel="noreferrer"
-                    >AzerothJS</a>{ ' ' }
-                    <span class="inline-flex items-center gap-1.5 rounded-md border border-line bg-raised px-2 py-0.5 text-[11px] text-muted">
-                        { locale.t('footer.version') }{ ' ' }
-                        <span class="data">{ APP_VERSION }</span>
-                    </span>
+                    >AzerothJS</a>
                 </p>
+                <span class="inline-flex items-center gap-1.5 rounded-md border border-line bg-raised px-2 py-0.5 text-[11px] text-muted">
+                    { locale.t('footer.version') }{ ' ' }
+                    <span class="data">{ APP_VERSION }</span>
+                </span>
             </div>
         </div>
     </footer>
