@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  review_details: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/coverage/**"
+    - "!**/*.lock"
+  path_instructions:
+    - path: "**/*.{ts,tsx,js,jsx}"
+      instructions: |
+        Review as production TypeScript/JavaScript for a blockchain explorer.
+        - Check type safety, async behavior, validation, error handling, caching, and performance.
+        - Treat RPC/API responses as untrusted input. Validate addresses, hashes, quantities, pagination, and response schemas.
+        - Check XSS, SSRF, injection, unsafe HTML rendering, authentication/authorization, and secret exposure.
+        - Flag client-side trust of balances, transaction status, confirmations, prices, or chain metadata.
+    - path: "**/server/**"
+      instructions: |
+        Treat server code as a security boundary. Check RPC proxying, URL validation, SSRF, rate limiting, CORS, authentication, request validation, and sensitive error leakage.
+    - path: "**/*.{sol}"
+      instructions: |
+        Review Solidity as security-critical code: access control, reentrancy, arithmetic/precision, token accounting, signature/replay protection, and unsafe external calls.
+    - path: "**/*.{md,mdx}"
+      instructions: |
+        Verify blockchain terminology, API examples, network IDs, RPC configuration, and deployment instructions.
