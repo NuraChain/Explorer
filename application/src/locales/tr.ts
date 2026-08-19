@@ -155,6 +155,7 @@ export const tr: Dictionary = {
     'contract.mutability.pure': 'saf',
     'contract.mutability.nonpayable': 'yazma',
     'contract.mutability.payable': 'ödeme alan',
+    'contract.mutability.library': 'kitaplık',
     'contract.mutability.unknown': 'bilinmiyor',
 
     'contract.read': 'Okuma',
@@ -162,6 +163,8 @@ export const tr: Dictionary = {
     'contract.write': 'Yazma',
     'contract.write.hint': 'Bunlar kendi cüzdanınızdan, bu ağ üzerinde işlem gönderir. Cüzdanınız imzalamadan önce sorar, gaz ücretini siz ödersiniz.',
     'contract.unnamedGroup': 'Adsız seçiciler',
+    'contract.libraryGroup': 'Kitaplık fonksiyonları',
+    'contract.library.hint': 'Kendilerini bağlayan sözleşmeden delegatecall ile çalışır, bu yüzden burada çağrılamaz.',
     'contract.call.query': 'Sorgula',
     'contract.call.write': 'Yaz',
     'contract.call.value': 'Gönderilecek tutar ({symbol})',

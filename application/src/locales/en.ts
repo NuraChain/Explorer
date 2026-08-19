@@ -168,6 +168,7 @@ export const en = {
     'contract.mutability.pure': 'pure',
     'contract.mutability.nonpayable': 'write',
     'contract.mutability.payable': 'payable',
+    'contract.mutability.library': 'library',
     'contract.mutability.unknown': 'unknown',
 
     // The two halves of calling one. Worded so the difference between them is unmissable: the
@@ -177,6 +178,8 @@ export const en = {
     'contract.write': 'Write',
     'contract.write.hint': 'These send a transaction from your own wallet, on this network. Your wallet asks before anything is signed, and you pay the gas.',
     'contract.unnamedGroup': 'Unnamed selectors',
+    'contract.libraryGroup': 'Library functions',
+    'contract.library.hint': 'Run by delegatecall from the contract that linked them, so they cannot be called here.',
     'contract.call.query': 'Query',
     'contract.call.write': 'Write',
     'contract.call.value': 'Value to send ({symbol})',

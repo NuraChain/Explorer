@@ -150,7 +150,9 @@ export type TopAccounts = Infer<typeof topAccounts>;
 // from a table of published signatures (see chain/signatures.ts), so a field left EMPTY means
 // "not known", never "not there" - the difference matters to someone about to call one of these.
 
-export const MUTABILITY = ['view', 'pure', 'nonpayable', 'payable', 'unknown'] as const;
+// `library` is not a state promise: it marks a function that lives on a Solidity library and is
+// reached by delegatecall, so it is named but never offered as a call. See chain/signatures.ts.
+export const MUTABILITY = ['view', 'pure', 'nonpayable', 'payable', 'library', 'unknown'] as const;
 
 export const contractFunction = object({
     selector: string(),

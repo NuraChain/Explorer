@@ -38,6 +38,10 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
     derived writable = props.detail.functions.filter((entry) =>
         entry.signature !== '' && (entry.mutability === 'nonpayable' || entry.mutability === 'payable'));
     derived unnamed = props.detail.functions.filter((entry) => entry.signature === '');
+    // Named, and deliberately in neither call section: a library's code runs at the address that
+    // DELEGATECALLs it, never at this one, so a Read form here would encode a call that cannot
+    // work. It is listed so the count above is honest - one of one named, not zero of one.
+    derived libraries = props.detail.functions.filter((entry) => entry.mutability === 'library');
 
     const copyBytecode = async (): Promise<void> =>
     {
@@ -179,6 +183,31 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                     <For each={ writable } key={ (row) => row.selector } let={ row }>
                         <li class="border-b border-line last:border-b-0">
                             <ContractCall address={ props.detail.address } entry={ row } chain={ props.chain } />
+                        </li>
+                    </For>
+                </ul>
+            </section>
+        </Show>
+
+        {/* A library, which is why this contract has one selector and no callable surface. Named
+            in full - the signature a library hashes keeps its struct's qualified name rather than
+            expanding it, which is the only reason this reads as a function and not as four
+            bytes. */}
+        <Show when={ libraries.length > 0 }>
+            <section class="panel overflow-hidden">
+                <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
+                    <span class="flex items-center gap-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="layers" size={ 15 } /> { locale.t('contract.libraryGroup') }
+                    </span>
+                    <span class="text-[13px] text-muted">{ locale.t('contract.library.hint') }</span>
+                </h2>
+                <ul class="divide-y divide-line">
+                    <For each={ libraries } key={ (row) => row.selector } let={ row }>
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                            <span class="data w-24 shrink-0 text-[13px] text-muted">{ row.selector }</span>
+                            <span class="hash min-w-0 flex-1 text-[14px]">
+                                <span class="font-semibold">{ row.name }</span>(<span class="text-muted">{ row.inputs.join(', ') }</span>)
+                            </span>
                         </li>
                     </For>
                 </ul>

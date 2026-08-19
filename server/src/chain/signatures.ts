@@ -16,7 +16,16 @@ import { splitTypes } from './values.ts';
 // chains deploy, so a name shown here is the name its author gave it - never a guess. A selector
 // this file does not know is shown as its raw four bytes, which is the honest answer.
 
-export type Mutability = 'view' | 'pure' | 'nonpayable' | 'payable' | 'unknown';
+/**
+ * What a function promises about state - plus `library`, which is not a mutability at all.
+ *
+ * A Solidity LIBRARY's public functions live at their own address and are reached by
+ * DELEGATECALL from the contract that linked them. They are named here like anything else, but
+ * they can never be called at this address: a library holds no storage of its own, and calling
+ * one directly runs its code against nothing. `library` is what keeps them out of the two
+ * sections that offer a call.
+ */
+export type Mutability = 'view' | 'pure' | 'nonpayable' | 'payable' | 'library' | 'unknown';
 
 /** One entry of the table: the signature, split into the parts a reader is shown. */
 export interface KnownFunction
@@ -295,6 +304,21 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['nativeCurrencyLabel()', 'view', 'string'],
     ['nativeCurrencyLabelBytes()', 'view', 'bytes32'],
     ['constructTokenURI((uint256,address,address,string,string,uint8,uint8,bool,int24,int24,int24,int24,uint24,address))', 'pure', 'string'],
+
+    // --- Solidity libraries -------------------------------------------------------------------
+    // A library's selector is NOT hashed the way every other entry in this file is.
+    //
+    // For an ordinary function the compiler expands a struct parameter into its tuple, which is
+    // what the entry directly above does. For a LIBRARY it does not: a library may take arguments
+    // the ABI has no spelling for - a storage pointer, a recursive struct - so the compiler keeps
+    // the parameter's QUALIFIED NAME instead, and hashes `Lib.StructName` verbatim. The two forms
+    // hash to different selectors, and only the qualified one appears in deployed bytecode.
+    //
+    // Uniswap V3's NFTDescriptor is the library almost every chain has a copy of - the position
+    // manager links it to draw the SVG for a liquidity NFT - and it is the whole reason a reader
+    // meets a 24KB contract with exactly ONE selector on it. Both forms are kept: the tuple above
+    // for a fork that inlines the function into a contract, this one for the library itself.
+    ['constructTokenURI(NFTDescriptor.ConstructTokenURIParams)', 'library', 'string'],
 
     // --- Multicall3 ---------------------------------------------------------------------------
     // Deployed at the same address on most chains and called by every wallet and dashboard, so an

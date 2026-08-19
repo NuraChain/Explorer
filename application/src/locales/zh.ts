@@ -154,6 +154,7 @@ export const zh: Dictionary = {
     'contract.mutability.pure': '纯函数',
     'contract.mutability.nonpayable': '写入',
     'contract.mutability.payable': '可支付',
+    'contract.mutability.library': '库',
     'contract.mutability.unknown': '未知',
 
     'contract.read': '读取',
@@ -161,6 +162,8 @@ export const zh: Dictionary = {
     'contract.write': '写入',
     'contract.write.hint': '这些会从你自己的钱包在本网络上发出交易。签名前钱包会询问，燃料费由你支付。',
     'contract.unnamedGroup': '未命名选择器',
+    'contract.libraryGroup': '库函数',
+    'contract.library.hint': '由链接它们的合约通过 delegatecall 执行，因此无法在此调用。',
     'contract.call.query': '查询',
     'contract.call.write': '写入',
     'contract.call.value': '随调用发送的金额（{symbol}）',

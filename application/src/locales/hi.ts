@@ -155,6 +155,7 @@ export const hi: Dictionary = {
     'contract.mutability.pure': 'शुद्ध',
     'contract.mutability.nonpayable': 'लिखना',
     'contract.mutability.payable': 'भुगतान योग्य',
+    'contract.mutability.library': 'लाइब्रेरी',
     'contract.mutability.unknown': 'अज्ञात',
 
     'contract.read': 'पढ़ना',
@@ -162,6 +163,8 @@ export const hi: Dictionary = {
     'contract.write': 'लिखना',
     'contract.write.hint': 'ये आपके अपने वॉलेट से, इसी नेटवर्क पर लेनदेन भेजते हैं। हस्ताक्षर से पहले वॉलेट पूछता है, और गैस आप चुकाते हैं।',
     'contract.unnamedGroup': 'बिना नाम के सेलेक्टर',
+    'contract.libraryGroup': 'लाइब्रेरी फ़ंक्शन',
+    'contract.library.hint': 'इन्हें लिंक करने वाले कॉन्ट्रैक्ट से delegatecall द्वारा चलाया जाता है, इसलिए यहाँ इन्हें कॉल नहीं किया जा सकता।',
     'contract.call.query': 'क्वेरी',
     'contract.call.write': 'लिखें',
     'contract.call.value': 'भेजी जाने वाली राशि ({symbol})',

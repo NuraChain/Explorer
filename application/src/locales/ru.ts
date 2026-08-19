@@ -155,6 +155,7 @@ export const ru: Dictionary = {
     'contract.mutability.pure': 'чистая',
     'contract.mutability.nonpayable': 'запись',
     'contract.mutability.payable': 'платёжная',
+    'contract.mutability.library': 'библиотека',
     'contract.mutability.unknown': 'неизвестно',
 
     'contract.read': 'Чтение',
@@ -162,6 +163,8 @@ export const ru: Dictionary = {
     'contract.write': 'Запись',
     'contract.write.hint': 'Эти отправляют транзакцию из вашего собственного кошелька в этой сети. Кошелёк спросит перед подписью, а газ платите вы.',
     'contract.unnamedGroup': 'Безымянные селекторы',
+    'contract.libraryGroup': 'Функции библиотеки',
+    'contract.library.hint': 'Выполняются через delegatecall из контракта, который их подключил, поэтому вызвать их здесь нельзя.',
     'contract.call.query': 'Запросить',
     'contract.call.write': 'Записать',
     'contract.call.value': 'Сумма к отправке ({symbol})',

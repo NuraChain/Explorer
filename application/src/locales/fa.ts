@@ -159,6 +159,7 @@ export const fa: Dictionary = {
     'contract.mutability.pure': 'خالص',
     'contract.mutability.nonpayable': 'نوشتن',
     'contract.mutability.payable': 'قابل پرداخت',
+    'contract.mutability.library': 'کتابخانه',
     'contract.mutability.unknown': 'نامشخص',
 
     'contract.read': 'خواندن',
@@ -166,6 +167,8 @@ export const fa: Dictionary = {
     'contract.write': 'نوشتن',
     'contract.write.hint': 'این‌ها از کیف پول خودتان و روی همین شبکه تراکنش می‌فرستند. کیف پول پیش از امضا می‌پرسد و کارمزد را شما می‌پردازید.',
     'contract.unnamedGroup': 'شناسه‌های بی‌نام',
+    'contract.libraryGroup': 'توابع کتابخانه',
+    'contract.library.hint': 'با delegatecall از قراردادی که آن‌ها را پیوند داده اجرا می‌شوند، پس اینجا قابل فراخوانی نیستند.',
     'contract.call.query': 'پرس‌وجو',
     'contract.call.write': 'نوشتن',
     'contract.call.value': 'مقدار ارسالی ({symbol})',

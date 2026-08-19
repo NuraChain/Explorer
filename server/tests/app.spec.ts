@@ -729,3 +729,32 @@ describe('naming the contracts a chain is actually made of', () =>
         expect(detectStandards(MULTICALL.map(toFunctionSelector))).toContain('Multicall3');
     });
 });
+
+describe('naming a Solidity library', () =>
+{
+    // The real NFTDescriptor deployed by every Uniswap V3 fork. One selector on 24KB of code,
+    // and for a long time this explorer printed it as four bytes.
+    const NFT_DESCRIPTOR = '0xc49917d7';
+
+    it('hashes a library signature from the struct NAME, not its tuple', () =>
+    {
+        // The two forms of the same function. Only the qualified one is what the compiler put in
+        // the bytecode, because a library's ABI keeps the parameter's declared type.
+        expect(toFunctionSelector('constructTokenURI(NFTDescriptor.ConstructTokenURIParams)')).toBe(NFT_DESCRIPTOR);
+        expect(toFunctionSelector(
+            'constructTokenURI((uint256,address,address,string,string,uint8,uint8,bool,int24,int24,int24,int24,uint24,address))'
+        )).not.toBe(NFT_DESCRIPTOR);
+    });
+
+    it('names the descriptor and refuses to offer it as a call', () =>
+    {
+        const [described] = describeFunctions([NFT_DESCRIPTOR]);
+        expect(described!.name).toBe('constructTokenURI');
+        expect(described!.signature).toBe('constructTokenURI(NFTDescriptor.ConstructTokenURIParams)');
+        // Not view and not pure: a library runs at the address that delegatecalls it, so a Read
+        // form here would encode a call that cannot work.
+        expect(described!.mutability).toBe('library');
+        expect(described!.outputs).toEqual(['string']);
+    });
+});
+

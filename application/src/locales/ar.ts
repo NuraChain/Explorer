@@ -155,6 +155,7 @@ export const ar: Dictionary = {
     'contract.mutability.pure': 'خالصة',
     'contract.mutability.nonpayable': 'كتابة',
     'contract.mutability.payable': 'قابلة للدفع',
+    'contract.mutability.library': 'مكتبة',
     'contract.mutability.unknown': 'غير معروف',
 
     'contract.read': 'قراءة',
@@ -162,6 +163,8 @@ export const ar: Dictionary = {
     'contract.write': 'كتابة',
     'contract.write.hint': 'هذه ترسل معاملة من محفظتك أنت، على هذه الشبكة. محفظتك تسأل قبل أي توقيع، وأنت من يدفع الغاز.',
     'contract.unnamedGroup': 'مُعرِّفات بلا اسم',
+    'contract.libraryGroup': 'دوال المكتبة',
+    'contract.library.hint': 'تُنفَّذ عبر delegatecall من العقد الذي ربطها، لذا لا يمكن استدعاؤها هنا.',
     'contract.call.query': 'استعلام',
     'contract.call.write': 'كتابة',
     'contract.call.value': 'القيمة المُرسَلة ({symbol})',

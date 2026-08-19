@@ -154,6 +154,7 @@ export const fr: Dictionary = {
     'contract.mutability.pure': 'pure',
     'contract.mutability.nonpayable': 'écriture',
     'contract.mutability.payable': 'payable',
+    'contract.mutability.library': 'bibliothèque',
     'contract.mutability.unknown': 'inconnue',
 
     'contract.read': 'Lecture',
@@ -161,6 +162,8 @@ export const fr: Dictionary = {
     'contract.write': 'Écriture',
     'contract.write.hint': 'Celles-ci envoient une transaction depuis votre propre portefeuille, sur ce réseau. Le portefeuille demande avant toute signature, et le gaz est à votre charge.',
     'contract.unnamedGroup': 'Sélecteurs sans nom',
+    'contract.libraryGroup': 'Fonctions de bibliothèque',
+    'contract.library.hint': 'Exécutées par delegatecall depuis le contrat qui les a liées ; elles ne peuvent pas être appelées ici.',
     'contract.call.query': 'Interroger',
     'contract.call.write': 'Écrire',
     'contract.call.value': 'Montant à envoyer ({symbol})',
