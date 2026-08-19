@@ -60,8 +60,57 @@ bytes, and says so on the page:
 - **Deployment.** Who deployed it, in which transaction and block. This half comes from the
   index - the chain cannot map a contract back to the receipt that created it.
 
-Source verification is **not** implemented: nothing here compiles source or checks it against the
-deployed code, and the page says as much above everything it shows.
+Everything above is what the page can say **before** anyone publishes source. It says so at the
+top, too - the notice is not a disclaimer to be trimmed.
+
+### Publishing source
+
+Anyone can publish the source of a deployed contract, from the contract's own page. There is no
+account, no key and no approval queue, because **the chain is the credential**: the explorer
+compiles what you submit with the exact solc build you name and accepts it only if the result is
+the runtime bytecode already at that address. A submission that does not reproduce those bytes is
+refused, and one that does cannot be wrong about what the code is.
+
+What changes on the page afterwards:
+
+- **Every selector gets its real name.** Not "some standard calls this `transfer`" but "the source
+  that produced these bytes declares this function" - so the selectors that were four bytes become
+  named, typed and callable, including the ones no standard has ever claimed.
+- **Structs can be passed.** A published ABI carries a tuple's components, which a signature string
+  cannot, so a function taking a struct is callable rather than merely listed.
+- **The contract's own getters are read.** Zero-argument `view` functions beyond the standard
+  handful are called and shown with the rest of the current values.
+- **The source is on the page**, with the compiler, the optimizer settings and the licence it was
+  submitted under.
+
+Two things are compared honestly rather than smoothed over:
+
+- **Immutables are excluded.** The constructor writes them after deployment; solc emits zeros there
+  and says exactly which bytes, so those ranges are not compared. Anything else in them would be a
+  different contract.
+- **A full match and a partial match are different claims.** Full means identical bytes, metadata
+  trailer included. Partial means identical everywhere the EVM executes, differing only in the
+  trailer - which a moved comment or a different file path is enough to change. The page shows
+  which one it has; a partial match proves the instructions, not the comments around them.
+
+**Constructor arguments are never asked for.** Etherscan needs them because it compares *creation*
+bytecode, which carries them on the end. This compares the *runtime* code the chain holds, which
+does not - so the most common reason a verification fails elsewhere does not exist here.
+
+Two forms are accepted: a single Solidity file, or a solc **standard-json** document taken exactly
+as written - remappings, library addresses and `viaIR` included, since every one of those decides
+whether the bytes come out the same. A contract linked against libraries needs the second form,
+with `settings.libraries` filled in; unlinked placeholders are refused rather than blanked out,
+because blanking them would mean not checking the twenty bytes a reader most wants checked.
+
+Compilers come from `SOLC_DIR` first and are downloaded once from
+[binaries.soliditylang.org](https://binaries.soliditylang.org) if missing, checked against the
+sha256 that host publishes and cached on disk. Populate the directory by hand and the explorer
+never makes an outbound request. Each compile runs on a worker thread with a timeout, and one runs
+at a time - so a submission cannot take the explorer down with it.
+
+Verified source lives in **its own database** (`SOURCES_DB_PATH`), not in the index. The index is a
+cache the chain can replay; this is text somebody typed, and nothing can reproduce it. Back it up.
 
 ### Calling one
 
@@ -85,7 +134,8 @@ Two constraints are load-bearing:
   sent on another network reaches a different contract, or nothing at all.
 
 Selectors with no published signature are listed but not callable - without an ABI there is no
-way to know what arguments they take.
+way to know what arguments they take. [Publishing the source](#publishing-source) is what supplies
+one, and it is what turns those rows into named, callable functions.
 
 ---
 
@@ -170,6 +220,8 @@ the two files in step: a key added there belongs in `.env` too.
 | `POLL_MS` | `2000` | How often to check for a new head |
 | `BATCH_SIZE` | `25` | Blocks per catch-up batch |
 | `DB_PATH` | `.data/index.db` | The SQLite index |
+| `SOURCES_DB_PATH` | `.data/sources.db` | Published source. **Not** replayable - back this one up |
+| `SOLC_DIR` | `.data/solc` | Where solc builds are kept, and where downloads land |
 
 ---
 
@@ -210,6 +262,10 @@ sudo npm run service:start
 What to know before running it for real:
 
 - **The index is a file.** Back up `DB_PATH`, or accept a replay on loss. Deleting it is safe.
+- **`SOURCES_DB_PATH` is a different file, and deleting it is not safe.** Verified source cannot be
+  replayed from the chain. It is the one piece of state here that is not a cache.
+- **Verification compiles on the box.** One at a time, on a worker thread, with a timeout - but it
+  is real CPU work a stranger can ask for. Put it behind the same reverse proxy as everything else.
 - **Reorgs are handled.** On a parent-hash mismatch the indexer walks back and rolls the orphaned blocks out, rather than serving transactions that were un-mined.
 - **`eth_getBlockReceipts` is probed once** and falls back to per-transaction receipts on nodes
   that lack it - slower, still correct.
