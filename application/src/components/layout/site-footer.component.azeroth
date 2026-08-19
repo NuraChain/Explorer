@@ -15,7 +15,8 @@ const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
     { name: 'X', href: 'https://x.com/nurachainnet', icon: 'social-x' },
     { name: 'GitHub', href: 'https://github.com/NuraChain/Explorer', icon: 'social-github' },
     { name: 'Discord', href: 'https://discord.gg/8BMAXTdXQg', icon: 'social-discord' },
-    { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' }
+    { name: 'Telegram', href: 'https://t.me/nurachain', icon: 'social-telegram' },
+    { name: 'Instagram', href: 'https://www.instagram.com/nura.chain/', icon: 'social-instagram' }
 ];
 
 // The footer says what this explorer IS and where its project can be reached - the questions a
