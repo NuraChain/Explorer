@@ -35,6 +35,9 @@ export default component SiteFooter()
                     </span>
                     <BrandMark class="text-[14px]" />
                 </span>
+                <p class="mt-1 text-[11px] text-muted">
+                    { locale.t('footer.version') }{ ' ' }<span class="data">{ APP_VERSION }</span>
+                </p>
                 <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
             </div>
 
@@ -86,10 +89,6 @@ export default component SiteFooter()
                         rel="noreferrer"
                     >AzerothJS</a>
                 </p>
-                <span class="inline-flex items-center gap-1.5 rounded-md border border-line bg-raised px-2 py-0.5 text-[11px] text-muted">
-                    { locale.t('footer.version') }{ ' ' }
-                    <span class="data">{ APP_VERSION }</span>
-                </span>
             </div>
         </div>
     </footer>
