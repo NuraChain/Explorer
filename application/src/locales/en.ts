@@ -253,6 +253,7 @@ export const en = {
     'footer.community': 'Community',
     'footer.note': 'Reads come from a local index of the chain. Balances are read live from the node.',
     'footer.builtWith': 'Built with',
+    'footer.version': 'Version',
 
     // --- Time and units -----------------------------------------------------------------------
     'time.justNow': 'just now',

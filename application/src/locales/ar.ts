@@ -237,6 +237,7 @@ export const ar: Dictionary = {
     'footer.community': 'المجتمع',
     'footer.note': 'تُقرأ البيانات من فهرس محلي للسلسلة. الأرصدة تُقرأ مباشرة من العقدة.',
     'footer.builtWith': 'بُني باستخدام',
+    'footer.version': 'الإصدار',
 
     // --- Time and units -----------------------------------------------------------------------
     'time.justNow': 'الآن',

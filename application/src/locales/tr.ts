@@ -237,6 +237,7 @@ export const tr: Dictionary = {
     'footer.community': 'Topluluk',
     'footer.note': 'Okumalar zincirin yerel dizininden gelir. Bakiyeler düğümden canlı okunur.',
     'footer.builtWith': 'Şununla yapıldı:',
+    'footer.version': 'Sürüm',
 
     // --- Time and units -----------------------------------------------------------------------
     // Turkish does not pluralize a noun after a numeral, so both forms are the same string.

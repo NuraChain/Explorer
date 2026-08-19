@@ -237,6 +237,7 @@ export const hi: Dictionary = {
     'footer.community': 'समुदाय',
     'footer.note': 'रीड चेन के स्थानीय इंडेक्स से आते हैं। बैलेंस नोड से लाइव पढ़े जाते हैं।',
     'footer.builtWith': 'इससे बना:',
+    'footer.version': 'संस्करण',
 
     // --- Time and units -----------------------------------------------------------------------
     // Hindi does not inflect these nouns after a numeral, so both forms are the same string.

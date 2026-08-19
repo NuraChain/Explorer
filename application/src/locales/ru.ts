@@ -237,6 +237,7 @@ export const ru: Dictionary = {
     'footer.community': 'Сообщество',
     'footer.note': 'Чтение идёт из локального индекса цепочки. Балансы читаются с узла вживую.',
     'footer.builtWith': 'Сделано на',
+    'footer.version': 'Версия',
 
     // --- Time and units -----------------------------------------------------------------------
     // Abbreviated units on purpose: they do not inflect, so one form serves every count where the

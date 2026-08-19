@@ -241,6 +241,7 @@ export const fa: Dictionary = {
     'footer.community': 'شبکه‌های اجتماعی',
     'footer.note': 'خواندن‌ها از یک نمایهٔ محلی زنجیره انجام می‌شود. موجودی‌ها زنده از نود خوانده می‌شوند.',
     'footer.builtWith': 'ساخته‌شده با',
+    'footer.version': 'نسخه',
 
     // --- Time and units -----------------------------------------------------------------------
     // Persian does not inflect a noun after a number, so both forms are the same string. They stay

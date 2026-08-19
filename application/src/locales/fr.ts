@@ -236,6 +236,7 @@ export const fr: Dictionary = {
     'footer.community': 'Communauté',
     'footer.note': 'Les lectures proviennent d’un index local de la chaîne. Les soldes sont lus en direct depuis le nœud.',
     'footer.builtWith': 'Conçu avec',
+    'footer.version': 'Version',
 
     // --- Time and units -----------------------------------------------------------------------
     'time.justNow': 'à l’instant',

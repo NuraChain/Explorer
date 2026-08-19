@@ -235,6 +235,7 @@ export const pt: Dictionary = {
     'footer.community': 'Comunidade',
     'footer.note': 'As leituras vêm de um índice local da cadeia. Os saldos são lidos ao vivo do nó.',
     'footer.builtWith': 'Feito com',
+    'footer.version': 'Versão',
 
     // --- Time and units -----------------------------------------------------------------------
     'time.justNow': 'agora mesmo',

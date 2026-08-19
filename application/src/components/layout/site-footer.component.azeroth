@@ -85,7 +85,10 @@ export default component SiteFooter()
                         target="_blank"
                         rel="noreferrer"
                     >AzerothJS</a>{ ' ' }
-                    <span>{ APP_VERSION }</span>
+                    <span class="inline-flex items-center gap-1.5 rounded-md border border-line bg-raised px-2 py-0.5 text-[11px] text-muted">
+                        { locale.t('footer.version') }{ ' ' }
+                        <span class="data">{ APP_VERSION }</span>
+                    </span>
                 </p>
             </div>
         </div>

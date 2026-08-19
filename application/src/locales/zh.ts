@@ -236,6 +236,7 @@ export const zh: Dictionary = {
     'footer.community': '社区',
     'footer.note': '数据来自链的本地索引。余额从节点实时读取。',
     'footer.builtWith': '基于',
+    'footer.version': '版本',
 
     // --- Time and units -----------------------------------------------------------------------
     // Chinese does not inflect for number, so both forms are the same string.
