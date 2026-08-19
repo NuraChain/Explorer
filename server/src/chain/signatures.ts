@@ -290,6 +290,39 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['permit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
     ['uniswapV3MintCallback(uint256,uint256,bytes)', 'nonpayable', ''],
 
+    // --- Uniswap V3 pool ----------------------------------------------------------------------
+    // The contract a V3 deployment has thousands of, and the one a reader is most likely to land
+    // on from a swap: the factory and the router are one address each, a POOL exists per pair per
+    // fee tier. Its getters are also the only place the chain will tell you a price - `slot0`
+    // carries the current sqrt price and tick - so leaving them as raw selectors made the most
+    // interesting contract on a DEX the least readable one.
+    ['slot0()', 'view', 'uint160,int24,uint16,uint16,uint16,uint8,bool'],
+    ['liquidity()', 'view', 'uint128'],
+    ['fee()', 'view', 'uint24'],
+    ['tickSpacing()', 'view', 'int24'],
+    ['maxLiquidityPerTick()', 'view', 'uint128'],
+    ['feeGrowthGlobal0X128()', 'view', 'uint256'],
+    ['feeGrowthGlobal1X128()', 'view', 'uint256'],
+    ['protocolFees()', 'view', 'uint128,uint128'],
+    ['ticks(int24)', 'view', 'uint128,int128,uint256,uint256,int56,uint160,uint32,bool'],
+    ['tickBitmap(int16)', 'view', 'uint256'],
+    ['positions(bytes32)', 'view', 'uint128,uint256,uint256,uint128,uint128'],
+    ['observations(uint256)', 'view', 'uint32,int56,uint160,bool'],
+    ['observe(uint32[])', 'view', 'int56[],uint160[]'],
+    ['snapshotCumulativesInside(int24,int24)', 'view', 'int56,uint160,uint32'],
+    ['initialize(uint160)', 'nonpayable', ''],
+    // The four that move liquidity. Each is a CALLBACK protocol - the pool calls back into the
+    // caller for payment - so they are named here and are not usable from a wallet directly; the
+    // position manager is what a person actually sends.
+    ['mint(address,int24,int24,uint128,bytes)', 'nonpayable', 'uint256,uint256'],
+    ['burn(int24,int24,uint128)', 'nonpayable', 'uint256,uint256'],
+    ['collect(address,int24,int24,uint128,uint128)', 'nonpayable', 'uint128,uint128'],
+    ['swap(address,bool,int256,uint160,bytes)', 'nonpayable', 'int256,int256'],
+    ['flash(address,uint256,uint256,bytes)', 'nonpayable', ''],
+    ['increaseObservationCardinalityNext(uint16)', 'nonpayable', ''],
+    ['setFeeProtocol(uint8,uint8)', 'nonpayable', ''],
+    ['collectProtocol(address,uint128,uint128)', 'nonpayable', 'uint128,uint128'],
+
     // --- Uniswap V3 quoter, tick lens and descriptors -----------------------------------------
     // `quoteExact*` are nonpayable rather than view: the quoter routes a real (zero-amount) swap
     // through a pool to read its price, so the ABI cannot promise it changes nothing.

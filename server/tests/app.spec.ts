@@ -758,3 +758,42 @@ describe('naming a Solidity library', () =>
     });
 });
 
+describe('naming a Uniswap V3 pool', () =>
+{
+    // A V3 deployment has one factory and thousands of POOLS, so this is the contract a reader
+    // most often lands on from a swap - and every one of these was printed as four raw bytes.
+    const POOL = [
+        'slot0()', 'liquidity()', 'fee()', 'tickSpacing()', 'maxLiquidityPerTick()',
+        'feeGrowthGlobal0X128()', 'feeGrowthGlobal1X128()', 'protocolFees()',
+        'ticks(int24)', 'tickBitmap(int16)', 'positions(bytes32)', 'observations(uint256)',
+        'observe(uint32[])', 'snapshotCumulativesInside(int24,int24)', 'initialize(uint160)',
+        'mint(address,int24,int24,uint128,bytes)', 'burn(int24,int24,uint128)',
+        'collect(address,int24,int24,uint128,uint128)', 'swap(address,bool,int256,uint160,bytes)',
+        'flash(address,uint256,uint256,bytes)', 'increaseObservationCardinalityNext(uint16)',
+        'setFeeProtocol(uint8,uint8)', 'collectProtocol(address,uint128,uint128)'
+    ];
+
+    it('names every function of the pool interface', () =>
+    {
+        const described = describeFunctions(POOL.map(toFunctionSelector));
+        expect(described.filter(entry => entry.signature === '')).toEqual([]);
+
+        // The one that carries the price. Seven return values, and without them a call to it
+        // could be offered but never decoded.
+        const slot0 = described.find(entry => entry.name === 'slot0')!;
+        expect(slot0.mutability).toBe('view');
+        expect(slot0.outputs).toEqual(['uint160', 'int24', 'uint16', 'uint16', 'uint16', 'uint8', 'bool']);
+
+        // `swap` takes a callback: the pool calls back for payment, so it is a write even though
+        // a reader might expect the quoter's shape here.
+        expect(described.find(entry => entry.name === 'swap')!.mutability).toBe('nonpayable');
+    });
+
+    it('claims the pool only when the dispatcher answers the whole fingerprint', () =>
+    {
+        const selectors = POOL.map(toFunctionSelector);
+        expect(detectStandards(selectors)).toContain('Uniswap V3 pool');
+        // Drop `slot0` and it is no longer a pool: a badge is a claim about what the code does.
+        expect(detectStandards(selectors.slice(1))).not.toContain('Uniswap V3 pool');
+    });
+});

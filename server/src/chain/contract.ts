@@ -424,6 +424,9 @@ const STANDARDS: ReadonlyArray<readonly [string, readonly string[]]> = [
     // every selector listed, so the badge says what the code does and not what it is called.
     ['Uniswap V2 pair', ['getReserves()', 'token0()', 'token1()', 'swap(uint256,uint256,address,bytes)', 'mint(address)', 'burn(address)']],
     ['Uniswap V2 factory', ['getPair(address,address)', 'createPair(address,address)', 'allPairsLength()']],
+    // `slot0` and `tickSpacing` together are the fingerprint: a V2 pair has neither, and nothing
+    // outside a concentrated-liquidity pool carries a tick at all.
+    ['Uniswap V3 pool', ['slot0()', 'liquidity()', 'tickSpacing()', 'ticks(int24)', 'swap(address,bool,int256,uint160,bytes)', 'observe(uint32[])']],
     ['Uniswap V2 router', ['swapExactTokensForTokens(uint256,uint256,address[],address,uint256)', 'addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)', 'getAmountsOut(uint256,address[])', 'WETH()']],
     ['Multicall3', ['aggregate3((address,bool,bytes)[])', 'tryAggregate(bool,(address,bytes)[])', 'getEthBalance(address)']]
 ];
