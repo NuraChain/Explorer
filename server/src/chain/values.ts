@@ -127,6 +127,64 @@ export function coerce(type: string, text: string, at = 0): unknown
     throw new ArgumentError(at, `this explorer cannot encode a ${ type }`);
 }
 
+/**
+ * A struct argument, from the JSON a reader typed into the field.
+ *
+ * A struct is a `tuple` parameter with its fields hanging off `components` - read back out of the
+ * type string a signature spells it with (see {@link parseType}), or taken from an ABI that
+ * declares one. Both arrive here as the same shape, and both are encoded the same way.
+ *
+ * Positional JSON - `["0xabc...", "5"]` - because the field names in an ABI are optional and a
+ * contract compiled without them would have no keys to match against. Every leaf still goes
+ * through {@link coerce}, so a wrong address inside a struct is refused the same way as one
+ * outside it.
+ */
+function coerceTuple(parameter: AbiParameter, value: unknown, at: number): unknown
+{
+    const components = 'components' in parameter && Array.isArray(parameter.components) ? parameter.components : [];
+    const suffix = parameter.type.slice('tuple'.length);
+
+    if (suffix !== '')
+    {
+        if (!Array.isArray(value))
+        {
+            throw new ArgumentError(at, 'expected a JSON list');
+        }
+        // The LAST bracket is the outermost dimension: `tuple[2][]` is a list of `tuple[2]`.
+        const element = { ...parameter, type: `tuple${ suffix.replace(/\[[^\]]*\]$/, '') }` } as AbiParameter;
+        return value.map((entry) => coerceTuple(element, entry, at));
+    }
+
+    if (!Array.isArray(value) || value.length !== components.length)
+    {
+        throw new ArgumentError(at, `expected a JSON list of ${ components.length } values`);
+    }
+    return components.map((component, index) =>
+    {
+        const field = value[index];
+        return component.type.startsWith('tuple')
+            ? coerceTuple(component, field, at)
+            : coerce(component.type, typeof field === 'string' ? field : JSON.stringify(field), at);
+    });
+}
+
+/** One field's text as the value its ABI parameter means - structs included. */
+function coerceParameter(parameter: AbiParameter, text: string, at: number): unknown
+{
+    if (!parameter.type.startsWith('tuple'))
+    {
+        return coerce(parameter.type, text, at);
+    }
+    try
+    {
+        return coerceTuple(parameter, JSON.parse(text.trim() === '' ? 'null' : text) as unknown, at);
+    }
+    catch (error)
+    {
+        throw error instanceof ArgumentError ? error : new ArgumentError(at, 'expected JSON');
+    }
+}
+
 /** An EVM value as text. Amounts stay whole - see the note at the top of this file. */
 export function stringify(value: unknown): string
 {
@@ -150,9 +208,95 @@ export function stringify(value: unknown): string
     return String(value);
 }
 
+/**
+ * A comma-separated type list, split at the TOP level only.
+ *
+ * A tuple carries its own commas - `(address,bool,bytes)[]` is one type, not three - so a plain
+ * `split(',')` turns one argument into three, which the page draws as three fields and the
+ * encoder then refuses for having the wrong number of arguments.
+ */
+export function splitTypes(list: string): string[]
+{
+    if (list === '')
+    {
+        return [];
+    }
+
+    const out: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let at = 0; at < list.length; at++)
+    {
+        const character = list[at];
+        if (character === '(')
+        {
+            depth++;
+        }
+        else if (character === ')')
+        {
+            depth--;
+        }
+        else if (character === ',' && depth === 0)
+        {
+            out.push(list.slice(start, at));
+            start = at + 1;
+        }
+    }
+    out.push(list.slice(start));
+    return out;
+}
+
+/**
+ * A type as WRITTEN in a signature, back into the parameter viem encodes from.
+ *
+ * `(address,bool,bytes)[]` is how a signature spells a list of structs, and it is the only spelling
+ * a table of published signatures can hold - there is nowhere in a string to put a component list.
+ * Reading it back is what lets the table describe the same shapes a verified ABI can, instead of
+ * naming a function it then cannot call.
+ */
+export function parseType(type: string): AbiParameter
+{
+    const trimmed = type.trim();
+    if (!trimmed.startsWith('('))
+    {
+        return { type: trimmed };
+    }
+
+    let depth = 0;
+    let close = -1;
+    for (let at = 0; at < trimmed.length; at++)
+    {
+        if (trimmed[at] === '(')
+        {
+            depth++;
+        }
+        else if (trimmed[at] === ')')
+        {
+            depth--;
+            if (depth === 0)
+            {
+                close = at;
+                break;
+            }
+        }
+    }
+    if (close === -1)
+    {
+        // Unbalanced. Left as it is, so the encoder refuses it by name rather than this function
+        // inventing a shape nobody wrote.
+        return { type: trimmed };
+    }
+
+    // The array suffix rides OUTSIDE the parentheses: `(address,uint256)[2][]` is a list of pairs.
+    return {
+        type: `tuple${ trimmed.slice(close + 1) }`,
+        components: splitTypes(trimmed.slice(1, close)).map(parseType)
+    };
+}
+
 function parameters(types: readonly string[]): AbiParameter[]
 {
-    return types.map((type) => ({ type }));
+    return types.map(parseType);
 }
 
 /**
@@ -167,10 +311,11 @@ export function encodeCall(entry: KnownFunction, args: readonly string[]): strin
     {
         throw new ArgumentError(args.length, `${ entry.name } takes ${ entry.inputs.length } arguments`);
     }
-    const values = entry.inputs.map((type, at) => coerce(type, args[at] ?? '', at));
-    const encoded = entry.inputs.length === 0
+    const declared = parameters(entry.inputs);
+    const values = declared.map((parameter, at) => coerceParameter(parameter, args[at] ?? '', at));
+    const encoded = declared.length === 0
         ? '0x'
-        : encodeAbiParameters(parameters(entry.inputs), values);
+        : encodeAbiParameters(declared, values);
     return `${ entry.selector }${ encoded.slice(2) }`;
 }
 

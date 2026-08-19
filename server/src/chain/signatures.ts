@@ -1,5 +1,7 @@
 import { toEventSelector, toFunctionSelector } from 'viem';
 
+import { splitTypes } from './values.ts';
+
 // The dictionary that gives a 4-byte selector back its name.
 //
 // A deployed contract keeps NO names. `eth_getCode` returns the dispatcher's selectors and
@@ -170,6 +172,95 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['deposit()', 'payable', ''],
     ['withdraw(uint256)', 'nonpayable', ''],
 
+    // --- Uniswap V2 pair ----------------------------------------------------------------------
+    // The single largest source of unnamed selectors on a chain with a DEX on it: a pair answers
+    // sixteen calls and a standards table that stops at ERC-20 names none of them. `mint` and
+    // `burn` take one address here and mean something else than the ERC-20 pair of the same name
+    // - which is exactly why they are worth writing down rather than guessing at.
+    ['getReserves()', 'view', 'uint112,uint112,uint32'],
+    ['token0()', 'view', 'address'],
+    ['token1()', 'view', 'address'],
+    ['factory()', 'view', 'address'],
+    ['mint(address)', 'nonpayable', 'uint256'],
+    ['burn(address)', 'nonpayable', 'uint256,uint256'],
+    ['swap(uint256,uint256,address,bytes)', 'nonpayable', ''],
+    ['skim(address)', 'nonpayable', ''],
+    ['sync()', 'nonpayable', ''],
+    ['price0CumulativeLast()', 'view', 'uint256'],
+    ['price1CumulativeLast()', 'view', 'uint256'],
+    ['kLast()', 'view', 'uint256'],
+    ['MINIMUM_LIQUIDITY()', 'pure', 'uint256'],
+    ['PERMIT_TYPEHASH()', 'pure', 'bytes32'],
+    ['initialize(address,address)', 'nonpayable', ''],
+
+    // --- Uniswap V2 factory -------------------------------------------------------------------
+    ['feeTo()', 'view', 'address'],
+    ['feeToSetter()', 'view', 'address'],
+    ['getPair(address,address)', 'view', 'address'],
+    ['allPairs(uint256)', 'view', 'address'],
+    ['allPairsLength()', 'view', 'uint256'],
+    ['createPair(address,address)', 'nonpayable', 'address'],
+    ['setFeeTo(address)', 'nonpayable', ''],
+    ['setFeeToSetter(address)', 'nonpayable', ''],
+
+    // --- Uniswap V2 router --------------------------------------------------------------------
+    // Which of these is payable is not a detail: `swapExactETHForTokens` takes the currency being
+    // swapped as the transaction's own value, and a router entry marked nonpayable would offer no
+    // field to put it in.
+    ['WETH()', 'pure', 'address'],
+    ['addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)', 'nonpayable', 'uint256,uint256,uint256'],
+    ['addLiquidityETH(address,uint256,uint256,uint256,address,uint256)', 'payable', 'uint256,uint256,uint256'],
+    ['removeLiquidity(address,address,uint256,uint256,uint256,address,uint256)', 'nonpayable', 'uint256,uint256'],
+    ['removeLiquidityETH(address,uint256,uint256,uint256,address,uint256)', 'nonpayable', 'uint256,uint256'],
+    ['removeLiquidityWithPermit(address,address,uint256,uint256,uint256,address,uint256,bool,uint8,bytes32,bytes32)', 'nonpayable', 'uint256,uint256'],
+    ['removeLiquidityETHWithPermit(address,uint256,uint256,uint256,address,uint256,bool,uint8,bytes32,bytes32)', 'nonpayable', 'uint256,uint256'],
+    ['removeLiquidityETHSupportingFeeOnTransferTokens(address,uint256,uint256,uint256,address,uint256)', 'nonpayable', 'uint256'],
+    ['removeLiquidityETHWithPermitSupportingFeeOnTransferTokens(address,uint256,uint256,uint256,address,uint256,bool,uint8,bytes32,bytes32)', 'nonpayable', 'uint256'],
+    ['swapExactTokensForTokens(uint256,uint256,address[],address,uint256)', 'nonpayable', 'uint256[]'],
+    ['swapTokensForExactTokens(uint256,uint256,address[],address,uint256)', 'nonpayable', 'uint256[]'],
+    ['swapExactETHForTokens(uint256,address[],address,uint256)', 'payable', 'uint256[]'],
+    ['swapTokensForExactETH(uint256,uint256,address[],address,uint256)', 'nonpayable', 'uint256[]'],
+    ['swapExactTokensForETH(uint256,uint256,address[],address,uint256)', 'nonpayable', 'uint256[]'],
+    ['swapETHForExactTokens(uint256,address[],address,uint256)', 'payable', 'uint256[]'],
+    ['swapExactTokensForTokensSupportingFeeOnTransferTokens(uint256,uint256,address[],address,uint256)', 'nonpayable', ''],
+    ['swapExactETHForTokensSupportingFeeOnTransferTokens(uint256,address[],address,uint256)', 'payable', ''],
+    ['swapExactTokensForETHSupportingFeeOnTransferTokens(uint256,uint256,address[],address,uint256)', 'nonpayable', ''],
+    ['quote(uint256,uint256,uint256)', 'pure', 'uint256'],
+    ['getAmountOut(uint256,uint256,uint256)', 'pure', 'uint256'],
+    ['getAmountIn(uint256,uint256,uint256)', 'pure', 'uint256'],
+    ['getAmountsOut(uint256,address[])', 'view', 'uint256[]'],
+    ['getAmountsIn(uint256,address[])', 'view', 'uint256[]'],
+
+    // --- Multicall3 ---------------------------------------------------------------------------
+    // Deployed at the same address on most chains and called by every wallet and dashboard, so an
+    // explorer that cannot name it leaves its busiest contract reading as twenty unknown bytes.
+    // The batching entries take arrays of structs, which no signature STRING can describe - they
+    // are named here and refuse to encode, which is the honest half of what this table can do.
+    ['aggregate((address,bytes)[])', 'payable', 'uint256,bytes[]'],
+    ['aggregate3((address,bool,bytes)[])', 'payable', '(bool,bytes)[]'],
+    ['aggregate3Value((address,bool,uint256,bytes)[])', 'payable', '(bool,bytes)[]'],
+    ['blockAndAggregate((address,bytes)[])', 'payable', 'uint256,bytes32,(bool,bytes)[]'],
+    ['tryAggregate(bool,(address,bytes)[])', 'payable', '(bool,bytes)[]'],
+    ['tryBlockAndAggregate(bool,(address,bytes)[])', 'payable', 'uint256,bytes32,(bool,bytes)[]'],
+    ['getBasefee()', 'view', 'uint256'],
+    ['getBlockHash(uint256)', 'view', 'bytes32'],
+    ['getBlockNumber()', 'view', 'uint256'],
+    ['getChainId()', 'view', 'uint256'],
+    ['getCurrentBlockCoinbase()', 'view', 'address'],
+    ['getCurrentBlockDifficulty()', 'view', 'uint256'],
+    ['getCurrentBlockGasLimit()', 'view', 'uint256'],
+    ['getCurrentBlockTimestamp()', 'view', 'uint256'],
+    ['getEthBalance(address)', 'view', 'uint256'],
+    ['getLastBlockHash()', 'view', 'bytes32'],
+
+    // --- Admin conveniences bolted onto ordinary tokens ---------------------------------------
+    // Not from any standard: these are the two extras that turned up on real deployments here,
+    // recovered by hashing candidate names until keccak agreed with the selector. That is the
+    // only way a name gets into this file - a name that does not hash to its selector is not a
+    // name, and a plausible-looking one would be worse than the four bytes it replaced.
+    ['rescueERC20(address,address,uint256)', 'nonpayable', ''],
+    ['mintBatch(address[],uint256[])', 'nonpayable', ''],
+
     // --- Odds and ends every toolchain emits --------------------------------------------------
     ['multicall(bytes[])', 'nonpayable', 'bytes[]'],
     ['version()', 'view', 'string'],
@@ -206,7 +297,7 @@ const EVENTS: readonly string[] = [
 /** A comma-separated type list; '' is NO types, not one nameless one (''.split(',') is ['']). */
 function types(list: string): string[]
 {
-    return list === '' ? [] : list.split(',');
+    return splitTypes(list);
 }
 
 /** `transfer(address,uint256)` -> `['transfer', ['address', 'uint256']]`. */
@@ -260,6 +351,10 @@ const IDENTITY: readonly string[] = [
     'decimals()',
     'totalSupply()',
     'cap()',
+    // A liquidity pair has no useful name or symbol - `UNI-V2` says nothing about which pair it
+    // is. The two tokens ARE its identity, so they are read on sight like a token's symbol.
+    'token0()',
+    'token1()',
     'owner()',
     'getOwner()',
     'pendingOwner()',
@@ -268,6 +363,7 @@ const IDENTITY: readonly string[] = [
     'asset()',
     'totalAssets()',
     'implementation()',
+    'factory()',
     'version()',
     'VERSION()',
     'UPGRADE_INTERFACE_VERSION()',

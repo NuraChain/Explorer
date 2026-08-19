@@ -6,6 +6,7 @@ import { toFunctionSelector } from 'viem';
 
 import { buildApp } from '../src/app.ts';
 import { analyze, describeFunctions, detectStandards } from '../src/chain/contract.ts';
+import { encodeCall } from '../src/chain/values.ts';
 import { syncOnce } from '../src/chain/indexer.ts';
 import { IndexStore, TRANSFER_TOPIC } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
@@ -601,5 +602,84 @@ describe('calling a contract', () =>
         expect(response.status).toBe(200);
         expect(result.values).toEqual([]);
         expect(result.error).toContain('nonexistent token');
+    });
+});
+
+describe('naming the contracts a chain is actually made of', () =>
+{
+    // A liquidity pair and a Multicall3 read as a wall of hex against a table that stops at
+    // ERC-20 - and on a chain with a DEX on it they are the busiest contracts there are. These
+    // are the signatures that turn those pages from unreadable into readable, so a future edit
+    // that drops one should fail here rather than quietly go back to printing four bytes.
+    const PAIR = [
+        'getReserves()',
+        'token0()',
+        'token1()',
+        'swap(uint256,uint256,address,bytes)',
+        'mint(address)',
+        'burn(address)',
+        'skim(address)',
+        'sync()',
+        'kLast()',
+        'price0CumulativeLast()'
+    ];
+
+    const ROUTER = [
+        'WETH()',
+        'addLiquidityETH(address,uint256,uint256,uint256,address,uint256)',
+        'swapExactTokensForTokens(uint256,uint256,address[],address,uint256)',
+        'swapExactETHForTokens(uint256,address[],address,uint256)',
+        'getAmountsOut(uint256,address[])'
+    ];
+
+    const MULTICALL = [
+        'aggregate3((address,bool,bytes)[])',
+        'tryAggregate(bool,(address,bytes)[])',
+        'getEthBalance(address)',
+        'getBlockNumber()',
+        'getCurrentBlockTimestamp()'
+    ];
+
+    it('names every entry point of a Uniswap V2 pair', () =>
+    {
+        const described = describeFunctions(PAIR.map(toFunctionSelector));
+        expect(described.filter(entry => entry.signature === '')).toEqual([]);
+        // `mint(address)` on a pair is not the ERC-20 `mint(address,uint256)`, and the difference
+        // is what somebody about to call it needs to see.
+        expect(described.find(entry => entry.signature === 'mint(address)')?.outputs).toEqual(['uint256']);
+    });
+
+    it('names a router, and marks the entries that take the currency as payable', () =>
+    {
+        const described = describeFunctions(ROUTER.map(toFunctionSelector));
+        expect(described.filter(entry => entry.signature === '')).toEqual([]);
+        // A router entry marked nonpayable would offer no field for the value being swapped.
+        const swap = described.find(entry => entry.name === 'swapExactETHForTokens');
+        expect(swap?.mutability).toBe('payable');
+    });
+
+    it('names Multicall3, and treats its array of structs as ONE argument', () =>
+    {
+        const described = describeFunctions(MULTICALL.map(toFunctionSelector));
+        expect(described.filter(entry => entry.signature === '')).toEqual([]);
+
+        // One argument, not three. Splitting the signature on every comma would draw this as
+        // three fields and then refuse the call for having the wrong number of them.
+        const batch = described.find(entry => entry.name === 'aggregate3')!;
+        expect(batch.inputs).toEqual(['(address,bool,bytes)[]']);
+
+        // And it encodes: the struct's shape is read back out of the type string, so the table
+        // can call the same things a verified ABI can - it just has no names for the fields.
+        const data = encodeCall(batch, [JSON.stringify([[ALICE, true, '0x1234']])]);
+        expect(data.slice(0, 10)).toBe(toFunctionSelector('aggregate3((address,bool,bytes)[])'));
+        expect(data).toContain(ALICE.slice(2));
+    });
+
+    it('claims a pair only when the dispatcher answers every one of its calls', () =>
+    {
+        const full = PAIR.map(toFunctionSelector);
+        expect(detectStandards(full)).toContain('Uniswap V2 pair');
+        expect(detectStandards(full.slice(1))).not.toContain('Uniswap V2 pair');
+        expect(detectStandards(MULTICALL.map(toFunctionSelector))).toContain('Multicall3');
     });
 });

@@ -418,7 +418,14 @@ const STANDARDS: ReadonlyArray<readonly [string, readonly string[]]> = [
     ['Ownable', ['owner()', 'transferOwnership(address)']],
     ['AccessControl', ['hasRole(bytes32,address)', 'getRoleAdmin(bytes32)', 'grantRole(bytes32,address)']],
     ['Pausable', ['paused()']],
-    ['Upgradeable', ['proxiableUUID()']]
+    ['Upgradeable', ['proxiableUUID()']],
+    // Not standards bodies, but the contracts a chain with a DEX on it is mostly made of. The
+    // rule is the same one every entry above follows: claimed only when the dispatcher answers
+    // every selector listed, so the badge says what the code does and not what it is called.
+    ['Uniswap V2 pair', ['getReserves()', 'token0()', 'token1()', 'swap(uint256,uint256,address,bytes)', 'mint(address)', 'burn(address)']],
+    ['Uniswap V2 factory', ['getPair(address,address)', 'createPair(address,address)', 'allPairsLength()']],
+    ['Uniswap V2 router', ['swapExactTokensForTokens(uint256,uint256,address[],address,uint256)', 'addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)', 'getAmountsOut(uint256,address[])', 'WETH()']],
+    ['Multicall3', ['aggregate3((address,bool,bytes)[])', 'tryAggregate(bool,(address,bytes)[])', 'getEthBalance(address)']]
 ];
 
 const STANDARD_SELECTORS = STANDARDS.map(([label, signatures]) => ({
