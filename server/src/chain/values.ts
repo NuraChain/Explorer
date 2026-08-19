@@ -110,10 +110,14 @@ export function coerce(type: string, text: string, at = 0): unknown
         {
             throw new ArgumentError(at, 'expected hex, starting 0x');
         }
-        const width = Number(type.slice(5));
+        // The width, and ONLY when the type names one. `'bytes'.slice(5)` is '', and `Number('')`
+        // is 0 - so a plain dynamic `bytes` used to be checked as `bytes0` and every non-empty
+        // value was refused for not being exactly zero bytes long.
+        const suffix = type.slice(5);
+        const width = Number(suffix);
         // A fixed-width bytesN is padded by the encoder, and a value that is too SHORT would be
         // padded into a different value than the one that was typed.
-        if (Number.isInteger(width) && value.length !== 2 + width * 2)
+        if (suffix !== '' && Number.isInteger(width) && value.length !== 2 + width * 2)
         {
             throw new ArgumentError(at, `expected exactly ${ width } bytes`);
         }

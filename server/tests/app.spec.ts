@@ -544,6 +544,18 @@ describe('calling a contract', () =>
         expect(JSON.stringify(await response.json())).toContain('Argument 1');
     });
 
+    it('accepts a dynamic bytes argument of any length', async () =>
+    {
+        // `'bytes'.slice(5)` is '' and `Number('')` is 0, so a plain dynamic `bytes` read as
+        // `bytes0` and every non-empty value was refused for not being exactly zero bytes.
+        const response = await post(`/api/address/${ CONTRACT }/calldata`, {
+            selector: toFunctionSelector('safeTransferFrom(address,address,uint256,bytes)'),
+            args: [ALICE, BOB, '7', '0xdeadbeef']
+        });
+        expect(response.status).toBe(200);
+        expect(((await response.json()) as ContractCalldata).data).toContain('deadbeef');
+    });
+
     it('refuses a selector no published signature describes', async () =>
     {
         const response = await post(`/api/address/${ CONTRACT }/calldata`, { selector: '0x12345678', args: [] });
