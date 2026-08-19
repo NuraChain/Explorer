@@ -126,7 +126,6 @@ export const ar: Dictionary = {
     'address.transfers.token': 'التوكن',
 
     // --- العقد -----------------------------------------
-    'contract.notice': 'لم يُنشر الكود المصدري لهذا العقد. كل ما يلي مقروء من البايت كود المنشور على السلسلة.',
     'contract.compiler': 'المُصرِّف',
     'contract.size': 'حجم الكود',
     'contract.deployer': 'الناشر',

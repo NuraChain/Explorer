@@ -138,10 +138,6 @@ export const en = {
     'address.transfers.token': 'Token',
 
     // --- Contract -----------------------------------------------------------------------------
-    // Read off the deployed bytecode, which is all the chain keeps. Names come from a table of
-    // published signatures, so `contract.notice` is not a disclaimer to be trimmed: it is the
-    // difference between "this is what the source says" and "this is what the bytes say".
-    'contract.notice': 'No source is published for this contract. Everything below is read from the bytecode deployed on chain.',
     'contract.compiler': 'Compiler',
     'contract.size': 'Code size',
     'contract.deployer': 'Deployed by',

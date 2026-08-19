@@ -125,7 +125,6 @@ export const es: Dictionary = {
     'address.transfers.token': 'Token',
 
     // --- Contrato -----------------------------------------
-    'contract.notice': 'No hay código fuente publicado para este contrato. Todo lo que sigue se lee del bytecode desplegado en la cadena.',
     'contract.compiler': 'Compilador',
     'contract.size': 'Tamaño del código',
     'contract.deployer': 'Desplegado por',

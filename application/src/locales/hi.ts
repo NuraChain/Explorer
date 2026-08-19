@@ -126,7 +126,6 @@ export const hi: Dictionary = {
     'address.transfers.token': 'टोकन',
 
     // --- कॉन्ट्रैक्ट -----------------------------------------
-    'contract.notice': 'इस कॉन्ट्रैक्ट का सोर्स कोड प्रकाशित नहीं है। नीचे जो कुछ है वह चेन पर तैनात बाइटकोड से पढ़ा गया है।',
     'contract.compiler': 'कंपाइलर',
     'contract.size': 'कोड आकार',
     'contract.deployer': 'तैनात करने वाला',

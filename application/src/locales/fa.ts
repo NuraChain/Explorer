@@ -130,7 +130,6 @@ export const fa: Dictionary = {
     'address.transfers.token': 'توکن',
 
     // --- قرارداد -----------------------------------------
-    'contract.notice': 'کد منبع این قرارداد منتشر نشده است. هرچه در ادامه می‌آید از روی بایت‌کد مستقر روی زنجیره خوانده شده است.',
     'contract.compiler': 'کامپایلر',
     'contract.size': 'اندازه کد',
     'contract.deployer': 'مستقرکننده',

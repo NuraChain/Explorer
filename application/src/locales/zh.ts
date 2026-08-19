@@ -125,7 +125,6 @@ export const zh: Dictionary = {
     'address.transfers.token': '代币',
 
     // --- 合约 -----------------------------------------
-    'contract.notice': '该合约没有公开源码。以下内容全部读自链上部署的字节码。',
     'contract.compiler': '编译器',
     'contract.size': '代码大小',
     'contract.deployer': '部署者',

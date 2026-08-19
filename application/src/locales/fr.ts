@@ -125,7 +125,6 @@ export const fr: Dictionary = {
     'address.transfers.token': 'Jeton',
 
     // --- Contrat -----------------------------------------
-    'contract.notice': 'Aucun code source n’est publié pour ce contrat. Tout ce qui suit est lu depuis le bytecode déployé sur la chaîne.',
     'contract.compiler': 'Compilateur',
     'contract.size': 'Taille du code',
     'contract.deployer': 'Déployé par',

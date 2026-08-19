@@ -126,7 +126,6 @@ export const tr: Dictionary = {
     'address.transfers.token': 'Token',
 
     // --- Sözleşme -----------------------------------------
-    'contract.notice': 'Bu sözleşmenin kaynak kodu yayımlanmamış. Aşağıdaki her şey zincire dağıtılmış bayt kodundan okundu.',
     'contract.compiler': 'Derleyici',
     'contract.size': 'Kod boyutu',
     'contract.deployer': 'Dağıtan',

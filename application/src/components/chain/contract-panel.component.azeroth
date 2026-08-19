@@ -17,10 +17,9 @@ import Tooltip from '../ui/tooltip.component.azeroth';
 // What a deployed contract is, for a reader who has only its address.
 //
 // Everything on this panel is read from the bytecode the chain returns - there is no verified
-// source behind it, and the panel says so at the top rather than letting a named function imply
-// one. That distinction is the whole honesty of the page: `transfer(address,uint256)` is named
-// because its selector is a published constant, while `0x7c88e3d9` is printed as four bytes
-// because nobody has published what it means. Both are shown. Only one is named.
+// source behind it. `transfer(address,uint256)` is named because its selector is a published
+// constant, while `0x7c88e3d9` is printed as four bytes because nobody has published what it
+// means. Both are shown. Only one is named.
 //
 // A named function can also be CALLED, which is the other half of this panel: the ones that only
 // read are answered through this explorer's node, and the ones that write are handed to the
@@ -54,14 +53,6 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
     };
 
     <div class="flex flex-col gap-4">
-        {/* Said first, not last: every name below comes from matching a selector against a table
-            of published signatures, and a reader who thinks they are looking at verified source
-            would trust the unnamed ones less than they should. */}
-        <p class="flex items-start gap-2 rounded-lg border border-line bg-raised px-4 py-3 text-[12px] text-muted">
-            <Icon name="help" size={ 14 } class="mt-0.5 shrink-0" />
-            { locale.t('contract.notice') }
-        </p>
-
         <dl class="panel divide-y divide-line">
             <Show when={ props.detail.compiler !== '' }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">

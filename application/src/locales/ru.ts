@@ -126,7 +126,6 @@ export const ru: Dictionary = {
     'address.transfers.token': 'Токен',
 
     // --- Контракт -----------------------------------------
-    'contract.notice': 'Исходный код этого контракта не опубликован. Всё ниже прочитано из байт-кода, развёрнутого в сети.',
     'contract.compiler': 'Компилятор',
     'contract.size': 'Размер кода',
     'contract.deployer': 'Развернул',

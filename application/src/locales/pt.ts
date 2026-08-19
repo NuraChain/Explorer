@@ -124,7 +124,6 @@ export const pt: Dictionary = {
     'address.transfers.token': 'Token',
 
     // --- Contrato -----------------------------------------
-    'contract.notice': 'Nenhum código-fonte foi publicado para este contrato. Tudo abaixo é lido do bytecode implantado na rede.',
     'contract.compiler': 'Compilador',
     'contract.size': 'Tamanho do código',
     'contract.deployer': 'Implantado por',
