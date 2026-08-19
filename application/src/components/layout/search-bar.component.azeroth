@@ -88,7 +88,6 @@ export default component SearchBar(props: { size?: 'hero' | 'compact' })
                 <Input
                     icon="search"
                     size={ hero ? 'md' : 'sm' }
-                    center={ !hero }
                     type="search"
                     label={ locale.t('search.label') }
                     placeholder={ hero ? locale.t('search.placeholder') : locale.t('search.placeholder.compact') }
