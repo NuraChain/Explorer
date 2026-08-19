@@ -38,6 +38,14 @@
     {
         line-height: 1.75;
     }
+
+    /* The clear button a `type="search"` field draws for itself. It is a button and it acts like
+       one, but the browser gives it the text cursor of the input it sits inside - so the one
+       control on the field that can be clicked is the one that does not look clickable. */
+    input[type='search']::-webkit-search-cancel-button
+    {
+        cursor: pointer;
+    }
 }
 
 @utility panel
