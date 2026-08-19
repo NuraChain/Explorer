@@ -139,7 +139,7 @@ export default component LanguageSwitch(props: { labelled?: boolean })
                             else if (key === 'ArrowLeft') { event.preventDefault(); moveFocus(-horizontal); }
                         } }
                     >
-                        <div class="mb-1 flex shrink-0 items-center justify-between gap-2">
+                        <div class="mb-2 flex shrink-0 items-center justify-between gap-2">
                             <h2 class="text-[15px] font-semibold text-text">{ locale.t('language.label') }</h2>
                             <button
                                 class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text"
@@ -166,6 +166,18 @@ export default component LanguageSwitch(props: { labelled?: boolean })
                                 >
                                     <Flag locale={ name } />
                                     { LOCALE_LABEL[name] }
+                                    {/* The tick, and not colour alone, is what says "this is the
+                                        one you are reading in": the selected row is already
+                                        `text-nur` on `bg-raised`, and a reader who cannot tell
+                                        those apart from the row beside them has nothing else to
+                                        go on. `ms-auto` parks it at the row's far end, which is
+                                        the left one in a mirrored layout. Icon is aria-hidden of
+                                        its own accord, which is right here - aria-selected on the
+                                        option already says this to a screen reader, and a second
+                                        announcement would just be the same fact twice. */}
+                                    <Show when={ locale.locale() === name }>
+                                        <Icon name="check" size={ 15 } class="ms-auto shrink-0" />
+                                    </Show>
                                 </button>
                             </For>
                         </div>
