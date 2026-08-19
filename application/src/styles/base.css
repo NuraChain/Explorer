@@ -29,6 +29,7 @@
     html:lang(ar)
     {
         font-family: var(--font-persian);
+        font-size: 1.0625rem;
         line-height: 1.85;
     }
 
@@ -94,6 +95,23 @@
     direction: ltr;
     unicode-bidi: isolate;
     overflow-wrap: anywhere;
+}
+
+/*
+ * The same data, in a field somebody types into.
+ *
+ * `hash` pins the direction because a hash set in a mirrored SENTENCE reorders against the words
+ * beside it. A field has no words beside it - the value is alone in its own box - so the isolate
+ * carries the guarantee on its own, and pinning the direction as well hands the box to the wrong
+ * side: the placeholder and the caret go to the far border while the icon stays at the reader's
+ * start, with the whole width of the field between them. Inherited, the box belongs to the
+ * layout and the value still reads left to right, because a run of hex resolves that way inside
+ * a mirrored paragraph too.
+ */
+@utility hash-field
+{
+    font-family: var(--font-mono);
+    unicode-bidi: isolate;
 }
 
 /* The drawer's entrance. Both are motion-safe at the call site, so a reduced-motion reader gets
