@@ -3,6 +3,7 @@
 
 import type { PageRoute } from '@azerothjs/kit';
 
+import AccountsPage from './pages/accounts.page.azeroth';
 import AddressPage from './pages/address.page.azeroth';
 import BlockPage from './pages/block.page.azeroth';
 import BlocksPage from './pages/blocks.page.azeroth';
@@ -15,6 +16,7 @@ import TransactionsPage from './pages/txs.page.azeroth';
 // a transaction arrive as real markup rather than an empty shell.
 export const routes: PageRoute[] = [
     { path: '/', component: Home, render: 'server' },
+    { path: '/accounts', component: AccountsPage, render: 'server' },
     { path: '/blocks', component: BlocksPage, render: 'server' },
     { path: '/block/:number', component: BlockPage, render: 'server' },
     { path: '/txs', component: TransactionsPage, render: 'server' },

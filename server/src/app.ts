@@ -21,6 +21,7 @@ import {
     summary,
     transactionDetail,
     transactionPage,
+    topAccounts,
     transferPage,
     type Transfer
 } from './schemas.ts';
@@ -69,6 +70,12 @@ function build({ store, chain }: ApiDeps)
         const page = query.page ?? 1;
         return { limit, offset: (page - 1) * limit, page };
     };
+
+    // The rich list. Balances are live, and reading the node for every address on every request
+    // would turn one page view into a balance storm, so the ranked list is cached for a few
+    // seconds. The cache keeps every NON-zero balance; the route slices to the requested limit.
+    let rankedAccounts: { at: number; rows: Array<{ address: string; balance: string }> } | null = null;
+    const RANKED_TTL_MS = 10_000;
 
     return {
         stats: feature('/stats', (routes) => ({
@@ -256,6 +263,30 @@ function build({ store, chain }: ApiDeps)
                         : { kind: 'block' as const, path: `/block/${ asBlock.number }` };
                 }
                 return { kind: 'none' as const, path: null };
+            })
+        })),
+
+        accounts: feature('/accounts', (routes) => ({
+            top: routes.get('/top', { query: pageQuery, output: topAccounts }, async ({ query }) =>
+            {
+                const limit = Math.min(query.limit ?? DEFAULT_LIMIT, 100);
+                const now = Date.now();
+                if (rankedAccounts === null || now - rankedAccounts.at >= RANKED_TTL_MS)
+                {
+                    const addresses = store.distinctAddresses();
+                    const rows = await Promise.all(addresses.map(async (address) => ({
+                        address,
+                        balance: await chain.balance(address).then((value) => value.toString()).catch(() => '0')
+                    })));
+                    rows.sort((left, right) =>
+                    {
+                        const a = BigInt(left.balance);
+                        const b = BigInt(right.balance);
+                        return a > b ? -1 : a < b ? 1 : 0;
+                    });
+                    rankedAccounts = { at: now, rows: rows.filter((row) => row.balance !== '0') };
+                }
+                return { rows: rankedAccounts.rows.slice(0, limit) };
             })
         }))
     };

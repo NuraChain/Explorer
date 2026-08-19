@@ -21,6 +21,7 @@ export const ar: Dictionary = {
     'nav.home': 'الرئيسية',
     'nav.blocks': 'الكتل',
     'nav.transactions': 'المعاملات',
+    'nav.accounts': 'الحسابات',
     'nav.overview': 'نظرة عامة',
     'nav.menu': 'القائمة',
     'nav.open': 'فتح القائمة',
@@ -124,6 +125,12 @@ export const ar: Dictionary = {
     'address.transfers.empty.title': 'لا تحويلات توكن',
     'address.transfers.empty.hint': 'تظهر هنا حركات ERC-20 و721 و1155 لهذا العنوان.',
     'address.transfers.token': 'التوكن',
+
+    // --- الحسابات (قائمة الأغنياء) --------------------------
+    'accounts.title': 'أعلى الحسابات',
+    'accounts.hint': 'مرتّبة حسب الرصيد الأصلي، يُقرأ مباشرة من العقدة لكل عنوان رآه المستكشف.',
+    'accounts.empty.title': 'لا حسابات مفهرسة بعد',
+    'accounts.empty.hint': 'تظهر الحسابات هنا بعد أول معاملة على السلسلة.',
 
     // --- العقد -----------------------------------------
     'contract.compiler': 'المُصرِّف',

@@ -19,6 +19,9 @@ export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11
 /** `TransferSingle(address,address,address,uint256,uint256)` - ERC-1155. */
 export const TRANSFER_SINGLE_TOPIC = '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
 
+/** The zero address: mints and burns name it, but nothing can be spent from it. */
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
 const DDL = `
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
@@ -582,6 +585,27 @@ export class IndexStore
             }
         }
         return { in: inbound.toString(), out: outbound.toString(), fees: fees.toString() };
+    }
+
+    /**
+     * Every address the index has seen, deduplicated - the candidate set for the rich list.
+     *
+     * JSON-RPC has no "who holds the most" call, so a top-accounts list ranks the addresses that
+     * have appeared on-chain and reads each balance live against the node.
+     */
+    public distinctAddresses(): string[]
+    {
+        const rows = this.#stmt(`
+            SELECT DISTINCT addr FROM (
+                SELECT from_addr AS addr FROM transactions
+                UNION ALL SELECT to_addr AS addr FROM transactions
+                UNION ALL SELECT miner AS addr FROM blocks
+                UNION ALL SELECT from_addr AS addr FROM token_transfers
+                UNION ALL SELECT to_addr AS addr FROM token_transfers
+                UNION ALL SELECT token AS addr FROM token_transfers
+            ) WHERE addr IS NOT NULL AND addr != ?`)
+            .all(ZERO_ADDRESS) as unknown as Array<{ addr: string }>;
+        return rows.map((row) => row.addr);
     }
 
     public token(address: string): TokenRow | null

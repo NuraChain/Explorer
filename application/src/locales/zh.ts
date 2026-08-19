@@ -20,6 +20,7 @@ export const zh: Dictionary = {
     'nav.home': '首页',
     'nav.blocks': '区块',
     'nav.transactions': '交易',
+    'nav.accounts': '账户',
     'nav.overview': '总览',
     'nav.menu': '菜单',
     'nav.open': '打开导航',
@@ -123,6 +124,12 @@ export const zh: Dictionary = {
     'address.transfers.empty.title': '没有代币转账',
     'address.transfers.empty.hint': '该地址的 ERC-20、721 和 1155 转移会显示在这里。',
     'address.transfers.token': '代币',
+
+    // --- 账户（排行） ---------------------------------------
+    'accounts.title': '账户排行',
+    'accounts.hint': '按原生余额排序，余额从节点实时读取（针对浏览器所见过的每个地址）。',
+    'accounts.empty.title': '暂无已索引账户',
+    'accounts.empty.hint': '链上出现第一笔交易后，账户将显示在这里。',
 
     // --- 合约 -----------------------------------------
     'contract.compiler': '编译器',

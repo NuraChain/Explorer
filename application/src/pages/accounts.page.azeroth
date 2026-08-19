@@ -1,0 +1,62 @@
+import { client } from '../api.ts';
+import { formatValue } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
+
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import EmptyState from '../components/ui/empty-state.component.azeroth';
+import Skeleton from '../components/ui/skeleton.component.azeroth';
+
+// The rich list: accounts ranked by native balance, read live from the node. It follows the
+// chain like the home page does - balances move on every block, so a stale leaderboard is a
+// wrong one - but on a slower timer, because a ranking is an overview, not a ticker.
+export default component AccountsPage()
+{
+    const locale = useLocale();
+
+    resource stats = () => client.stats.summary();
+    resource accounts = () => client.accounts.top({ query: { limit: 50 } });
+
+    effect
+    {
+        const timer = setInterval(() => accounts.refetch(), 10_000);
+        return () => clearInterval(timer);
+    }
+
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived ranked = (accounts.data()?.rows ?? []).map((row, index) => ({ row, rank: index + 1 }));
+
+    useTitle(() => locale.t('accounts.title'));
+
+    <div class="flex flex-col gap-4">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('accounts.title') }</h1>
+            <p class="mt-1 max-w-2xl text-[13px] leading-relaxed text-muted">{ locale.t('accounts.hint') }</p>
+        </div>
+
+        <section class="panel overflow-hidden">
+            <ul class="divide-y divide-line">
+                <For each={ ranked } key={ (entry) => entry.row.address } let={ entry }>
+                    <li class="flex items-center gap-3 px-4 py-2.5">
+                        <span class="amount w-8 shrink-0 text-end text-[12px] text-muted">{ entry.rank }</span>
+                        <div class="min-w-0 flex-1">
+                            <HashLink value={ entry.row.address } to={ `/address/${ entry.row.address }` } lead={ 16 } tail={ 10 } />
+                        </div>
+                        <p class="amount shrink-0 text-end text-[13px]">{ formatValue(entry.row.balance, symbol, decimals) }</p>
+                    </li>
+                </For>
+            </ul>
+            <Show when={ accounts.data() === undefined }>
+                <div class="flex flex-col gap-2 px-4 py-4">
+                    <Skeleton class="h-10 w-full" />
+                    <Skeleton class="h-10 w-full" />
+                    <Skeleton class="h-10 w-full" />
+                </div>
+            </Show>
+            <Show when={ accounts.data()?.rows.length === 0 }>
+                <EmptyState icon="wallet" title={ locale.t('accounts.empty.title') } hint={ locale.t('accounts.empty.hint') } />
+            </Show>
+        </section>
+    </div>
+}

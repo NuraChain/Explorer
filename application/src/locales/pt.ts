@@ -19,6 +19,7 @@ export const pt: Dictionary = {
     'nav.home': 'Início',
     'nav.blocks': 'Blocos',
     'nav.transactions': 'Transações',
+    'nav.accounts': 'Contas',
     'nav.overview': 'Visão geral',
     'nav.menu': 'Menu',
     'nav.open': 'Abrir a navegação',
@@ -122,6 +123,12 @@ export const pt: Dictionary = {
     'address.transfers.empty.title': 'Sem transferências de tokens',
     'address.transfers.empty.hint': 'Os movimentos ERC-20, 721 e 1155 deste endereço aparecem aqui.',
     'address.transfers.token': 'Token',
+
+    // --- Contas (lista das maiores) -------------------------
+    'accounts.title': 'Maiores contas',
+    'accounts.hint': 'Ordenadas pelo saldo nativo, lido ao vivo do nó para cada endereço que o explorador viu.',
+    'accounts.empty.title': 'Nenhuma conta indexada ainda',
+    'accounts.empty.hint': 'As contas aparecem aqui após a primeira transação da cadeia.',
 
     // --- Contrato -----------------------------------------
     'contract.compiler': 'Compilador',

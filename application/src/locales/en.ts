@@ -28,6 +28,7 @@ export const en = {
     'nav.home': 'Home',
     'nav.blocks': 'Blocks',
     'nav.transactions': 'Transactions',
+    'nav.accounts': 'Accounts',
     'nav.overview': 'Overview',
     'nav.menu': 'Menu',
     'nav.open': 'Open navigation',
@@ -136,6 +137,12 @@ export const en = {
     'address.transfers.empty.title': 'No token transfers',
     'address.transfers.empty.hint': 'ERC-20, 721 and 1155 movements for this address appear here.',
     'address.transfers.token': 'Token',
+
+    // --- Accounts (rich list) -----------------------------------------------------------------
+    'accounts.title': 'Top accounts',
+    'accounts.hint': 'Ranked by native balance, read live from the node for every address the explorer has seen.',
+    'accounts.empty.title': 'No accounts indexed yet',
+    'accounts.empty.hint': 'Accounts appear here once the chain has seen its first transaction.',
 
     // --- Contract -----------------------------------------------------------------------------
     'contract.compiler': 'Compiler',

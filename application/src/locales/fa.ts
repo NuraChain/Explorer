@@ -24,6 +24,7 @@ export const fa: Dictionary = {
     'nav.home': 'خانه',
     'nav.blocks': 'بلاک‌ها',
     'nav.transactions': 'تراکنش‌ها',
+    'nav.accounts': 'حساب‌ها',
     'nav.overview': 'نمای کلی',
     'nav.menu': 'منو',
     'nav.open': 'باز کردن منو',
@@ -128,6 +129,12 @@ export const fa: Dictionary = {
     'address.transfers.empty.title': 'انتقال توکنی وجود ندارد',
     'address.transfers.empty.hint': 'جابه‌جایی‌های ERC-20، 721 و 1155 این آدرس اینجا نمایش داده می‌شوند.',
     'address.transfers.token': 'توکن',
+
+    // --- حساب‌ها (فهرست برتر) ---------------------------------
+    'accounts.title': 'حساب‌های برتر',
+    'accounts.hint': 'رتبه‌بندی بر اساس موجودی بومی، که زنده از نود برای هر نشانی که کاوشگر دیده خوانده می‌شود.',
+    'accounts.empty.title': 'هنوز حسابی نمایه نشده است',
+    'accounts.empty.hint': 'وقتی زنجیره نخستین تراکنشش را ببیند، حساب‌ها اینجا ظاهر می‌شوند.',
 
     // --- قرارداد -----------------------------------------
     'contract.compiler': 'کامپایلر',

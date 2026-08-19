@@ -20,6 +20,7 @@ export const tr: Dictionary = {
     'nav.home': 'Ana sayfa',
     'nav.blocks': 'Bloklar',
     'nav.transactions': 'İşlemler',
+    'nav.accounts': 'Hesaplar',
     'nav.overview': 'Genel bakış',
     'nav.menu': 'Menü',
     'nav.open': 'Menüyü aç',
@@ -124,6 +125,12 @@ export const tr: Dictionary = {
     'address.transfers.empty.title': 'Token transferi yok',
     'address.transfers.empty.hint': 'Bu adresin ERC-20, 721 ve 1155 hareketleri burada görünür.',
     'address.transfers.token': 'Token',
+
+    // --- Hesaplar (zengin listesi) --------------------------
+    'accounts.title': 'En büyük hesaplar',
+    'accounts.hint': 'Gezginin gördüğü her adres için düğümden canlı okunan yerel bakiyeye göre sıralanır.',
+    'accounts.empty.title': 'Henüz indekslenmiş hesap yok',
+    'accounts.empty.hint': 'Zincir ilk işlemini gördükten sonra hesaplar burada görünür.',
 
     // --- Sözleşme -----------------------------------------
     'contract.compiler': 'Derleyici',

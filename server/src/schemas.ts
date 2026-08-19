@@ -132,6 +132,19 @@ export const account = object({
 });
 export type Account = Infer<typeof account>;
 
+/** One row of the rich list: an address and its LIVE native balance, in wei. */
+export const topAccount = object({
+    address: string(),
+    balance: string()
+});
+export type TopAccount = Infer<typeof topAccount>;
+
+/** The rich list, sorted highest balance first. */
+export const topAccounts = object({
+    rows: array(topAccount)
+});
+export type TopAccounts = Infer<typeof topAccounts>;
+
 // --- Contracts ------------------------------------------------------------------------------
 // What a deployed contract can be asked about with standard JSON-RPC and nothing else. Names come
 // from a table of published signatures (see chain/signatures.ts), so a field left EMPTY means

@@ -19,6 +19,7 @@ import type {
     ContractDetail,
     SearchResult,
     Summary,
+    TopAccounts,
     TransactionPage,
     TransferPage
 } from '../src/schemas.ts';
@@ -74,6 +75,7 @@ function tokenBlock(number: number, parentHash: string, hash: string): BlockWith
 interface ChainStub
 {
     code?: Record<string, string>;
+    balance?: (address: string) => Promise<bigint>;
     call?: (address: string, data: string) => Promise<string>;
 }
 
@@ -88,7 +90,7 @@ function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): ChainGate
         genesisHash: async () => blocks[0]?.hash ?? '0xgenesis',
         blockHashAt: async number => blocks.find(entry => entry.number === number)?.hash ?? null,
         tokenMetadata: async () => null,
-        balance: async () => 5n * 10n ** 18n,
+        balance: stub.balance ?? (async () => 5n * 10n ** 18n),
         isContract: async address => codeAt(address) !== '0x',
         code: async address => codeAt(address),
         storageAt: async () => `0x${ '0'.repeat(64) }`,
@@ -330,6 +332,24 @@ describe('the API over the index', () =>
         expect(account.balance).toBe((5n * 10n ** 18n).toString());
         expect(account.txCount).toBe(4);
         expect(account.flow.out).toBe((4n * 10n ** 18n).toString());
+    });
+
+    it('ranks accounts by live native balance, highest first', async () =>
+    {
+        const { store, chain } = await indexed(CHAIN, {
+            balance: async (address) => address === ALICE ? 10n * 10n ** 18n : 2n * 10n ** 18n
+        });
+        const app = buildApp({ dev: false, store, chain });
+        const response = await app.handle(new Request('http://local/api/accounts/top?limit=10'));
+        const body = (await response.json()) as TopAccounts;
+
+        expect(response.status).toBe(200);
+        expect(body.rows[0]).toEqual({ address: ALICE, balance: (10n * 10n ** 18n).toString() });
+        // Every later row balances no higher than the one above it.
+        for (let at = 1; at < body.rows.length; at++)
+        {
+            expect(BigInt(body.rows[at - 1]!.balance) >= BigInt(body.rows[at]!.balance)).toBe(true);
+        }
     });
 
     it('serves a token contract its OWN transfers rather than an empty ledger', async () =>

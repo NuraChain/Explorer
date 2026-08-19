@@ -21,6 +21,8 @@ export type {
     Transaction,
     TransactionDetail,
     TransactionPage,
+    TopAccount,
+    TopAccounts,
     Transfer,
     TransferPage
 } from '../../server/src/schemas.ts';

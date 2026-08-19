@@ -20,6 +20,7 @@ export const hi: Dictionary = {
     'nav.home': 'होम',
     'nav.blocks': 'ब्लॉक',
     'nav.transactions': 'लेनदेन',
+    'nav.accounts': 'खाते',
     'nav.overview': 'अवलोकन',
     'nav.menu': 'मेनू',
     'nav.open': 'नेविगेशन खोलें',
@@ -124,6 +125,12 @@ export const hi: Dictionary = {
     'address.transfers.empty.title': 'कोई टोकन ट्रांसफ़र नहीं',
     'address.transfers.empty.hint': 'इस पते के ERC-20, 721 और 1155 मूवमेंट यहाँ दिखते हैं।',
     'address.transfers.token': 'टोकन',
+
+    // --- खाते (शीर्ष सूची) -----------------------------------
+    'accounts.title': 'शीर्ष खाते',
+    'accounts.hint': 'मूल शेष के अनुसार क्रमबद्ध, एक्सप्लोरर द्वारा देखे गए हर पते के लिए नोड से लाइव पढ़ा गया।',
+    'accounts.empty.title': 'अभी कोई खाता अनुक्रमित नहीं',
+    'accounts.empty.hint': 'चेन का पहला लेनदेन होने के बाद खाते यहाँ दिखेंगे।',
 
     // --- कॉन्ट्रैक्ट -----------------------------------------
     'contract.compiler': 'कंपाइलर',

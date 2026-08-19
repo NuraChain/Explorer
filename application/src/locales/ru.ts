@@ -21,6 +21,7 @@ export const ru: Dictionary = {
     'nav.home': 'Главная',
     'nav.blocks': 'Блоки',
     'nav.transactions': 'Транзакции',
+    'nav.accounts': 'Счета',
     'nav.overview': 'Обзор',
     'nav.menu': 'Меню',
     'nav.open': 'Открыть меню',
@@ -124,6 +125,12 @@ export const ru: Dictionary = {
     'address.transfers.empty.title': 'Переводов токенов нет',
     'address.transfers.empty.hint': 'Движения ERC-20, 721 и 1155 этого адреса появляются здесь.',
     'address.transfers.token': 'Токен',
+
+    // --- Счета (список крупнейших) --------------------------
+    'accounts.title': 'Крупнейшие счета',
+    'accounts.hint': 'Отсортированы по нативному балансу, читаемому вживую с узла для каждого адреса, который видел обозреватель.',
+    'accounts.empty.title': 'Пока нет проиндексированных счетов',
+    'accounts.empty.hint': 'Счета появятся здесь после первой транзакции в сети.',
 
     // --- Контракт -----------------------------------------
     'contract.compiler': 'Компилятор',

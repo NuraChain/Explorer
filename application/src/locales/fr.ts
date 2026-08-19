@@ -20,6 +20,7 @@ export const fr: Dictionary = {
     'nav.home': 'Accueil',
     'nav.blocks': 'Blocs',
     'nav.transactions': 'Transactions',
+    'nav.accounts': 'Comptes',
     'nav.overview': 'Vue d’ensemble',
     'nav.menu': 'Menu',
     'nav.open': 'Ouvrir la navigation',
@@ -123,6 +124,12 @@ export const fr: Dictionary = {
     'address.transfers.empty.title': 'Aucun transfert de jetons',
     'address.transfers.empty.hint': 'Les mouvements ERC-20, 721 et 1155 de cette adresse apparaissent ici.',
     'address.transfers.token': 'Jeton',
+
+    // --- Comptes (liste des plus riches) --------------------
+    'accounts.title': 'Principaux comptes',
+    'accounts.hint': 'Classés par solde natif, lu en direct du nœud pour chaque adresse vue par l’explorateur.',
+    'accounts.empty.title': 'Aucun compte indexé pour l’instant',
+    'accounts.empty.hint': 'Les comptes apparaissent ici une fois la première transaction de la chaîne enregistrée.',
 
     // --- Contrat -----------------------------------------
     'contract.compiler': 'Compilateur',
