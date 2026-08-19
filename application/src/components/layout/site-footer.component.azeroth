@@ -1,6 +1,7 @@
 import { Link } from 'azerothjs';
 
 import { useLocale } from '../../stores/locale.store.ts';
+import { APP_VERSION } from '../../version.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
 import type { IconName } from '../../icons/registry.ts';
@@ -83,7 +84,8 @@ export default component SiteFooter()
                         href="https://github.com/AzerothJS/AzerothJS"
                         target="_blank"
                         rel="noreferrer"
-                    >AzerothJS</a>
+                    >AzerothJS</a>{ ' ' }
+                    <span>{ APP_VERSION }</span>
                 </p>
             </div>
         </div>
