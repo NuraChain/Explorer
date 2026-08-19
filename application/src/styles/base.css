@@ -9,6 +9,9 @@
         font-family: var(--font-display);
         /* Hashes and addresses are the content; they must never be ambiguous. */
         font-variant-ligatures: none;
+        /* The English (default) leading for the Latin UI, looser than the browser default so
+           consecutive lines read as separate thoughts. The fa/ar/hi overrides below still win. */
+        line-height: 1.6;
     }
 
     :focus-visible
@@ -20,7 +23,7 @@
 
     /*
      * Persian sits lower and taller than Latin at the same size - descenders carry dots, and the
-     * default 1.5 packs consecutive lines close enough that they collide. It also puts the shipped
+     * default 1.4 packs consecutive lines close enough that they collide. It also puts the shipped
      * Vazirmatn ahead of Archivo, so Persian is set in the face drawn for it. Scoped to the
      * language rather than the direction, so both follow the text and not the layout. Arabic is
      * the same script with the same metrics, and Vazirmatn's Arabic subset covers it.
@@ -33,7 +36,7 @@
         line-height: 1.85;
     }
 
-    /* Devanagari stacks headline bars and under-marks the same way: at 1.5 a matra can touch the
+    /* Devanagari stacks headline bars and under-marks the same way: at 1.6 a matra can touch the
        line above, so Hindi gets more air too - less than Arabic script, which hangs deeper. */
     html:lang(hi)
     {
