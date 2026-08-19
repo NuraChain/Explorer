@@ -202,6 +202,11 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['createPair(address,address)', 'nonpayable', 'address'],
     ['setFeeTo(address)', 'nonpayable', ''],
     ['setFeeToSetter(address)', 'nonpayable', ''],
+    // The fee-on-swap addition this fork adds on top of the standard factory: `swapFee` reads the
+    // rate a pair pays, `MAX_SWAP_FEE` caps it, and `setSwapFee` writes a new one.
+    ['swapFee()', 'view', 'uint32'],
+    ['MAX_SWAP_FEE()', 'view', 'uint32'],
+    ['setSwapFee(uint32)', 'nonpayable', ''],
 
     // --- Uniswap V2 router --------------------------------------------------------------------
     // Which of these is payable is not a detail: `swapExactETHForTokens` takes the currency being
@@ -230,6 +235,66 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['getAmountIn(uint256,uint256,uint256)', 'pure', 'uint256'],
     ['getAmountsOut(uint256,address[])', 'view', 'uint256[]'],
     ['getAmountsIn(uint256,address[])', 'view', 'uint256[]'],
+
+    // --- Uniswap V3 factory ------------------------------------------------------------------
+    // A pool is created, not deployed: `createPool` deploys it deterministically, and every pool
+    // answers `factory()` with the address below. Fee tiers are the factory's table - `enableFeeAmount`
+    // writes one and `feeAmountTickSpacing` reads it back.
+    ['createPool(address,address,uint24)', 'nonpayable', 'address'],
+    ['getPool(address,address,uint24)', 'view', 'address'],
+    ['enableFeeAmount(uint24,int24)', 'nonpayable', ''],
+    ['feeAmountTickSpacing(uint24)', 'view', 'int24'],
+    ['parameters()', 'view', 'address,address,address,uint24,int24'],
+    ['setOwner(address)', 'nonpayable', ''],
+
+    // --- Uniswap V3 swap router --------------------------------------------------------------
+    // The `exact` families take one struct parameter, spelled as a tuple. `exactInput` starts from
+    // a known amount in, `exactOutput` reaches a known amount out, and each has a `Single` form
+    // that skips the encoded path for one hop.
+    ['WETH9()', 'view', 'address'],
+    ['exactInput((bytes,address,uint256,uint256,uint256))', 'payable', 'uint256'],
+    ['exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))', 'payable', 'uint256'],
+    ['exactOutput((bytes,address,uint256,uint256,uint256))', 'payable', 'uint256'],
+    ['exactOutputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))', 'payable', 'uint256'],
+    ['refundETH()', 'payable', ''],
+    ['unwrapWETH9(uint256,address)', 'payable', ''],
+    ['unwrapWETH9WithFee(uint256,address,uint256,address)', 'payable', ''],
+    ['sweepToken(address,uint256,address)', 'payable', ''],
+    ['sweepTokenWithFee(address,uint256,address,uint256,address)', 'payable', ''],
+    ['selfPermit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
+    ['selfPermitAllowed(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
+    ['selfPermitAllowedIfNecessary(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
+    ['selfPermitIfNecessary(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
+    ['uniswapV3SwapCallback(int256,int256,bytes)', 'nonpayable', ''],
+
+    // --- Uniswap V3 non-fungible position manager --------------------------------------------
+    // Liquidity is an NFT. `mint` opens a position and returns its id, `increaseLiquidity` and
+    // `decreaseLiquidity` move it, `collect` takes the fees it earned. Each takes one struct, so
+    // each is spelled as one tuple parameter.
+    ['baseURI()', 'pure', 'string'],
+    ['positions(uint256)', 'view', 'uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128'],
+    ['mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))', 'payable', 'uint256,uint128,uint256,uint256'],
+    ['increaseLiquidity((uint256,uint256,uint256,uint256,uint256,uint256))', 'payable', 'uint128,uint256,uint256'],
+    ['decreaseLiquidity((uint256,uint128,uint256,uint256,uint256))', 'payable', 'uint256,uint256'],
+    ['collect((uint256,address,uint128,uint128))', 'payable', 'uint256,uint256'],
+    ['createAndInitializePoolIfNecessary(address,address,uint24,uint160)', 'payable', 'address'],
+    ['permit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
+    ['uniswapV3MintCallback(uint256,uint256,bytes)', 'nonpayable', ''],
+
+    // --- Uniswap V3 quoter, tick lens and descriptors -----------------------------------------
+    // `quoteExact*` are nonpayable rather than view: the quoter routes a real (zero-amount) swap
+    // through a pool to read its price, so the ABI cannot promise it changes nothing.
+    ['quoteExactInput(bytes,uint256)', 'nonpayable', 'uint256,uint160[],uint32[],uint256'],
+    ['quoteExactInputSingle((address,address,uint256,uint24,uint160))', 'nonpayable', 'uint256,uint160,uint32,uint256'],
+    ['quoteExactOutput(bytes,uint256)', 'nonpayable', 'uint256,uint160[],uint32[],uint256'],
+    ['quoteExactOutputSingle((address,address,uint256,uint24,uint160))', 'nonpayable', 'uint256,uint160,uint32,uint256'],
+    ['getPopulatedTicksInWord(address,int16)', 'view', '(int24,int128,uint128)[]'],
+    ['tokenURI(address,uint256)', 'view', 'string'],
+    ['flipRatio(address,address,uint256)', 'view', 'bool'],
+    ['tokenRatioPriority(address,uint256)', 'view', 'int256'],
+    ['nativeCurrencyLabel()', 'view', 'string'],
+    ['nativeCurrencyLabelBytes()', 'view', 'bytes32'],
+    ['constructTokenURI((uint256,address,address,string,string,uint8,uint8,bool,int24,int24,int24,int24,uint24,address))', 'pure', 'string'],
 
     // --- Multicall3 ---------------------------------------------------------------------------
     // Deployed at the same address on most chains and called by every wallet and dashboard, so an
@@ -291,7 +356,21 @@ const EVENTS: readonly string[] = [
     'Withdrawal(address,uint256)',
     'Deposit(address,address,uint256,uint256)',
     'Withdraw(address,address,address,uint256,uint256)',
-    'EIP712DomainChanged()'
+    'EIP712DomainChanged()',
+    // Uniswap V2 pair and factory.
+    'PairCreated(address,address,address,uint256)',
+    'SwapFeeUpdated(uint32,uint32)',
+    'Mint(address,uint256,uint256)',
+    'Burn(address,uint256,uint256,address)',
+    'Swap(address,uint256,uint256,uint256,uint256,address)',
+    'Sync(uint112,uint112)',
+    // Uniswap V3 factory and position manager.
+    'FeeAmountEnabled(uint24,int24)',
+    'OwnerChanged(address,address)',
+    'PoolCreated(address,address,uint24,int24,address)',
+    'IncreaseLiquidity(uint256,uint128,uint256,uint256)',
+    'DecreaseLiquidity(uint256,uint128,uint256,uint256)',
+    'Collect(uint256,address,uint256,uint256)'
 ];
 
 /** A comma-separated type list; '' is NO types, not one nameless one (''.split(',') is ['']). */

@@ -640,6 +640,16 @@ describe('naming the contracts a chain is actually made of', () =>
         'getCurrentBlockTimestamp()'
     ];
 
+    const V3 = [
+        'createPool(address,address,uint24)',
+        'exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))',
+        'mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))',
+        'collect((uint256,address,uint128,uint128))',
+        'quoteExactInputSingle((address,address,uint256,uint24,uint160))',
+        'positions(uint256)',
+        'getPopulatedTicksInWord(address,int16)'
+    ];
+
     it('names every entry point of a Uniswap V2 pair', () =>
     {
         const described = describeFunctions(PAIR.map(toFunctionSelector));
@@ -673,6 +683,22 @@ describe('naming the contracts a chain is actually made of', () =>
         const data = encodeCall(batch, [JSON.stringify([[ALICE, true, '0x1234']])]);
         expect(data.slice(0, 10)).toBe(toFunctionSelector('aggregate3((address,bool,bytes)[])'));
         expect(data).toContain(ALICE.slice(2));
+    });
+
+    it('names every entry point of the Uniswap V3 periphery', () =>
+    {
+        const described = describeFunctions(V3.map(toFunctionSelector));
+        expect(described.filter(entry => entry.signature === '')).toEqual([]);
+
+        // A struct argument is ONE tuple parameter, not one field per member - otherwise the page
+        // draws eleven fields and then refuses the call for the wrong number of them.
+        const mint = described.find(entry => entry.name === 'mint')!;
+        expect(mint.inputs).toEqual(['(address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256)']);
+
+        // The quoter is not a view: it routes a real (zero-amount) swap, so the ABI cannot promise
+        // it changes nothing.
+        const quote = described.find(entry => entry.name === 'quoteExactInputSingle')!;
+        expect(quote.mutability).toBe('nonpayable');
     });
 
     it('claims a pair only when the dispatcher answers every one of its calls', () =>
