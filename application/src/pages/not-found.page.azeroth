@@ -22,13 +22,13 @@ export default component NotFoundPage()
         </span>
 
         <h1 class="mt-4 text-[20px] font-bold tracking-tight">{ locale.t('notFound.heading') }</h1>
-        <p class="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-muted">{ locale.t('notFound.hint') }</p>
+        <p class="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">{ locale.t('notFound.hint') }</p>
 
         <div class="mx-auto mt-6 max-w-lg">
             <SearchBar />
         </div>
 
-        <nav class="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px]" aria-label={ locale.t('nav.elsewhere') }>
+        <nav class="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px]" aria-label={ locale.t('nav.elsewhere') }>
             <Link to="/" class="inline-flex min-h-11 items-center px-2 text-nur no-underline hover:underline">{ locale.t('nav.overview') }</Link>
             <Link to="/blocks" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link>
             <Link to="/txs" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link>

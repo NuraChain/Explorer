@@ -32,18 +32,18 @@ export default component AccountsPage()
     <div class="flex flex-col gap-4">
         <div>
             <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('accounts.title') }</h1>
-            <p class="mt-1 max-w-2xl text-[13px] leading-relaxed text-muted">{ locale.t('accounts.hint') }</p>
+            <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('accounts.hint') }</p>
         </div>
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
                 <For each={ ranked } key={ (entry) => entry.row.address } let={ entry }>
                     <li class="flex items-center gap-3 px-4 py-2.5">
-                        <span class="amount w-8 shrink-0 text-end text-[12px] text-muted">{ entry.rank }</span>
+                        <span class="amount w-8 shrink-0 text-end text-[13px] text-muted">{ entry.rank }</span>
                         <div class="min-w-0 flex-1">
                             <HashLink value={ entry.row.address } to={ `/address/${ entry.row.address }` } lead={ 16 } tail={ 10 } />
                         </div>
-                        <p class="amount shrink-0 text-end text-[13px]">{ formatValue(entry.row.balance, symbol, decimals) }</p>
+                        <p class="amount shrink-0 text-end text-[14px]">{ formatValue(entry.row.balance, symbol, decimals) }</p>
                     </li>
                 </For>
             </ul>

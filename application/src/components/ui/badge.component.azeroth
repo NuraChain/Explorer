@@ -13,9 +13,9 @@ export default component Badge(props: {
     children?: Child;
 })
 {
-    <span class={ `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${ TONE_CLASS[props.tone ?? 'neutral'] }` }>
+    <span class={ `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold ${ TONE_CLASS[props.tone ?? 'neutral'] }` }>
         <Show when={ props.icon !== undefined }>
-            <Icon name={ props.icon ?? 'help' } size={ 12 } />
+            <Icon name={ props.icon ?? 'help' } size={ 13 } />
         </Show>
         { props.children }
     </span>

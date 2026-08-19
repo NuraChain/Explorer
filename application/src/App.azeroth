@@ -32,12 +32,12 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                 <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:gap-x-5 sm:px-6 sm:py-3">
                     <Link to="/" class="flex shrink-0 items-center gap-2 no-underline">
                         <span class="flex h-7 w-7 items-center justify-center rounded-md bg-nur text-void">
-                            <Icon name="layers" size={ 16 } />
+                            <Icon name="layers" size={ 17 } />
                         </span>
-                        <BrandMark class="text-[15px] text-text" />
+                        <BrandMark class="text-[16px] text-text" />
                     </Link>
 
-                    <nav class="hidden items-center gap-4 text-[13px] sm:flex" aria-label={ locale.t('nav.sections') }>
+                    <nav class="hidden items-center gap-4 text-[14px] sm:flex" aria-label={ locale.t('nav.sections') }>
                         <Link
                             to="/blocks"
                             class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"

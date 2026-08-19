@@ -31,19 +31,19 @@ export default component SiteFooter()
             <div>
                 <span class="flex items-center gap-2">
                     <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
-                        <Icon name="layers" size={ 14 } />
+                        <Icon name="layers" size={ 15 } />
                     </span>
-                    <BrandMark class="text-[14px]" />
+                    <BrandMark class="text-[15px]" />
                 </span>
-                <p class="mt-2 max-w-xs text-[12px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
-                <p class="mt-1 text-[11px] text-muted">
+                <p class="mt-2 max-w-xs text-[13px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
+                <p class="mt-1 text-[12px] text-muted">
                     { locale.t('footer.version') }{ ' ' }<span class="data">{ APP_VERSION }</span>
                 </p>
             </div>
 
             <nav class="text-center" aria-label={ locale.t('footer.explore') }>
-                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
-                <ul class="mt-3 flex flex-col gap-2 text-[13px]">
+                <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
+                <ul class="mt-3 flex flex-col gap-2 text-[14px]">
                     <li><Link to="/" class="text-muted no-underline hover:text-text">{ locale.t('nav.home') }</Link></li>
                     <li><Link to="/blocks" class="text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link></li>
                     <li><Link to="/txs" class="text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link></li>
@@ -53,8 +53,8 @@ export default component SiteFooter()
             {/* Named in text, not by logo alone: the icon set carries no brand marks, and a
                 generic glyph beside a name still reads correctly in either direction. */}
             <nav class="text-center" aria-label={ locale.t('footer.community') }>
-                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
-                <ul class="mt-3 flex flex-col gap-2 text-[13px]">
+                <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
+                <ul class="mt-3 flex flex-col gap-2 text-[14px]">
                     <For each={ SOCIALS } key={ (link) => link.name } let={ link }>
                         <li>
                             {/* `w-fit` keeps the hover target on the words, so centring takes an
@@ -76,7 +76,7 @@ export default component SiteFooter()
         </div>
 
         <div class="border-t border-line">
-            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-[12px] text-faint sm:px-6">
+            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-[13px] text-faint sm:px-6">
                 <p>{ locale.t('footer.note') }</p>
                 <p>
                     {/* Explicit: a literal text line before an element line collapses to a single

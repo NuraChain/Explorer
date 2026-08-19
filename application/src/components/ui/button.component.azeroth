@@ -38,7 +38,7 @@ export default component Button(props: {
             <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
         </Show>
         <Show when={ props.busy !== true && props.icon !== undefined }>
-            <Icon name={ props.icon ?? 'help' } size={ 15 } />
+            <Icon name={ props.icon ?? 'help' } size={ 16 } />
         </Show>
         { props.children }
     </button>

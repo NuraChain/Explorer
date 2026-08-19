@@ -149,21 +149,21 @@ export default component ContractCall(props: {
             aria-expanded={ open }
             onClick={ () => open = !open }
         >
-            <span class="data w-24 shrink-0 text-[12px] text-muted">{ props.entry.selector }</span>
-            <span class="hash min-w-0 flex-1 text-[13px]">
+            <span class="data w-24 shrink-0 text-[13px] text-muted">{ props.entry.selector }</span>
+            <span class="hash min-w-0 flex-1 text-[14px]">
                 <span class="font-semibold">{ props.entry.name }</span>(<span class="text-muted">{ props.entry.inputs.join(', ') }</span>)
             </span>
             <Badge tone={ MUTABILITY_TONE[props.entry.mutability] ?? 'neutral' }>
                 { locale.t(`contract.mutability.${ props.entry.mutability }`) }
             </Badge>
-            <Icon name="chevron-down" size={ 14 } class={ open ? 'shrink-0 rotate-180 text-muted' : 'shrink-0 text-muted' } />
+            <Icon name="chevron-down" size={ 15 } class={ open ? 'shrink-0 rotate-180 text-muted' : 'shrink-0 text-muted' } />
         </button>
 
         <Show when={ open }>
             <div class="flex flex-col gap-2.5 border-t border-line bg-raised px-4 py-3">
                 <For each={ fields } key={ (field) => String(field.at) } let={ field }>
                     <div class="flex flex-col gap-1">
-                        <span class="data text-[11px] text-muted">{ field.type }</span>
+                        <span class="data text-[12px] text-muted">{ field.type }</span>
                         <Input
                             label={ `${ props.entry.name } - ${ field.type }` }
                             placeholder={ field.type }
@@ -179,7 +179,7 @@ export default component ContractCall(props: {
                     charging for the privilege. */}
                 <Show when={ payable }>
                     <div class="flex flex-col gap-1">
-                        <span class="text-[11px] text-muted">{ locale.t('contract.call.value', { symbol: props.chain.symbol }) }</span>
+                        <span class="text-[12px] text-muted">{ locale.t('contract.call.value', { symbol: props.chain.symbol }) }</span>
                         <Input
                             label={ locale.t('contract.call.value', { symbol: props.chain.symbol }) }
                             placeholder="0.0"
@@ -214,8 +214,8 @@ export default component ContractCall(props: {
                     <dl class="flex flex-col gap-1 rounded-lg border border-line bg-field px-3 py-2">
                         <For each={ values } key={ (row) => String(row.at) } let={ row }>
                             <div class="flex flex-wrap items-baseline gap-x-2">
-                                <dt class="data text-[11px] text-muted">{ row.type }</dt>
-                                <dd class="min-w-0 flex-1"><span class="amount text-[13px]">{ row.value }</span></dd>
+                                <dt class="data text-[12px] text-muted">{ row.type }</dt>
+                                <dd class="min-w-0 flex-1"><span class="amount text-[14px]">{ row.value }</span></dd>
                             </div>
                         </For>
                     </dl>
@@ -224,20 +224,20 @@ export default component ContractCall(props: {
                 {/* A function that returns nothing still answered - saying so beats a panel that
                     looks like the button did not work. */}
                 <Show when={ values.length === 0 && failure === '' && hash === '' && props.entry.outputs.length === 0 && reads }>
-                    <p class="text-[12px] text-muted">{ locale.t('contract.call.noReturn') }</p>
+                    <p class="text-[13px] text-muted">{ locale.t('contract.call.noReturn') }</p>
                 </Show>
 
                 <Show when={ hash !== '' }>
-                    <p class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-field px-3 py-2 text-[12px]">
-                        <Icon name="success" size={ 14 } class="text-inflow" />
+                    <p class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-field px-3 py-2 text-[13px]">
+                        <Icon name="success" size={ 15 } class="text-inflow" />
                         <span class="text-muted">{ locale.t('contract.call.sent') }</span>
                         <Link to={ `/tx/${ hash }` } class="data text-beam no-underline hover:underline">{ hash.slice(0, 12) }…{ hash.slice(-8) }</Link>
                     </p>
                 </Show>
 
                 <Show when={ failure !== '' }>
-                    <p class={ `flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] ${ TONE_CLASS.danger }` }>
-                        <Icon name="alert" size={ 14 } class="mt-0.5 shrink-0" />
+                    <p class={ `flex items-start gap-2 rounded-lg px-3 py-2 text-[13px] ${ TONE_CLASS.danger }` }>
+                        <Icon name="alert" size={ 15 } class="mt-0.5 shrink-0" />
                         <span class="hash min-w-0">{ failure }</span>
                     </p>
                 </Show>

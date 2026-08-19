@@ -18,7 +18,7 @@ export default component ThemeSwitch(props: { labelled?: boolean })
             <button
                 class={ [
                     'flex cursor-pointer items-center justify-center gap-2 rounded-md transition-colors duration-150',
-                    props.labelled === true ? 'h-9 flex-1 text-[14px]' : 'h-7 w-7',
+                    props.labelled === true ? 'h-9 flex-1 text-[15px]' : 'h-7 w-7',
                     theme.theme() === name ? 'bg-raised text-nur' : 'text-muted hover:text-text'
                 ].join(' ') }
                 type="button"
@@ -27,7 +27,7 @@ export default component ThemeSwitch(props: { labelled?: boolean })
                 aria-pressed={ theme.theme() === name }
                 onClick={ () => theme.setTheme(name) }
             >
-                <Icon name={ iconFor(name) } size={ 15 } />
+                <Icon name={ iconFor(name) } size={ 16 } />
                 <Show when={ props.labelled === true }>
                     <span>{ locale.t(THEME_LABEL[name]) }</span>
                 </Show>

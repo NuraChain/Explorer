@@ -81,8 +81,8 @@ export default component WalletConnect(props: { chain: ChainInfo; compact?: bool
             }
         >
             <Tooltip label={ wallet.account() }>
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-raised px-2.5 py-1 text-[12px] text-inflow">
-                    <Icon name="wallet" size={ 12 } />
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-raised px-2.5 py-1 text-[13px] text-inflow">
+                    <Icon name="wallet" size={ 13 } />
                     <span class="data">{ wallet.account().slice(0, 6) }…{ wallet.account().slice(-4) }</span>
                 </span>
             </Tooltip>

@@ -56,29 +56,29 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
         <dl class="panel divide-y divide-line">
             <Show when={ props.detail.compiler !== '' }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.compiler') }</dt>
-                    <dd class="data flex-1 text-[13px]">solc { props.detail.compiler }</dd>
+                    <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.compiler') }</dt>
+                    <dd class="data flex-1 text-[14px]">solc { props.detail.compiler }</dd>
                 </div>
             </Show>
             <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.size') }</dt>
-                <dd class="flex-1 text-[13px]"><span class="amount">{ locale.bytes(props.detail.codeSize) }</span></dd>
+                <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.size') }</dt>
+                <dd class="flex-1 text-[14px]"><span class="amount">{ locale.bytes(props.detail.codeSize) }</span></dd>
             </div>
             <Show when={ props.detail.creation } let={ creation }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.deployer') }</dt>
+                    <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.deployer') }</dt>
                     <dd class="min-w-0 flex-1">
                         <HashLink value={ creation.deployer } to={ `/address/${ creation.deployer }` } lead={ 16 } tail={ 10 } />
                     </dd>
                 </div>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.deployedAt') }</dt>
-                    <dd class="min-w-0 flex-1 text-[13px]">
+                    <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.deployedAt') }</dt>
+                    <dd class="min-w-0 flex-1 text-[14px]">
                         <Link to={ `/block/${ creation.blockNumber }` } class="data text-beam no-underline hover:underline">
                             #{ creation.blockNumber }
                         </Link>
                         <Tooltip label={ locale.dateTime(creation.at) } class="ms-2 inline-flex">
-                            <span class="text-[12px] text-muted">{ locale.ago(creation.at) }</span>
+                            <span class="text-[13px] text-muted">{ locale.ago(creation.at) }</span>
                         </Tooltip>
                         <span class="ms-2 inline-flex align-middle">
                             <HashLink value={ creation.txHash } to={ `/tx/${ creation.txHash }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } />
@@ -90,9 +90,9 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                     {/* The EIP number is an identifier, so it stays as it is written everywhere
                         else - translating it would make the page disagree with the standard. */}
-                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.proxy') }</dt>
-                    <dd class="min-w-0 flex-1 text-[13px]">
-                        <span class="data text-[12px] uppercase text-muted">{ proxy.kind }</span>
+                    <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.proxy') }</dt>
+                    <dd class="min-w-0 flex-1 text-[14px]">
+                        <span class="data text-[13px] uppercase text-muted">{ proxy.kind }</span>
                         <span class="ms-2 inline-flex align-middle">
                             <HashLink value={ proxy.implementation } to={ `/address/${ proxy.implementation }` } lead={ 16 } tail={ 10 } />
                         </span>
@@ -101,15 +101,15 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             </Show>
             <Show when={ props.detail.metadataUri !== '' }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                    <dt class="w-32 shrink-0 text-[12px] text-muted">{ locale.t('contract.metadata') }</dt>
-                    <dd class="hash min-w-0 flex-1 text-[12px] text-muted">{ props.detail.metadataUri }</dd>
+                    <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.metadata') }</dt>
+                    <dd class="hash min-w-0 flex-1 text-[13px] text-muted">{ props.detail.metadataUri }</dd>
                 </div>
             </Show>
         </dl>
 
         <Show when={ props.detail.standards.length > 0 }>
             <div class="flex flex-wrap items-center gap-2">
-                <span class="text-[12px] uppercase tracking-[0.14em] text-muted">{ locale.t('contract.standards') }</span>
+                <span class="text-[13px] uppercase tracking-[0.14em] text-muted">{ locale.t('contract.standards') }</span>
                 <For each={ props.detail.standards } key={ (entry) => String(entry) } let={ entry }>
                     <span class="inline-flex"><Badge tone="accent">{ entry }</Badge></span>
                 </For>
@@ -120,14 +120,14 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             NOW - a cached total supply is a wrong total supply. */}
         <Show when={ props.detail.reads.length > 0 }>
             <section class="panel overflow-hidden">
-                <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                    <Icon name="layers" size={ 14 } /> { locale.t('contract.reads') }
+                <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="layers" size={ 15 } /> { locale.t('contract.reads') }
                 </h2>
                 <dl class="divide-y divide-line">
                     <For each={ props.detail.reads } key={ (row) => row.signature } let={ row }>
                         <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5">
-                            <dt class="data w-40 shrink-0 text-[12px] text-muted">{ row.name }()</dt>
-                            <dd class="min-w-0 flex-1 text-[13px]"><span class="amount">{ row.value }</span></dd>
+                            <dt class="data w-40 shrink-0 text-[13px] text-muted">{ row.name }()</dt>
+                            <dd class="min-w-0 flex-1 text-[14px]"><span class="amount">{ row.value }</span></dd>
                         </div>
                     </For>
                 </dl>
@@ -141,10 +141,10 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
         <Show when={ readable.length > 0 }>
             <section class="panel overflow-hidden">
                 <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
-                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                        <Icon name="run" size={ 14 } /> { locale.t('contract.read') }
+                    <span class="flex items-center gap-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="run" size={ 15 } /> { locale.t('contract.read') }
                     </span>
-                    <span class="text-[12px] text-muted">{ locale.t('contract.read.hint') }</span>
+                    <span class="text-[13px] text-muted">{ locale.t('contract.read.hint') }</span>
                 </h2>
                 <ul class="max-h-[30rem] overflow-y-auto">
                     <For each={ readable } key={ (row) => row.selector } let={ row }>
@@ -159,14 +159,14 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
         <Show when={ writable.length > 0 }>
             <section class="panel overflow-hidden">
                 <h2 class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
-                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                        <Icon name="send" size={ 14 } /> { locale.t('contract.write') }
+                    <span class="flex items-center gap-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="send" size={ 15 } /> { locale.t('contract.write') }
                     </span>
                     {/* The wallet control sits at the TOP of the section it applies to, so the
                         state of the connection is visible before a row is ever opened. */}
                     <WalletConnect chain={ props.chain } compact />
                 </h2>
-                <p class="border-b border-line px-4 py-2.5 text-[12px] text-muted">{ locale.t('contract.write.hint') }</p>
+                <p class="border-b border-line px-4 py-2.5 text-[13px] text-muted">{ locale.t('contract.write.hint') }</p>
                 <ul class="max-h-[30rem] overflow-y-auto">
                     <For each={ writable } key={ (row) => row.selector } let={ row }>
                         <li class="border-b border-line last:border-b-0">
@@ -183,18 +183,18 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
         <Show when={ unnamed.length > 0 }>
             <section class="panel overflow-hidden">
                 <h2 class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
-                    <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                        <Icon name="help" size={ 14 } /> { locale.t('contract.unnamedGroup') }
+                    <span class="flex items-center gap-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="help" size={ 15 } /> { locale.t('contract.unnamedGroup') }
                     </span>
-                    <span class="text-[12px] text-muted">
+                    <span class="text-[13px] text-muted">
                         { locale.t('contract.functions.named', { named: locale.n(named), total: locale.n(props.detail.functions.length) }) }
                     </span>
                 </h2>
                 <ul class="divide-y divide-line">
                     <For each={ unnamed } key={ (row) => row.selector } let={ row }>
                         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-                            <span class="data w-24 shrink-0 text-[12px] text-muted">{ row.selector }</span>
-                            <span class="min-w-0 flex-1 text-[13px] italic text-muted">{ locale.t('contract.unnamed') }</span>
+                            <span class="data w-24 shrink-0 text-[13px] text-muted">{ row.selector }</span>
+                            <span class="min-w-0 flex-1 text-[14px] italic text-muted">{ locale.t('contract.unnamed') }</span>
                         </li>
                     </For>
                 </ul>
@@ -208,18 +208,18 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
         </Show>
 
         <Show when={ props.detail.fromImplementation }>
-            <p class="px-1 text-[12px] text-muted">{ locale.t('contract.viaImplementation') }</p>
+            <p class="px-1 text-[13px] text-muted">{ locale.t('contract.viaImplementation') }</p>
         </Show>
 
         <Show when={ props.detail.events.length > 0 }>
             <section class="panel overflow-hidden">
-                <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                    <Icon name="activity" size={ 14 } /> { locale.t('contract.events') }
+                <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="activity" size={ 15 } /> { locale.t('contract.events') }
                 </h2>
                 <ul class="divide-y divide-line">
                     <For each={ props.detail.events } key={ (row) => row.topic } let={ row }>
                         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-                            <span class="hash min-w-0 flex-1 text-[13px]">
+                            <span class="hash min-w-0 flex-1 text-[14px]">
                                 <span class="font-semibold">{ row.name }</span>(<span class="text-muted">{ row.inputs.join(', ') }</span>)
                             </span>
                             <HashLink value={ row.topic } tone="muted" lead={ 10 } tail={ 6 } copy={ false } />
@@ -231,12 +231,12 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
 
         <section class="panel overflow-hidden">
             <h2 class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
-                <span class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
-                    <Icon name="hash" size={ 14 } /> { locale.t('contract.bytecode') }
+                <span class="flex items-center gap-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    <Icon name="hash" size={ 15 } /> { locale.t('contract.bytecode') }
                 </span>
                 <span class="flex items-center gap-1">
                     <button
-                        class="cursor-pointer rounded-lg border border-line px-3 py-1 text-[12px] text-muted transition-colors duration-150 hover:text-text"
+                        class="cursor-pointer rounded-lg border border-line px-3 py-1 text-[13px] text-muted transition-colors duration-150 hover:text-text"
                         type="button"
                         aria-expanded={ showBytecode }
                         onClick={ () => showBytecode = !showBytecode }
@@ -249,7 +249,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                         aria-label={ locale.t('copy.action', { value: locale.t('contract.bytecode') }) }
                         onClick={ () => void copyBytecode() }
                     >
-                        <Icon name="copy" size={ 13 } />
+                        <Icon name="copy" size={ 14 } />
                     </button>
                 </span>
             </h2>
@@ -259,7 +259,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                 {/* `whitespace-pre-wrap` because a <pre> otherwise holds 13000 characters on one
                     line, and the horizontal scrollbar that follows drags the whole page sideways.
                     `hash` lets it break between characters - it is hex, so every point is one. */}
-                <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[11px] leading-relaxed text-muted">{ props.detail.bytecode }</pre>
+                <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[12px] leading-relaxed text-muted">{ props.detail.bytecode }</pre>
             </Show>
         </section>
     </div>

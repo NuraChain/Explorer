@@ -40,13 +40,13 @@ export default component TransactionsPage()
                         </Badge>
                         <div class="min-w-0 flex-1">
                             <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
-                            <p class="text-[11px] text-muted">
+                            <p class="text-[12px] text-muted">
                                 { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
                             </p>
                         </div>
                         <div class="min-w-0 max-w-[45%] text-end">
-                            <p class="amount text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
-                            <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
+                            <p class="amount text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>
+                            <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                         </div>
                     </li>
                 </For>
@@ -63,7 +63,7 @@ export default component TransactionsPage()
         </section>
 
         <Show when={ txs.data() !== undefined }>
-        { () => <p class="text-[12px] text-muted">{ locale.t('txs.total', { count: locale.n(txs.data()!.total) }) }</p> }
+        { () => <p class="text-[13px] text-muted">{ locale.t('txs.total', { count: locale.n(txs.data()!.total) }) }</p> }
         </Show>
     </div>
 }

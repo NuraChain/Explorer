@@ -54,7 +54,7 @@ export default component Pagination(props: {
                 disabled={ props.page <= 1 }
                 onClick={ () => props.onChange(1) }
             >
-                <Icon name="chevrons-left" size={ 15 } class="icon-flip" />
+                <Icon name="chevrons-left" size={ 16 } class="icon-flip" />
             </button>
             <button
                 class={ stepClass }
@@ -63,7 +63,7 @@ export default component Pagination(props: {
                 disabled={ props.page <= 1 }
                 onClick={ () => props.onChange(props.page - 1) }
             >
-                <Icon name="chevron-left" size={ 15 } class="icon-flip" />
+                <Icon name="chevron-left" size={ 16 } class="icon-flip" />
             </button>
 
             <For each={ window } key={ (item) => String(item.position) } let={ item }>
@@ -77,8 +77,8 @@ export default component Pagination(props: {
                             // the rest of the control stayed in the UI font.
                             <button
                                 class={ item.value === props.page
-                                    ? 'flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[13px] font-semibold tabular-nums text-nur'
-                                    : 'flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[13px] tabular-nums text-muted transition-colors duration-150 hover:border-line hover:text-text' }
+                                    ? 'flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-nur bg-raised px-2 text-[14px] font-semibold tabular-nums text-nur'
+                                    : 'flex h-9 min-w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 text-[14px] tabular-nums text-muted transition-colors duration-150 hover:border-line hover:text-text' }
                                 type="button"
                                 aria-label={ locale.t('pagination.page', { number: locale.n(item.value as number) }) }
                                 aria-current={ item.value === props.page ? 'page' : undefined }
@@ -88,7 +88,7 @@ export default component Pagination(props: {
                             </button>
                         }
                     >
-                        <span class="flex h-9 w-5 shrink-0 items-center justify-center text-[13px] text-faint" aria-hidden="true">...</span>
+                        <span class="flex h-9 w-5 shrink-0 items-center justify-center text-[14px] text-faint" aria-hidden="true">...</span>
                     </Show>
                 </div>
             </For>
@@ -100,7 +100,7 @@ export default component Pagination(props: {
                 disabled={ props.page >= props.pages }
                 onClick={ () => props.onChange(props.page + 1) }
             >
-                <Icon name="chevron-right" size={ 15 } class="icon-flip" />
+                <Icon name="chevron-right" size={ 16 } class="icon-flip" />
             </button>
             <button
                 class={ stepClass }
@@ -109,7 +109,7 @@ export default component Pagination(props: {
                 disabled={ props.page >= props.pages }
                 onClick={ () => props.onChange(props.pages) }
             >
-                <Icon name="chevrons-right" size={ 15 } class="icon-flip" />
+                <Icon name="chevrons-right" size={ 16 } class="icon-flip" />
             </button>
         </nav>
     </Show>

@@ -22,11 +22,11 @@ export default component ErrorPage(props: { reset: () => void })
         </span>
 
         <h1 class="mt-4 text-[20px] font-bold tracking-tight">{ locale.t('error.title') }</h1>
-        <p class="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-muted">{ locale.t('error.hint') }</p>
+        <p class="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">{ locale.t('error.hint') }</p>
 
         <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button variant="primary" onClick={ () => props.reset() }>{ locale.t('error.retry') }</Button>
-            <Link to="/" class="text-[13px] text-muted no-underline hover:text-text">{ locale.t('error.home') }</Link>
+            <Link to="/" class="text-[14px] text-muted no-underline hover:text-text">{ locale.t('error.home') }</Link>
         </div>
     </div>
 }

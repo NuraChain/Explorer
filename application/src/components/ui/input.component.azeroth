@@ -34,8 +34,8 @@ export default component Input(props: {
         <input
             class={ [
                 'min-w-0 flex-1 bg-transparent text-text outline-none placeholder:font-sans placeholder:text-muted',
-                props.prose === true ? '' : 'hash',
-                big ? 'text-[15px]' : 'text-[13px]'
+                props.prose === true ? '' : 'hash-field',
+                big ? 'text-[16px]' : 'text-[14px]'
             ].filter(Boolean).join(' ') }
             type={ props.type ?? 'text' }
             value={ props.value ?? '' }

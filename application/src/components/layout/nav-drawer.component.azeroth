@@ -77,7 +77,7 @@ export default component NavDrawer()
                         aria-label={ locale.t('nav.sections') }
                     >
                         <div class="mb-2 flex items-center justify-between">
-                            <span class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('nav.menu') }</span>
+                            <span class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('nav.menu') }</span>
                             <button
                                 class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:text-text"
                                 type="button"
@@ -90,33 +90,33 @@ export default component NavDrawer()
 
                         <Link
                             to="/"
-                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            class="rounded-lg px-3 py-2.5 text-[16px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
                             activeClass="active"
                             onClick={ close }
                         >{ locale.t('nav.home') }</Link>
                         <Link
                             to="/blocks"
-                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            class="rounded-lg px-3 py-2.5 text-[16px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
                             activeClass="active"
                             onClick={ close }
                         >{ locale.t('nav.blocks') }</Link>
                         <Link
                             to="/txs"
-                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            class="rounded-lg px-3 py-2.5 text-[16px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
                             activeClass="active"
                             onClick={ close }
                         >{ locale.t('nav.transactions') }</Link>
                         <Link
                             to="/accounts"
-                            class="rounded-lg px-3 py-2.5 text-[15px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            class="rounded-lg px-3 py-2.5 text-[16px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
                             activeClass="active"
                             onClick={ close }
                         >{ locale.t('nav.accounts') }</Link>
 
                         <div class="mt-auto border-t border-line pt-4">
-                            <h2 class="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('language.label') }</h2>
+                            <h2 class="mb-2 px-1 text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('language.label') }</h2>
                             <LanguageSwitch labelled />
-                            <h2 class="mt-4 mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('theme.label') }</h2>
+                            <h2 class="mt-4 mb-2 px-1 text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('theme.label') }</h2>
                             <ThemeSwitch labelled />
                         </div>
                     </nav>

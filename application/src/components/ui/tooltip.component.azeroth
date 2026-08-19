@@ -87,7 +87,7 @@ export default component Tooltip(props: {
         <Show when={ open }>
             <Portal>
                 <span
-                    class="pointer-events-none fixed z-50 max-w-[min(20rem,calc(100vw-1.5rem))] break-words rounded-md border border-line bg-raised px-2 py-1 text-center text-[11px] text-text shadow-lg"
+                    class="pointer-events-none fixed z-50 max-w-[min(20rem,calc(100vw-1.5rem))] break-words rounded-md border border-line bg-raised px-2 py-1 text-center text-[12px] text-text shadow-lg"
                     style={ `left: ${ left }px; top: ${ top }px; transform: translate(-50%, ${ below ? '0' : '-100%' })` }
                     aria-hidden="true"
                 >

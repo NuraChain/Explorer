@@ -58,15 +58,15 @@ export default component FlowLedger(props: {
 
     <div class="panel overflow-hidden">
         <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
-            <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('flow.title') }</h2>
-            <div class="flex items-center gap-4 text-[12px]">
-                <span class="flex items-center gap-1.5 text-inflow"><Icon name="inflow" size={ 13 } /> { locale.t('flow.in') }</span>
-                <span class="flex items-center gap-1.5 text-outflow"><Icon name="outflow" size={ 13 } /> { locale.t('flow.out') }</span>
+            <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('flow.title') }</h2>
+            <div class="flex items-center gap-4 text-[13px]">
+                <span class="flex items-center gap-1.5 text-inflow"><Icon name="inflow" size={ 14 } /> { locale.t('flow.in') }</span>
+                <span class="flex items-center gap-1.5 text-outflow"><Icon name="outflow" size={ 14 } /> { locale.t('flow.out') }</span>
             </div>
         </div>
 
         <Show when={ props.rows.length === 0 }>
-            <p class="px-4 py-10 text-center text-[14px] text-muted">{ locale.t('flow.empty') }</p>
+            <p class="px-4 py-10 text-center text-[15px] text-muted">{ locale.t('flow.empty') }</p>
         </Show>
 
         <ul class="divide-y divide-line">
@@ -88,7 +88,7 @@ export default component FlowLedger(props: {
                                 view came out broken across three lines. The cap is for the
                                 narrowest screens only, where a long value would otherwise push the
                                 row wider than the panel that clips it. */}
-                            <span class="amount max-w-[60%] shrink-0 text-[13px] font-semibold text-inflow">
+                            <span class="amount max-w-[60%] shrink-0 text-[14px] font-semibold text-inflow">
                                 +{ formatAmount(row.value, props.decimals) }
                             </span>
                             {/* The bar is sized inside a track that takes whatever the figure left,
@@ -110,11 +110,11 @@ export default component FlowLedger(props: {
                     >
                         <span class="flex items-center gap-1">
                             <Show when={ row.status === 'reverted' }>
-                                <Icon name="alert" size={ 12 } class="text-outflow" />
+                                <Icon name="alert" size={ 13 } class="text-outflow" />
                             </Show>
-                            <span class="data text-[12px] text-beam hover:underline">{ row.hash.slice(0, 10) }…</span>
+                            <span class="data text-[13px] text-beam hover:underline">{ row.hash.slice(0, 10) }…</span>
                         </span>
-                        <Tooltip label={ locale.dateTime(row.at) }><span class="text-[11px] text-muted">{ locale.ago(row.at) }</span></Tooltip>
+                        <Tooltip label={ locale.dateTime(row.at) }><span class="text-[12px] text-muted">{ locale.ago(row.at) }</span></Tooltip>
                     </Link>
 
                     {/* Right rail: value leaving. */}
@@ -126,14 +126,14 @@ export default component FlowLedger(props: {
                                     style={ `width: ${ share(amountOf(row)) }%` }
                                 ></span>
                             </span>
-                            <span class="amount max-w-[60%] shrink-0 text-[13px] font-semibold text-outflow">
+                            <span class="amount max-w-[60%] shrink-0 text-[14px] font-semibold text-outflow">
                                 &#8722;{ formatAmount(row.value, props.decimals) }
                             </span>
                         </Show>
                         {/* A zero-value transaction still belongs in the ledger - it is a call,
                             and saying so is more honest than leaving a blank row. */}
                         <Show when={ amountOf(row) === 0n }>
-                            <span class="text-[12px] text-muted">
+                            <span class="text-[13px] text-muted">
                                 { row.contractAddress === null ? locale.t('flow.call') : locale.t('flow.contractCreated') }
                             </span>
                         </Show>
@@ -143,7 +143,7 @@ export default component FlowLedger(props: {
         </ul>
 
         <Show when={ props.rows.length > 0 }>
-            <p class="border-t border-line px-4 py-2.5 text-[11px] text-muted">{ locale.t('flow.legend', { symbol: props.symbol }) }</p>
+            <p class="border-t border-line px-4 py-2.5 text-[12px] text-muted">{ locale.t('flow.legend', { symbol: props.symbol }) }</p>
         </Show>
     </div>
 }
