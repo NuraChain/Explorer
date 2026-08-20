@@ -255,8 +255,21 @@ export const searchResult = object({
 });
 export type SearchResult = Infer<typeof searchResult>;
 
+/**
+ * Paging, bounded at BOTH ends.
+ *
+ * `page` needs a maximum for the same reason `limit` does, and it is less obvious: the handler
+ * multiplies it out into an offset, and a page of 1e21 - which arrives as an ordinary-looking
+ * query string and passes an integer check, because it IS integral as a double - produced an
+ * offset past Number.MAX_SAFE_INTEGER. sqlite refuses to bind one of those, so the request died
+ * as a 500 instead of the 422 every other malformed page gets.
+ *
+ * A trillion pages at the largest permitted size is an offset of 1e14: still a safe integer with
+ * two orders of magnitude to spare, and far beyond any row count this index will ever hold. The
+ * cap refuses the absurd without ever refusing a page somebody could really be on.
+ */
 export const pageQuery = object({
-    page: number({ int: true, min: 1, coerce: true }).optional(),
+    page: number({ int: true, min: 1, max: 1_000_000_000_000, coerce: true }).optional(),
     limit: number({ int: true, min: 1, max: 100, coerce: true }).optional()
 });
 
