@@ -920,6 +920,217 @@ describe('the Etherscan-shaped range queries', () =>
     });
 });
 
+describe('the daily aggregates the charts are drawn from', () =>
+{
+    /** A day index turned back into the second it starts, so a test can place a row inside it. */
+    const DAY = 86_400;
+    const MONDAY = 19_700 * DAY;
+
+    /** Two days of chain: three blocks with four transactions on the first, one on the next. */
+    function fortnight(): IndexStore
+    {
+        const index = store();
+        index.insertBlock(
+            blockRow(1, { timestamp: MONDAY + 10, tx_count: 2, size: 400 }),
+            [
+                txRow('0xa1', 1, { timestamp: MONDAY + 10 }),
+                txRow('0xa2', 1, { tx_index: 1, timestamp: MONDAY + 10, from_addr: BOB, to_addr: CAROL })
+            ],
+            [transferRow('0xa1', 0, 1, { timestamp: MONDAY + 10 })]);
+        index.insertBlock(
+            blockRow(2, { timestamp: MONDAY + 16, tx_count: 1, size: 600 }),
+            [txRow('0xa3', 2, { timestamp: MONDAY + 16, contract_address: TOKEN })],
+            []);
+        index.insertBlock(
+            blockRow(3, { timestamp: MONDAY + DAY + 5, tx_count: 1, size: 500 }),
+            [txRow('0xb1', 3, { timestamp: MONDAY + DAY + 5, from_addr: MINER, to_addr: ALICE })],
+            []);
+        return index;
+    }
+
+    it('buckets a chain into UTC days', () =>
+    {
+        const rows = fortnight().statsDaily(0, MONDAY + 3 * DAY);
+        expect(rows.map((row) => row.day)).toEqual([19_700, 19_701]);
+        expect(rows[0]!.blocks).toBe(2);
+        expect(rows[0]!.transactions).toBe(3);
+        expect(rows[0]!.transfers).toBe(1);
+        expect(rows[1]!.blocks).toBe(1);
+        expect(rows[1]!.transactions).toBe(1);
+    });
+
+    it('returns NO row for a day nothing happened, rather than inventing a zero', () =>
+    {
+        // A day the indexer has not reached and a day the chain was silent are different facts,
+        // and only the caller knows which one it is looking at.
+        const rows = fortnight().statsDaily(0, MONDAY + 9 * DAY);
+        expect(rows).toHaveLength(2);
+    });
+
+    it('honours the window at both ends', () =>
+    {
+        const rows = fortnight().statsDaily(MONDAY + DAY, MONDAY + 2 * DAY);
+        expect(rows.map((row) => row.day)).toEqual([19_701]);
+    });
+
+    it('reads the mean interval between a day\'s blocks', () =>
+    {
+        // Two blocks six seconds apart is one interval of six, not an average over two blocks.
+        const rows = fortnight().statsDaily(0, MONDAY + 3 * DAY);
+        expect(rows[0]!.blockTime).toBe(6);
+        // A day with one block has no interval to report, and 0 says so.
+        expect(rows[1]!.blockTime).toBe(0);
+    });
+
+    it('averages block size and sums the gas of a day', () =>
+    {
+        const rows = fortnight().statsDaily(0, MONDAY + 3 * DAY);
+        expect(rows[0]!.blockSize).toBe(500);
+        expect(rows[0]!.gasUsed).toBe(42_000);
+        expect(rows[0]!.gasLimit).toBe(60_000_000);
+    });
+
+    it('counts an address once a day however many times it moved', () =>
+    {
+        // Alice sends twice on Monday and Bob is both a recipient and a sender: three addresses
+        // were active, not five.
+        const rows = fortnight().statsDaily(0, MONDAY + 3 * DAY);
+        expect(rows[0]!.activeAddresses).toBe(3);
+    });
+
+    it('counts an address as new only on the day it FIRST appeared', () =>
+    {
+        const rows = fortnight().statsDaily(0, MONDAY + 3 * DAY);
+        // Monday introduces Alice, Bob and Carol.
+        expect(rows[0]!.newAddresses).toBe(3);
+        // Tuesday introduces only the miner - Alice was already here.
+        expect(rows[1]!.newAddresses).toBe(1);
+    });
+
+    it('counts the contract deployments of a day', () =>
+    {
+        const rows = fortnight().statsDaily(0, MONDAY + 3 * DAY);
+        expect(rows[0]!.contracts).toBe(1);
+        expect(rows[1]!.contracts).toBe(0);
+    });
+
+    it('sums a day of fees EXACTLY, where a double would not', () =>
+    {
+        // 21000 gas at 0.123456789012345678 native is 2.59e21 wei per transaction. A double holds
+        // integers exactly only to 9e15, so a SUM() in sqlite returns a number that is merely
+        // close - and an explorer that reports fees which are merely close has misreported them.
+        const price = '123456789012345678';
+        const index = store();
+        index.insertBlock(blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
+            txRow('0xf1', 1, { timestamp: MONDAY + 10, gas_used: '21000', effective_gas_price: price }),
+            txRow('0xf2', 1, { tx_index: 1, timestamp: MONDAY + 10, gas_used: '21000', effective_gas_price: price })
+        ], []);
+
+        const rows = index.statsDaily(0, MONDAY + DAY);
+        expect(rows[0]!.fees).toBe((21_000n * BigInt(price) * 2n).toString());
+        // And the figure really is beyond what a double carries, so the case is not vacuous:
+        // pushed through one and back, it returns as a different number.
+        expect(BigInt(Number(rows[0]!.fees)).toString()).not.toBe(rows[0]!.fees);
+    });
+
+    it('reports the mean gas price of a day, rounded to the wei', () =>
+    {
+        const index = store();
+        index.insertBlock(blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
+            txRow('0xg1', 1, { timestamp: MONDAY + 10, effective_gas_price: '1000000000' }),
+            txRow('0xg2', 1, { tx_index: 1, timestamp: MONDAY + 10, effective_gas_price: '3000000000' })
+        ], []);
+        expect(index.statsDaily(0, MONDAY + DAY)[0]!.gasPrice).toBe('2000000000');
+    });
+
+    it('answers an empty index with no days at all', () =>
+    {
+        expect(store().statsDaily(0, MONDAY + DAY)).toEqual([]);
+    });
+});
+
+describe('the window figures behind the headline tiles', () =>
+{
+    const DAY = 86_400;
+    const MONDAY = 19_700 * DAY;
+
+    function busy(): IndexStore
+    {
+        const index = store();
+        index.insertBlock(
+            blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }),
+            [
+                txRow('0xa1', 1, { timestamp: MONDAY + 10 }),
+                txRow('0xa2', 1, { tx_index: 1, timestamp: MONDAY + 10, contract_address: TOKEN })
+            ],
+            [transferRow('0xa1', 0, 1, { timestamp: MONDAY + 10 })]);
+        index.insertBlock(
+            blockRow(2, { timestamp: MONDAY + 40, tx_count: 1 }),
+            [txRow('0xa3', 2, { timestamp: MONDAY + 40, from_addr: CAROL, to_addr: MINER })],
+            []);
+        return index;
+    }
+
+    it('counts everything inside the window and nothing outside it', () =>
+    {
+        const window = busy().statsWindow(MONDAY, MONDAY + DAY);
+        expect(window.blocks).toBe(2);
+        expect(window.transactions).toBe(3);
+        expect(window.transfers).toBe(1);
+        expect(window.contracts).toBe(1);
+        expect(window.activeAddresses).toBe(4);
+        expect(window.newAddresses).toBe(4);
+
+        const empty = busy().statsWindow(MONDAY + DAY, MONDAY + 2 * DAY);
+        expect(empty.blocks).toBe(0);
+        expect(empty.transactions).toBe(0);
+    });
+
+    it('reports the mean fee in wei, by integer division and not by a double', () =>
+    {
+        const price = '123456789012345678';
+        const index = store();
+        index.insertBlock(blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
+            txRow('0xf1', 1, { timestamp: MONDAY + 10, gas_used: '21000', effective_gas_price: price }),
+            txRow('0xf2', 1, { tx_index: 1, timestamp: MONDAY + 10, gas_used: '63000', effective_gas_price: price })
+        ], []);
+
+        const window = index.statsWindow(MONDAY, MONDAY + DAY);
+        const total = 21_000n * BigInt(price) + 63_000n * BigInt(price);
+        expect(window.fees).toBe(total.toString());
+        expect(window.averageFee).toBe((total / 2n).toString());
+    });
+
+    it('says zero rather than dividing by no transactions at all', () =>
+    {
+        const window = store().statsWindow(MONDAY, MONDAY + DAY);
+        expect(window).toMatchObject({ fees: '0', averageFee: '0', blockTime: 0 });
+    });
+});
+
+describe('the cumulative totals', () =>
+{
+    it('counts every table, and every address the chain has shown', () =>
+    {
+        const index = store();
+        index.insertBlock(blockRow(1), [txRow('0xt1', 1), txRow('0xt2', 1, { tx_index: 1, contract_address: TOKEN })],
+            [transferRow('0xt1', 0, 1)]);
+        index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
+
+        const totals = index.totals();
+        expect(totals).toMatchObject({ blocks: 1, transactions: 2, transfers: 1, tokens: 1, contracts: 1 });
+        // Alice, Bob, the miner and the token contract - and never the zero address.
+        expect(totals.addresses).toBe(4);
+    });
+
+    it('answers an empty index with zeros rather than nulls', () =>
+    {
+        expect(store().totals()).toEqual({
+            blocks: 0, transactions: 0, transfers: 0, addresses: 0, tokens: 0, contracts: 0
+        });
+    });
+});
+
 describe('schema versioning', () =>
 {
     it('rebuilds rather than migrating when the stored version is not the current one', () =>

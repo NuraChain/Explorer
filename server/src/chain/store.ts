@@ -142,6 +142,76 @@ export interface TokenRow
     kind: string;
 }
 
+/** Seconds in a UTC day - the bucket every series here is grouped into. */
+const DAY_SECONDS = 86_400;
+
+/**
+ * `timestamp / 86400` as sqlite must see it, INTERPOLATED and never bound.
+ *
+ * A bound JS number arrives as a REAL, and integer / REAL is real division - so every row landed
+ * in a bucket of its own and a day of chain came back as three hundred fractional "days". The
+ * constant is this file's own, so interpolating it is safe in the way a query string never is.
+ */
+const DAY_BUCKET = `timestamp / ${ DAY_SECONDS }`;
+
+/**
+ * One day of the chain, as the charts read it.
+ *
+ * Gas is a COUNT of gas units, not an amount of currency, so it crosses as a number: a whole day
+ * of a 30M-limit chain is about 4e12, which a double holds exactly with three orders of magnitude
+ * to spare. `fees` and `gasPrice` are wei and do not - see the note on #feesBy.
+ */
+export interface DailyStats
+{
+    /** Unix day index (timestamp / 86400), so the caller can turn it back into a date. */
+    day: number;
+    blocks: number;
+    transactions: number;
+    transfers: number;
+    contracts: number;
+    activeAddresses: number;
+    newAddresses: number;
+    gasUsed: number;
+    gasLimit: number;
+    /** Mean bytes per block. */
+    blockSize: number;
+    /** Mean seconds between this day's blocks; 0 when the day held only one. */
+    blockTime: number;
+    /** Mean effective gas price, in wei, rounded to the wei. */
+    gasPrice: string;
+    /** Total fees paid that day, in wei. */
+    fees: string;
+}
+
+/** The same figures over one arbitrary window - what a headline tile compares against. */
+export interface WindowStats
+{
+    blocks: number;
+    transactions: number;
+    transfers: number;
+    contracts: number;
+    activeAddresses: number;
+    newAddresses: number;
+    gasUsed: number;
+    gasLimit: number;
+    blockTime: number;
+    /** Total fees over the window, in wei. */
+    fees: string;
+    /** Fees divided by transactions, in wei. '0' when the window held none. */
+    averageFee: string;
+}
+
+/** Everything the index holds, counted. The cumulative half of the overview. */
+export interface TotalStats
+{
+    blocks: number;
+    transactions: number;
+    transfers: number;
+    addresses: number;
+    tokens: number;
+    contracts: number;
+}
+
 /** Addresses are stored and compared lower-cased; checksummed input must never miss a row. */
 export function normalize(address: string): string
 {
@@ -658,6 +728,241 @@ export class IndexStore
             ) WHERE addr IS NOT NULL AND addr != ?`)
             .all(ZERO_ADDRESS) as unknown as Array<{ addr: string }>;
         return rows.map((row) => row.addr);
+    }
+
+    // ----------------------------------------------------------------------------------
+    // Aggregates - what the charts are drawn from
+    // ----------------------------------------------------------------------------------
+
+    /**
+     * Fees over the transactions in a window, summed with BigInt into whatever bucket the caller
+     * keys on.
+     *
+     * NOT `SUM(gas_used * effective_gas_price)`. Both columns are TEXT holding decimal wei, and
+     * one transaction is already a product around 1e13 - a day of them overflows sqlite int64 and
+     * quietly becomes a REAL, which is how an explorer starts reporting fees that are almost
+     * right. The rows are read and reduced exactly instead. That costs a scan of two narrow
+     * columns across the window, which is why the route calling it caches its answer.
+     */
+    #feesBy(from: number, to: number, bucket: (timestamp: number) => number): Map<number, { fees: bigint; count: number }>
+    {
+        const rows = this.#stmt(
+            'SELECT timestamp, gas_used, effective_gas_price FROM transactions WHERE timestamp >= ? AND timestamp < ?')
+            .all(from, to) as unknown as Array<Pick<TransactionRow, 'timestamp' | 'gas_used' | 'effective_gas_price'>>;
+
+        const totals = new Map<number, { fees: bigint; count: number }>();
+        for (const row of rows)
+        {
+            const key = bucket(row.timestamp);
+            const seen = totals.get(key) ?? { fees: 0n, count: 0 };
+            seen.fees += BigInt(row.gas_used) * BigInt(row.effective_gas_price);
+            seen.count += 1;
+            totals.set(key, seen);
+        }
+        return totals;
+    }
+
+    /**
+     * How many addresses were seen for the FIRST time inside the window, bucketed.
+     *
+     * The inner query is deliberately NOT filtered by the window: "first time" is a fact about
+     * all of history, and an address that has been on this chain for a year would be counted as
+     * new the moment it appeared inside a thirty-day slice.
+     */
+    #firstSeen(from: number, to: number, bucket: (timestamp: number) => number): Map<number, number>
+    {
+        const rows = this.#stmt(`
+            SELECT first FROM (
+                SELECT addr, MIN(ts) AS first FROM (
+                    SELECT from_addr AS addr, timestamp AS ts FROM transactions
+                    UNION ALL
+                    SELECT to_addr AS addr, timestamp AS ts FROM transactions WHERE to_addr IS NOT NULL
+                ) GROUP BY addr
+            ) WHERE first >= ? AND first < ?`)
+            .all(from, to) as unknown as Array<{ first: number }>;
+
+        const counts = new Map<number, number>();
+        for (const row of rows)
+        {
+            const key = bucket(row.first);
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        return counts;
+    }
+
+    /**
+     * Every day between `from` and `to` that the index has something for, with the figures the
+     * charts draw.
+     *
+     * A day the chain was silent gets NO row. Filling it with zeros here would make a day the
+     * indexer has not reached indistinguishable from a day nothing happened, and only the caller
+     * knows which of those it is looking at.
+     */
+    public statsDaily(from: number, to: number): DailyStats[]
+    {
+        const days = new Map<number, DailyStats>();
+        const at = (day: number): DailyStats =>
+        {
+            let row = days.get(day);
+            if (row === undefined)
+            {
+                row = {
+                    day, blocks: 0, transactions: 0, transfers: 0, contracts: 0,
+                    activeAddresses: 0, newAddresses: 0, gasUsed: 0, gasLimit: 0,
+                    blockSize: 0, blockTime: 0, gasPrice: '0', fees: '0'
+                };
+                days.set(day, row);
+            }
+            return row;
+        };
+
+        // The mean interval is (last - first) / (blocks - 1) rather than an average of per-block
+        // differences: inside one day those differences telescope, so this is the same number
+        // without a window function or a second pass.
+        const blocks = this.#stmt(`
+            SELECT ${ DAY_BUCKET } AS day, COUNT(*) AS blocks, AVG(size) AS size,
+                   SUM(CAST(gas_used AS INTEGER)) AS gasUsed, SUM(CAST(gas_limit AS INTEGER)) AS gasLimit,
+                   MIN(timestamp) AS first, MAX(timestamp) AS last
+            FROM blocks WHERE timestamp >= ? AND timestamp < ? GROUP BY day ORDER BY day ASC`)
+            .all(from, to) as unknown as Array<{
+                day: number; blocks: number; size: number; gasUsed: number; gasLimit: number; first: number; last: number;
+            }>;
+        for (const row of blocks)
+        {
+            const entry = at(row.day);
+            entry.blocks = row.blocks;
+            entry.blockSize = row.size;
+            entry.gasUsed = row.gasUsed;
+            entry.gasLimit = row.gasLimit;
+            entry.blockTime = row.blocks > 1 ? (row.last - row.first) / (row.blocks - 1) : 0;
+        }
+
+        // The gas price is a MEAN, rounded to the wei on the way out - a statistic about a day,
+        // never a figure anybody is owed.
+        // The mean price comes back as TEXT, not as an integer. node:sqlite hands an INTEGER column
+        // to JS as a number and THROWS above 2^53 - which is 0.009 native in wei, a gas price a
+        // congested chain reaches - so a column that can hold wei must cross as text.
+        const transactions = this.#stmt(`
+            SELECT ${ DAY_BUCKET } AS day, COUNT(*) AS transactions, COUNT(contract_address) AS contracts,
+                   CAST(CAST(AVG(CAST(effective_gas_price AS INTEGER)) AS INTEGER) AS TEXT) AS gasPrice
+            FROM transactions WHERE timestamp >= ? AND timestamp < ? GROUP BY day ORDER BY day ASC`)
+            .all(from, to) as unknown as Array<{
+                day: number; transactions: number; contracts: number; gasPrice: string | null;
+            }>;
+        for (const row of transactions)
+        {
+            const entry = at(row.day);
+            entry.transactions = row.transactions;
+            entry.contracts = row.contracts;
+            entry.gasPrice = row.gasPrice ?? '0';
+        }
+
+        const transfers = this.#stmt(`
+            SELECT ${ DAY_BUCKET } AS day, COUNT(*) AS transfers
+            FROM token_transfers WHERE timestamp >= ? AND timestamp < ? GROUP BY day ORDER BY day ASC`)
+            .all(from, to) as unknown as Array<{ day: number; transfers: number }>;
+        for (const row of transfers)
+        {
+            at(row.day).transfers = row.transfers;
+        }
+
+        // UNION and not UNION ALL: an address that both sent and received on the same day was
+        // active once, and one that sent to itself was active once too.
+        const active = this.#stmt(`
+            SELECT day, COUNT(*) AS active FROM (
+                SELECT DISTINCT ${ DAY_BUCKET } AS day, from_addr AS addr FROM transactions WHERE timestamp >= ? AND timestamp < ?
+                UNION
+                SELECT DISTINCT ${ DAY_BUCKET } AS day, to_addr AS addr FROM transactions WHERE timestamp >= ? AND timestamp < ? AND to_addr IS NOT NULL
+            ) GROUP BY day ORDER BY day ASC`)
+            .all(from, to, from, to) as unknown as Array<{ day: number; active: number }>;
+        for (const row of active)
+        {
+            at(row.day).activeAddresses = row.active;
+        }
+
+        const bucket = (timestamp: number): number => Math.floor(timestamp / DAY_SECONDS);
+        for (const [day, count] of this.#firstSeen(from, to, bucket))
+        {
+            at(day).newAddresses = count;
+        }
+        for (const [day, totals] of this.#feesBy(from, to, bucket))
+        {
+            at(day).fees = totals.fees.toString();
+        }
+
+        return [...days.values()].sort((left, right) => left.day - right.day);
+    }
+
+    /** The same figures over one arbitrary window - what a headline tile compares against. */
+    public statsWindow(from: number, to: number): WindowStats
+    {
+        const blocks = this.#stmt(`
+            SELECT COUNT(*) AS blocks, SUM(CAST(gas_used AS INTEGER)) AS gasUsed,
+                   SUM(CAST(gas_limit AS INTEGER)) AS gasLimit, MIN(timestamp) AS first, MAX(timestamp) AS last
+            FROM blocks WHERE timestamp >= ? AND timestamp < ?`)
+            .get(from, to) as { blocks: number; gasUsed: number | null; gasLimit: number | null; first: number | null; last: number | null };
+
+        const transactions = this.#stmt(`
+            SELECT COUNT(*) AS transactions, COUNT(contract_address) AS contracts
+            FROM transactions WHERE timestamp >= ? AND timestamp < ?`)
+            .get(from, to) as { transactions: number; contracts: number };
+
+        const transfers = (this.#stmt('SELECT COUNT(*) AS n FROM token_transfers WHERE timestamp >= ? AND timestamp < ?')
+            .get(from, to) as { n: number }).n;
+
+        const active = (this.#stmt(`
+            SELECT COUNT(*) AS n FROM (
+                SELECT DISTINCT from_addr AS addr FROM transactions WHERE timestamp >= ? AND timestamp < ?
+                UNION
+                SELECT DISTINCT to_addr AS addr FROM transactions WHERE timestamp >= ? AND timestamp < ? AND to_addr IS NOT NULL
+            )`).get(from, to, from, to) as { n: number }).n;
+
+        // One bucket for the whole window.
+        const fees = this.#feesBy(from, to, () => 0).get(0) ?? { fees: 0n, count: 0 };
+        const fresh = this.#firstSeen(from, to, () => 0).get(0) ?? 0;
+
+        return {
+            blocks: blocks.blocks,
+            transactions: transactions.transactions,
+            transfers,
+            contracts: transactions.contracts,
+            activeAddresses: active,
+            newAddresses: fresh,
+            gasUsed: blocks.gasUsed ?? 0,
+            gasLimit: blocks.gasLimit ?? 0,
+            blockTime: blocks.blocks > 1 ? ((blocks.last ?? 0) - (blocks.first ?? 0)) / (blocks.blocks - 1) : 0,
+            fees: fees.fees.toString(),
+            // Integer division in BigInt: a mean fee is still wei, and a wei that came back
+            // through a double is the thing this whole file is written to avoid.
+            averageFee: fees.count === 0 ? '0' : (fees.fees / BigInt(fees.count)).toString()
+        };
+    }
+
+    /** Everything the index holds, counted - the cumulative half of the overview. */
+    public totals(): TotalStats
+    {
+        const row = this.#stmt(`
+            SELECT (SELECT COUNT(*) FROM blocks) AS blocks,
+                   (SELECT COUNT(*) FROM transactions) AS transactions,
+                   (SELECT COUNT(*) FROM token_transfers) AS transfers,
+                   (SELECT COUNT(*) FROM tokens) AS tokens,
+                   (SELECT COUNT(*) FROM transactions WHERE contract_address IS NOT NULL) AS contracts`)
+            .get() as Omit<TotalStats, 'addresses'>;
+
+        // Counted the same way the rich list gathers its candidates, so the two agree.
+        const addresses = (this.#stmt(`
+            SELECT COUNT(*) AS n FROM (
+                SELECT DISTINCT addr FROM (
+                    SELECT from_addr AS addr FROM transactions
+                    UNION ALL SELECT to_addr AS addr FROM transactions
+                    UNION ALL SELECT miner AS addr FROM blocks
+                    UNION ALL SELECT from_addr AS addr FROM token_transfers
+                    UNION ALL SELECT to_addr AS addr FROM token_transfers
+                    UNION ALL SELECT token AS addr FROM token_transfers
+                ) WHERE addr IS NOT NULL AND addr != ?
+            )`).get(ZERO_ADDRESS) as { n: number }).n;
+
+        return { ...row, addresses };
     }
 
     public token(address: string): TokenRow | null

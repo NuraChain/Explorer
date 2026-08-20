@@ -3,7 +3,7 @@ import { feature, manifestOf, register } from '@azerothjs/http/api';
 import { mountPages, type KitOptions } from '@azerothjs/kit';
 
 import type { ChainGateway } from './chain/client.ts';
-import { normalize, type IndexStore } from './chain/store.ts';
+import { normalize, type DailyStats, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
 import { calldataFor, inspectContract, readContract } from './inspect.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
@@ -14,6 +14,8 @@ import {
     blockDetail,
     blockListQuery,
     blockPage,
+    chartsQuery,
+    chartsSummary,
     contractCalldata,
     contractCallInput,
     contractCallResult,
@@ -27,6 +29,9 @@ import {
     transactionPage,
     topAccounts,
     transferPage,
+    type ChartSeries,
+    type ChartsSummary,
+    type StatFigure,
     type TopAccount,
     type Transfer
 } from './schemas.ts';
@@ -46,6 +51,34 @@ export interface ApiDeps
 }
 
 const DEFAULT_LIMIT = 25;
+
+/** How far the charts look back when nobody says. A month reads as a trend; a week reads as noise. */
+const DEFAULT_CHART_DAYS = 30;
+
+/** Seconds in a day, and the window every headline figure is measured over. */
+const DAY_SECONDS = 86_400;
+
+/**
+ * A headline figure and how it moved, as a RATIO of the earlier window.
+ *
+ * Null rather than zero when there is nothing to compare against. A chain three hours old has no
+ * previous day, and printing +0% there claims a measurement nobody took.
+ */
+function figure(value: bigint | number | string, before?: bigint | number | string): StatFigure
+{
+    const now = BigInt(typeof value === 'number' ? Math.round(value) : value);
+    if (before === undefined)
+    {
+        return { value: now.toString(), change: null };
+    }
+    const past = BigInt(typeof before === 'number' ? Math.round(before) : before);
+    return {
+        value: now.toString(),
+        // Through Number only AFTER the division has been reduced to a ratio: the inputs can be
+        // wei, and the answer is a percentage that never needed more than a few digits.
+        change: past === 0n ? null : Number(now - past) / Number(past)
+    };
+}
 
 export function createApi(deps: ApiDeps): ReturnType<typeof build>
 {
@@ -81,6 +114,92 @@ function build({ store, chain }: ApiDeps)
     // seconds. The cache keeps every NON-zero balance; the route slices to the requested limit.
     let rankedAccounts: { at: number; rows: TopAccount[] } | null = null;
     const RANKED_TTL_MS = 10_000;
+
+    // The charts, per window length. Short enough that a reader refreshing sees the day move, long
+    // enough that a page with thirteen series on it is one scan of the index rather than thirteen.
+    const chartsCache = new Map<number, { at: number; payload: ChartsSummary }>();
+    const CHARTS_TTL_MS = 30_000;
+
+    /** A day index back into the instant it started, which is what a chart point is labelled by. */
+    const dayStart = (day: number): string => new Date(day * DAY_SECONDS * 1000).toISOString();
+
+    /** One series, projected out of the daily rows. Percent crosses as basis points of 1. */
+    const seriesOf = (rows: DailyStats[], key: ChartSeries['key'], unit: ChartSeries['unit'],
+        read: (row: DailyStats) => bigint | number | string): ChartSeries => ({
+        key,
+        unit,
+        points: rows.map((row) =>
+        {
+            const value = read(row);
+            return {
+                at: dayStart(row.day),
+                // Rounded, never truncated to an integer type: a mean block time of 2.98 seconds
+                // is the reading, and floor()ing it to 2 would flatten the one series whose whole
+                // point is that it moves by fractions.
+                value: typeof value === 'number' ? String(Math.round(value * 1000) / 1000) : value.toString()
+            };
+        })
+    });
+
+    /** The whole payload for one window length, computed from the index. */
+    const summarize = (days: number, nowSeconds: number): ChartsSummary =>
+    {
+        const total = store.totals();
+        const dayWindow = store.statsWindow(nowSeconds - DAY_SECONDS, nowSeconds);
+        const before = store.statsWindow(nowSeconds - 2 * DAY_SECONDS, nowSeconds - DAY_SECONDS);
+        const rows = store.statsDaily(nowSeconds - days * DAY_SECONDS, nowSeconds);
+
+        const share = (whole: number, added: number): StatFigure =>
+            ({ value: String(whole), change: whole === 0 ? null : added / whole });
+
+        return {
+            days,
+            // A total's movement is what the last day ADDED to it, which is the reading a total
+            // wants: "and this much of it arrived yesterday".
+            total: {
+                blocks: share(total.blocks, dayWindow.blocks),
+                transactions: share(total.transactions, dayWindow.transactions),
+                transfers: share(total.transfers, dayWindow.transfers),
+                addresses: share(total.addresses, dayWindow.newAddresses),
+                tokens: { value: String(total.tokens), change: null },
+                contracts: share(total.contracts, dayWindow.contracts)
+            },
+            day: {
+                blocks: figure(dayWindow.blocks, before.blocks),
+                transactions: figure(dayWindow.transactions, before.transactions),
+                transfers: figure(dayWindow.transfers, before.transfers),
+                activeAddresses: figure(dayWindow.activeAddresses, before.activeAddresses),
+                newAddresses: figure(dayWindow.newAddresses, before.newAddresses),
+                contracts: figure(dayWindow.contracts, before.contracts),
+                fees: figure(dayWindow.fees, before.fees),
+                averageFee: figure(dayWindow.averageFee, before.averageFee),
+                gasUsed: figure(dayWindow.gasUsed, before.gasUsed),
+                // Basis points of one, so a share crosses as an integer like everything else and
+                // the client divides once. 37.5% is 3750.
+                utilization: figure(
+                    dayWindow.gasLimit === 0 ? 0 : (dayWindow.gasUsed / dayWindow.gasLimit) * 10_000,
+                    before.gasLimit === 0 ? undefined : (before.gasUsed / before.gasLimit) * 10_000),
+                // Milliseconds, for the same reason: seconds would round a 2.98s cadence to 3.
+                blockTime: figure(dayWindow.blockTime * 1000, before.blocks > 1 ? before.blockTime * 1000 : undefined)
+            },
+            series: [
+                seriesOf(rows, 'transactions', 'count', (row) => row.transactions),
+                seriesOf(rows, 'blocks', 'count', (row) => row.blocks),
+                seriesOf(rows, 'activeAddresses', 'count', (row) => row.activeAddresses),
+                seriesOf(rows, 'newAddresses', 'count', (row) => row.newAddresses),
+                seriesOf(rows, 'blockTime', 'seconds', (row) => row.blockTime),
+                seriesOf(rows, 'blockSize', 'bytes', (row) => row.blockSize),
+                seriesOf(rows, 'gasPrice', 'gwei', (row) => row.gasPrice),
+                seriesOf(rows, 'gasUsed', 'gas', (row) => row.gasUsed),
+                seriesOf(rows, 'utilization', 'percent', (row) => (row.gasLimit === 0 ? 0 : (row.gasUsed / row.gasLimit) * 100)),
+                seriesOf(rows, 'fees', 'native', (row) => row.fees),
+                seriesOf(rows, 'averageFee', 'native', (row) =>
+                    (row.transactions === 0 ? '0' : (BigInt(row.fees) / BigInt(row.transactions)).toString())),
+                seriesOf(rows, 'transfers', 'count', (row) => row.transfers),
+                seriesOf(rows, 'contracts', 'count', (row) => row.contracts)
+            ]
+        };
+    };
 
     return {
         stats: feature('/stats', (routes) => ({
@@ -124,6 +243,29 @@ function build({ store, chain }: ApiDeps)
                     page: 1,
                     pages: 1
                 };
+            }),
+
+            /**
+             * Everything the charts page draws, in one answer.
+             *
+             * One route rather than one per series: the page shows all of them at once, and
+             * thirteen requests that each re-scan the same window is thirteen times the work for
+             * the same screen. The whole payload is cached for a few seconds - a daily series
+             * does not move between two visitors, and the fee sum behind it is the most expensive
+             * read this server does.
+             */
+            charts: routes.get('/charts', { query: chartsQuery, output: chartsSummary }, ({ query }) =>
+            {
+                const days = query.days ?? DEFAULT_CHART_DAYS;
+                const now = Date.now();
+                const cached = chartsCache.get(days);
+                if (cached !== undefined && now - cached.at < CHARTS_TTL_MS)
+                {
+                    return cached.payload;
+                }
+                const payload = summarize(days, Math.floor(now / 1000));
+                chartsCache.set(days, { at: now, payload });
+                return payload;
             })
         })),
 

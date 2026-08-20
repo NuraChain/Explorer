@@ -347,3 +347,92 @@ export const addressListQuery = object({ ...pageShape, direction: enumOf(ADDRESS
 export const accountListQuery = object({ ...pageShape, q: string().optional() });
 
 export const searchQuery = object({ q: string() });
+
+// --- Charts and statistics --------------------------------------------------------------------
+// Everything below is DERIVED from the index and from nothing else. There is no price feed, no
+// mempool subscription, no verification service and no peer crawler behind this explorer, so
+// there is deliberately no market cap, no pending-transaction count, no "contracts verified" and
+// no node count here. A chart of a number nobody measured is worse than no chart.
+
+/**
+ * What a series is counted in. The client formats by this and never by the key, so a new series
+ * measured in something already listed needs no formatting code at all.
+ *
+ * `native` is wei of the chain currency; `gwei` is a wei figure the UI scales; both stay strings.
+ */
+export const CHART_UNITS = ['count', 'seconds', 'bytes', 'gas', 'gwei', 'percent', 'native'] as const;
+export type ChartUnit = (typeof CHART_UNITS)[number];
+
+/** Every series the page can draw, in the order it draws them. */
+export const CHART_SERIES = [
+    'transactions', 'blocks', 'activeAddresses', 'newAddresses', 'blockTime', 'blockSize',
+    'gasPrice', 'gasUsed', 'utilization', 'fees', 'averageFee', 'transfers', 'contracts'
+] as const;
+export type ChartSeriesKey = (typeof CHART_SERIES)[number];
+
+/**
+ * One point of one series.
+ *
+ * `value` is a decimal STRING for every unit, not only for the two measured in wei. A shape that
+ * is a number for eleven series and a string for the other two is the shape somebody eventually
+ * formats with the wrong function - and the one they get wrong is the fee.
+ */
+export const chartPoint = object({ at: string(), value: string() });
+export type ChartPoint = Infer<typeof chartPoint>;
+
+export const chartSeries = object({
+    key: enumOf(CHART_SERIES),
+    unit: enumOf(CHART_UNITS),
+    points: array(chartPoint)
+});
+export type ChartSeries = Infer<typeof chartSeries>;
+
+/**
+ * One headline figure: what it reads now, and how it moved.
+ *
+ * `change` is a RATIO against the window before it (0.058 is +5.8%), and null when there was no
+ * window to compare against. Null and zero are different facts: one is "we cannot say", the other
+ * is "it did not move", and a tile that prints 0% for both is lying about half of them.
+ */
+export const statFigure = object({ value: string(), change: number().nullable() });
+export type StatFigure = Infer<typeof statFigure>;
+
+export const chartsSummary = object({
+    /** How many days of series were asked for and returned. */
+    days: number({ int: true, min: 1 }),
+    /** Cumulative, as of now. `change` is what the last 24 hours added, as a share of the total. */
+    total: object({
+        blocks: statFigure,
+        transactions: statFigure,
+        transfers: statFigure,
+        addresses: statFigure,
+        tokens: statFigure,
+        contracts: statFigure
+    }),
+    /** The last 24 hours, each against the 24 before them. */
+    day: object({
+        blocks: statFigure,
+        transactions: statFigure,
+        transfers: statFigure,
+        activeAddresses: statFigure,
+        newAddresses: statFigure,
+        contracts: statFigure,
+        fees: statFigure,
+        averageFee: statFigure,
+        gasUsed: statFigure,
+        utilization: statFigure,
+        blockTime: statFigure
+    }),
+    series: array(chartSeries)
+});
+export type ChartsSummary = Infer<typeof chartsSummary>;
+
+/**
+ * How far back the series run.
+ *
+ * Capped at ninety days rather than left open: the fee series is summed row by row in BigInt (see
+ * IndexStore.#feesBy), so the window is the one thing deciding how much work a request is.
+ */
+export const chartsQuery = object({
+    days: number({ int: true, min: 1, max: 90, coerce: true }).optional()
+});

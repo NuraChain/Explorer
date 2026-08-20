@@ -14,6 +14,7 @@ import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/cli
 import type {
     Account,
     BlockPage,
+    ChartsSummary,
     ContractCalldata,
     ContractCallResult,
     ContractDetail,
@@ -564,6 +565,78 @@ describe('the API over the index', () =>
         expect(detail.transfers).toEqual([]);
         expect(detail.total).toBe(0);
         expect(detail).toMatchObject({ page: 1, pages: 1 });
+    });
+
+    it('summarises the index into the series the charts page draws', async () =>
+    {
+        // CHAIN's three blocks all sit in the same day, so the shape is what is under test here:
+        // every series present, every one the same length, and every point a decimal string.
+        const get = await api();
+        const charts = (await (await get('/api/stats/charts')).json()) as ChartsSummary;
+
+        expect(charts.days).toBe(30);
+        expect(charts.series.map((series) => series.key)).toEqual([
+            'transactions', 'blocks', 'activeAddresses', 'newAddresses', 'blockTime', 'blockSize',
+            'gasPrice', 'gasUsed', 'utilization', 'fees', 'averageFee', 'transfers', 'contracts'
+        ]);
+
+        // One row per day the index has something for, and every series agrees on how many.
+        const lengths = new Set(charts.series.map((series) => series.points.length));
+        expect(lengths.size).toBe(1);
+
+        for (const series of charts.series)
+        {
+            for (const point of series.points)
+            {
+                expect(typeof point.value).toBe('string');
+                expect(Number.isNaN(Date.parse(point.at))).toBe(false);
+            }
+        }
+    });
+
+    it('reports the cumulative totals beside the last day', async () =>
+    {
+        const get = await api();
+        const charts = (await (await get('/api/stats/charts')).json()) as ChartsSummary;
+
+        expect(charts.total.blocks.value).toBe('3');
+        expect(charts.total.transactions.value).toBe('4');
+        expect(charts.total.addresses.value).toBe('3');
+        // Nothing was deployed and no token was seen on this chain, and zero is the honest answer.
+        expect(charts.total.contracts.value).toBe('0');
+        expect(charts.total.tokens.value).toBe('0');
+    });
+
+    it('says it cannot compare rather than claiming nothing changed', async () =>
+    {
+        // CHAIN is timestamped in 2023, so the last 24 hours hold nothing at all. A tile that
+        // printed 0% here would be reporting a measurement nobody took.
+        const get = await api();
+        const charts = (await (await get('/api/stats/charts')).json()) as ChartsSummary;
+        expect(charts.day.transactions.value).toBe('0');
+        expect(charts.day.transactions.change).toBeNull();
+    });
+
+    it('honours the window it is asked for, and refuses one it will not compute', async () =>
+    {
+        const get = await api();
+        expect(((await (await get('/api/stats/charts?days=7')).json()) as ChartsSummary).days).toBe(7);
+        expect(((await (await get('/api/stats/charts?days=90')).json()) as ChartsSummary).days).toBe(90);
+        // The fee series is summed row by row, so the window is the one thing deciding how much
+        // work a request is - an unbounded one is a request to scan the whole index.
+        expect((await get('/api/stats/charts?days=365')).status).toBe(422);
+        expect((await get('/api/stats/charts?days=0')).status).toBe(422);
+    });
+
+    it('serves the same answer twice, because the payload is cached', async () =>
+    {
+        const get = await api();
+        const first = (await (await get('/api/stats/charts?days=7')).json()) as ChartsSummary;
+        const second = (await (await get('/api/stats/charts?days=7')).json()) as ChartsSummary;
+        expect(second).toEqual(first);
+        // A different window is a different entry, not a re-use of the one already held.
+        const wider = (await (await get('/api/stats/charts?days=14')).json()) as ChartsSummary;
+        expect(wider.days).toBe(14);
     });
 
     it('404s an unknown block rather than inventing one', async () =>
