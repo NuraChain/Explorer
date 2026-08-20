@@ -111,7 +111,7 @@ export const fr: Dictionary = {
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
     'tx.created': 'créé',
-    'tx.transfers': 'Transferts de jetons',
+    'tx.transfers': '{count} transferts de jetons',
     'tx.token': 'jeton',
 
     // --- Address ------------------------------------------------------------------------------

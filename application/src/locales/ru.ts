@@ -112,7 +112,7 @@ export const ru: Dictionary = {
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
     'tx.created': 'создан',
-    'tx.transfers': 'Переводы токенов',
+    'tx.transfers': 'Переводов токенов: {count}',
     'tx.token': 'токен',
 
     // --- Address ------------------------------------------------------------------------------

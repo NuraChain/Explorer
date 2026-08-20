@@ -193,7 +193,7 @@ describe('insertBlock', () =>
 
         expect(index.blockByNumber(1)).toMatchObject({ number: 1, hash: '0xb1' });
         expect(index.transactionByHash('0xt1')).toMatchObject({ hash: '0xt1', block_number: 1 });
-        expect(index.transfersOfTransaction('0xt1')).toHaveLength(1);
+        expect(index.transfersOfTransaction('0xt1', 10, 0).rows).toHaveLength(1);
     });
 
     it('is idempotent: replaying the same block does not duplicate a row', () =>
@@ -230,7 +230,7 @@ describe('insertBlock', () =>
             transferRow('0xt1', 0, 1),
             transferRow('0xt1', 1, 1, { to_addr: CAROL })
         ]);
-        expect(index.transfersOfTransaction('0xt1')).toHaveLength(2);
+        expect(index.transfersOfTransaction('0xt1', 10, 0).rows).toHaveLength(2);
     });
 
     it('accepts a block with no transactions at all', () =>
@@ -719,6 +719,34 @@ describe('the address queries this index exists for', () =>
     {
         const shouted = ALICE.toUpperCase().replace('0X', '0x');
         expect(withHistory().transactionsOfAddress(shouted, 10, 0, 'out').total).toBe(1);
+    });
+
+    it('pages the transfers one transaction emitted, in log order, oldest log first', () =>
+    {
+        // Ascending, unlike every other list here: within one transaction the log index IS the
+        // order the contract emitted them in. An airdrop read backwards is a different story.
+        const index = store();
+        index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [
+            transferRow('0xt1', 0, 1),
+            transferRow('0xt1', 1, 1, { to_addr: CAROL }),
+            transferRow('0xt1', 2, 1, { to_addr: MINER })
+        ]);
+
+        const first = index.transfersOfTransaction('0xt1', 2, 0);
+        expect(first.rows.map((row) => row.log_index)).toEqual([0, 1]);
+        // The total is every log the transaction emitted, so the pager knows how far it runs.
+        expect(first.total).toBe(3);
+
+        const second = index.transfersOfTransaction('0xt1', 2, 2);
+        expect(second.rows.map((row) => row.log_index)).toEqual([2]);
+        expect(second.total).toBe(3);
+    });
+
+    it('answers a transaction that emitted nothing with an empty page, not an error', () =>
+    {
+        const index = store();
+        index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+        expect(index.transfersOfTransaction('0xt1', 10, 0)).toEqual({ rows: [], total: 0 });
     });
 
     it('finds a token\'s transfers on the TOKEN\'s own page', () =>

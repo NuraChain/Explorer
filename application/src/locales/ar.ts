@@ -112,7 +112,7 @@ export const ar: Dictionary = {
     'tx.nonce': 'نونس',
     'tx.calldata': 'بيانات الاستدعاء {size}',
     'tx.created': 'أُنشئ',
-    'tx.transfers': 'تحويلات التوكن',
+    'tx.transfers': '{count} تحويل توكن',
     'tx.token': 'توكن',
 
     // --- Address ------------------------------------------------------------------------------

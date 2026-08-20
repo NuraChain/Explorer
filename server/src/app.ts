@@ -162,16 +162,21 @@ function build({ store, chain }: ApiDeps)
                 return { rows: rows.map(presentTransaction), total, page, pages: pageCount(total, limit) };
             }),
 
-            one: routes.get('/:hash', { output: transactionDetail }, ({ params }) =>
+            one: routes.get('/:hash', { query: pageQuery, output: transactionDetail }, ({ params, query }) =>
             {
                 const found = store.transactionByHash(params.hash);
                 if (found === null)
                 {
                     throw new NotFoundError('No such transaction in the index.');
                 }
+                const { limit, offset, page } = paging(query);
+                const { rows, total } = store.transfersOfTransaction(found.hash, limit, offset);
                 return {
                     transaction: presentTransaction(found),
-                    transfers: withTokens(store.transfersOfTransaction(found.hash))
+                    transfers: withTokens(rows),
+                    total,
+                    page,
+                    pages: pageCount(total, limit)
                 };
             })
         })),

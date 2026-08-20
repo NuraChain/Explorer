@@ -111,7 +111,7 @@ export const zh: Dictionary = {
     'tx.nonce': 'Nonce',
     'tx.calldata': '调用数据 {size}',
     'tx.created': '已创建',
-    'tx.transfers': '代币转账',
+    'tx.transfers': '{count} 笔代币转账',
     'tx.token': '代币',
 
     // --- Address ------------------------------------------------------------------------------

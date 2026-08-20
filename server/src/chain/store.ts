@@ -595,10 +595,21 @@ export class IndexStore
             .get(normalize(address)) as TransactionRow | undefined) ?? null;
     }
 
-    public transfersOfTransaction(hash: string): TransferRow[]
+    /**
+     * One page of the token transfers a transaction emitted, in LOG order.
+     *
+     * Ascending, unlike every other list here: within one transaction the log index is the order
+     * the contract emitted them in, and a distributor's receipt read backwards is a different
+     * story from the one that happened.
+     */
+    public transfersOfTransaction(hash: string, limit: number, offset: number): { rows: TransferRow[]; total: number }
     {
-        return this.#stmt('SELECT * FROM token_transfers WHERE tx_hash = ? ORDER BY log_index ASC')
-            .all(hash.toLowerCase()) as unknown as TransferRow[];
+        const key = hash.toLowerCase();
+        const total = (this.#stmt('SELECT COUNT(*) AS n FROM token_transfers WHERE tx_hash = ?')
+            .get(key) as { n: number }).n;
+        const rows = this.#stmt('SELECT * FROM token_transfers WHERE tx_hash = ? ORDER BY log_index ASC LIMIT ? OFFSET ?')
+            .all(key, limit, offset) as unknown as TransferRow[];
+        return { rows, total };
     }
 
     /** Native value in and out of an address, in wei - the flow ledger's totals. */

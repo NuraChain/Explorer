@@ -278,7 +278,14 @@ export type ContractCalldata = Infer<typeof contractCalldata>;
 export const blockDetail = object({ block, transactions: array(transaction), total: number(), page: number(), pages: number() });
 export type BlockDetail = Infer<typeof blockDetail>;
 
-export const transactionDetail = object({ transaction, transfers: array(transfer) });
+/**
+ * One transaction, with a PAGE of the token transfers it emitted.
+ *
+ * Paged for the reason a block's transactions are: one call to a distributor emits a Transfer log
+ * per recipient, and an airdrop's receipt carries hundreds of them. Shipping the lot turns a
+ * detail page into a download and prints a list nobody can read to the end of.
+ */
+export const transactionDetail = object({ transaction, transfers: array(transfer), total: number(), page: number(), pages: number() });
 export type TransactionDetail = Infer<typeof transactionDetail>;
 
 export const SEARCH_KINDS = ['block', 'transaction', 'address', 'none'] as const;

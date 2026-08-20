@@ -124,7 +124,7 @@ export const en = {
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
     'tx.created': 'created',
-    'tx.transfers': 'Token transfers',
+    'tx.transfers': '{count} token transfers',
     'tx.token': 'token',
 
     // --- Address ------------------------------------------------------------------------------

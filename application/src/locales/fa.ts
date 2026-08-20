@@ -116,7 +116,7 @@ export const fa: Dictionary = {
     'tx.nonce': 'نانس',
     'tx.calldata': 'دادهٔ فراخوانی {size}',
     'tx.created': 'ایجادشده',
-    'tx.transfers': 'انتقال‌های توکن',
+    'tx.transfers': '{count} انتقال توکن',
     'tx.token': 'توکن',
 
     // --- Address ------------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import type {
     SearchResult,
     Summary,
     TopAccounts,
+    TransactionDetail,
     TransactionPage,
     TransferPage
 } from '../src/schemas.ts';
@@ -520,6 +521,49 @@ describe('the API over the index', () =>
         expect((await get('/api/txs?status=maybe')).status).toBe(422);
         expect((await get('/api/blocks?content=some')).status).toBe(422);
         expect((await get(`/api/address/${ ALICE }/txs?direction=sideways`)).status).toBe(422);
+    });
+
+    it('pages the transfers a single transaction emitted, in log order', async () =>
+    {
+        // One call to a distributor emits a Transfer log per recipient, so a receipt can carry
+        // hundreds. Shipping all of them turns a detail page into a download.
+        const carrier = block(3, '0xb2', '0xb3', 1);
+        carrier.transactions[0]!.logs = [0, 1, 2].map((index) => ({
+            index,
+            address: TOKEN,
+            topics: [TRANSFER_TOPIC, topic(ALICE), topic(BOB)],
+            data: `0x${ (10n ** 18n).toString(16).padStart(64, '0') }`
+        }));
+        const { store, chain } = await indexed([...CHAIN, carrier]);
+        const app = buildApp({ dev: false, store, chain });
+        const hash = carrier.transactions[0]!.hash;
+        const at = async (query: string): Promise<TransactionDetail> =>
+            (await (await app.handle(new Request(`http://local/api/txs/${ hash }?${ query }`))).json()) as TransactionDetail;
+
+        const whole = await at('limit=25');
+        expect(whole.total).toBe(3);
+        expect(whole.transfers).toHaveLength(3);
+        expect(whole.pages).toBe(1);
+
+        const first = await at('limit=2&page=1');
+        expect(first.transfers.map((row) => row.logIndex)).toEqual([0, 1]);
+        expect(first.pages).toBe(2);
+
+        const second = await at('limit=2&page=2');
+        expect(second.transfers.map((row) => row.logIndex)).toEqual([2]);
+        expect(second.total).toBe(3);
+    });
+
+    it('serves a transaction that emitted nothing as an empty page, not a missing envelope', async () =>
+    {
+        // The UI draws its pager from `pages`, so a transaction with no transfers still has to
+        // answer with a coherent one rather than leaving the field off.
+        const get = await api();
+        const hash = CHAIN[0]!.transactions[0]!.hash;
+        const detail = (await (await get(`/api/txs/${ hash }`)).json()) as TransactionDetail;
+        expect(detail.transfers).toEqual([]);
+        expect(detail.total).toBe(0);
+        expect(detail).toMatchObject({ page: 1, pages: 1 });
     });
 
     it('404s an unknown block rather than inventing one', async () =>

@@ -112,7 +112,7 @@ export const hi: Dictionary = {
     'tx.nonce': 'नॉन्स',
     'tx.calldata': 'कॉलडेटा {size}',
     'tx.created': 'बनाया गया',
-    'tx.transfers': 'टोकन ट्रांसफ़र',
+    'tx.transfers': '{count} टोकन ट्रांसफ़र',
     'tx.token': 'टोकन',
 
     // --- Address ------------------------------------------------------------------------------
