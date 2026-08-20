@@ -1,0 +1,216 @@
+import { useLocale } from '../../stores/locale.store.ts';
+
+// One daily series, drawn as an area under a line.
+//
+// ONE series per chart and never two: two measures on one plot need two y scales, and a chart
+// with two y scales can be made to say anything. That is also why there is no legend - the title
+// names the only series there is, so a key would only repeat it.
+//
+// The reading sits in the CAPTION rather than in a bubble chasing the pointer. A floating tooltip
+// has to be clamped against its own panel, cannot be reached without a pointer at all, and on a
+// phone lands under the finger that summoned it. A fixed readout that changes as the crosshair
+// moves says the same thing and stays legible in every one of those cases.
+
+/** The plot's own coordinate space. It is stretched to the container, so only the ratios matter. */
+const WIDTH = 1000;
+const HEIGHT = 120;
+
+/** Room at the top and bottom for the line's own stroke, which would otherwise be half clipped. */
+const INSET = 6;
+
+export default component SeriesChart(props: {
+    /** Names the one series. There is no legend, so this is the only place it is named. */
+    title: string;
+
+    points: Array<{ at: string; value: string }>;
+
+    /**
+     * One value, as text. Handed the raw STRING and never a number: two of these series are wei,
+     * and the whole reason they cross as decimal strings is that nothing rounds them on the way
+     * to being read.
+     */
+    format: (value: string) => string;
+
+    /** What a screen reader is told the picture shows. The caller knows the unit; this does not. */
+    summary: string;
+
+    /** What the readout is labelled when nothing is under the pointer - "Latest", translated. */
+    latest: string;
+
+    /** What to say when the index has no days to draw. */
+    empty: string;
+})
+{
+    const locale = useLocale();
+
+    /** Which point the crosshair is on; -1 for none. */
+    state active = -1;
+
+    // Geometry comes off DOUBLES while the readout comes off the strings above. A fee series runs
+    // to 1e21 wei, which no double holds exactly - but the answer here is a pixel, and a pixel has
+    // never needed more than a few digits. Nothing a reader is shown passes through this.
+    derived values = props.points.map((point) => Number(point.value));
+
+    derived peak = ((): number =>
+    {
+        let top = 0;
+        for (const value of values)
+        {
+            if (value > top)
+            {
+                top = value;
+            }
+        }
+        // A flat run of zeros still has to draw a baseline rather than divide by one.
+        return top === 0 ? 1 : top;
+    })();
+
+    // The plot mirrors with the layout, as the cadence strip does: its bars are a flex row, so in
+    // Persian the oldest block already sits at the right and the newest at the left. An SVG
+    // mirrors for nobody, so the x axis is flipped here instead - and the two labels underneath,
+    // being a flex row, follow on their own.
+    derived rtl = locale.dir() === 'rtl';
+
+    derived plotted = ((): Array<{ x: number; y: number }> =>
+    {
+        const count = values.length;
+        const step = count > 1 ? WIDTH / (count - 1) : 0;
+        return values.map((value, index) =>
+        {
+            const along = count > 1 ? step * index : WIDTH / 2;
+            return {
+                x: rtl ? WIDTH - along : along,
+                y: HEIGHT - INSET - (value / peak) * (HEIGHT - INSET * 2)
+            };
+        });
+    })();
+
+    derived line = plotted
+        .map((point, index) => `${ index === 0 ? 'M' : 'L' }${ point.x.toFixed(2) } ${ point.y.toFixed(2) }`)
+        .join(' ');
+
+    // The area is that line closed down onto the baseline, from whichever end it started at - so
+    // a mirrored plot closes on the correct side instead of crossing itself.
+    derived area = plotted.length === 0
+        ? ''
+        : `${ line } L${ plotted[plotted.length - 1]!.x.toFixed(2) } ${ HEIGHT } L${ plotted[0]!.x.toFixed(2) } ${ HEIGHT } Z`;
+
+    /** The point being read: the crosshair's, or the most recent when there is no crosshair. */
+    derived reading = props.points[active] ?? props.points[props.points.length - 1];
+
+    /** The day the series peaked on, so the figure printed against the top of the plot is real. */
+    derived peakPoint = props.points[values.indexOf(peak)];
+
+    /**
+     * Which point the pointer is over.
+     *
+     * Measured against the box rather than read off `offsetX`: the pointer may be over the
+     * crosshair or the marker, and those report coordinates of their own. The ratio is inverted in
+     * a mirrored plot, where the newest point is the one at the left edge.
+     */
+    const track = (event: PointerEvent): void =>
+    {
+        const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const count = props.points.length;
+        if (box.width === 0 || count === 0)
+        {
+            return;
+        }
+        const ratio = (event.clientX - box.left) / box.width;
+        const along = rtl ? 1 - ratio : ratio;
+        active = Math.min(count - 1, Math.max(0, Math.round(along * (count - 1))));
+    };
+
+    <figure class="panel px-4 py-4">
+        <figcaption class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h3 class="text-[14px] font-semibold text-text">{ props.title }</h3>
+            <Show when={ reading }>
+            { () =>
+                <p class="text-[13px]">
+                    {/* The date only while a point is under the pointer - the rest of the time
+                        this reads the latest, which is the figure the title implies. */}
+                    <span class="text-muted">
+                        { active >= 0 ? locale.date(reading!.at) : props.latest }
+                    </span>
+                    <span class="amount ms-2 font-semibold text-text">{ props.format(reading!.value) }</span>
+                </p>
+            }
+            </Show>
+        </figcaption>
+
+        <Show
+            when={ props.points.length > 0 }
+            fallback={ <p class="flex h-32 items-center justify-center text-center text-[14px] text-muted sm:h-36">{ props.empty }</p> }
+        >
+            <div
+                class="relative mt-3 h-32 touch-pan-y sm:h-36"
+                role="img"
+                aria-label={ props.summary }
+                onPointerMove={ (event) => track(event as PointerEvent) }
+                onPointerDown={ (event) => track(event as PointerEvent) }
+                onPointerLeave={ () => active = -1 }
+            >
+                {/* `preserveAspectRatio="none"` stretches the plot to whatever width it is handed,
+                    which is what a time axis wants. Every stroke below is non-scaling, or the same
+                    2px line would be drawn at four on a desktop and at one on a phone. */}
+                <svg class="h-full w-full" viewBox={ `0 0 ${ WIDTH } ${ HEIGHT }` } preserveAspectRatio="none" aria-hidden="true">
+                    {/* Recessive: the grid exists to be measured against, not to be looked at. */}
+                    <For each={ [0.25, 0.5, 0.75] } key={ (fraction) => String(fraction) } let={ fraction }>
+                        <line
+                            x1="0"
+                            x2={ WIDTH }
+                            y1={ HEIGHT * fraction }
+                            y2={ HEIGHT * fraction }
+                            class="stroke-line"
+                            stroke-width="1"
+                            vector-effect="non-scaling-stroke"
+                        />
+                    </For>
+                    <path d={ area } class="fill-nur opacity-15" />
+                    <path
+                        d={ line }
+                        class="stroke-nur"
+                        fill="none"
+                        stroke-width="2"
+                        stroke-linejoin="round"
+                        stroke-linecap="round"
+                        vector-effect="non-scaling-stroke"
+                    />
+                </svg>
+
+                {/* The peak, named at the top of the scale it sets. Logical `start`, so it sits at
+                    the reader's own edge - which is the edge a y axis belongs on either way. */}
+                <Show when={ peakPoint }>
+                { () =>
+                    <span class="pointer-events-none absolute start-0 top-0 text-[11px] text-faint">
+                        <span class="amount">{ props.format(peakPoint!.value) }</span>
+                    </span>
+                }
+                </Show>
+
+                <Show when={ active >= 0 && plotted[active] !== undefined }>
+                { () =>
+                    <span class="pointer-events-none absolute inset-0" aria-hidden="true">
+                        {/* Positioned by PHYSICAL left, deliberately: `x` above is already resolved
+                            for the reader's direction, and a logical inset would mirror it twice. */}
+                        <span
+                            class="absolute inset-y-0 w-px bg-nur opacity-40"
+                            style={ `left: ${ (plotted[active]!.x / WIDTH) * 100 }%` }
+                        ></span>
+                        <span
+                            class="absolute h-2.5 w-2.5 rounded-full border-2 border-void bg-nur"
+                            style={ `left: ${ (plotted[active]!.x / WIDTH) * 100 }%; top: ${ (plotted[active]!.y / HEIGHT) * 100 }%; transform: translate(-50%, -50%)` }
+                        ></span>
+                    </span>
+                }
+                </Show>
+            </div>
+
+            {/* A flex row, so its ends swap with the layout - and the plot above swapped with it. */}
+            <div class="mt-2 flex items-baseline justify-between gap-2 text-[12px] text-faint">
+                <span>{ locale.date(props.points[0]!.at) }</span>
+                <span>{ locale.date(props.points[props.points.length - 1]!.at) }</span>
+            </div>
+        </Show>
+    </figure>
+}

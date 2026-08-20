@@ -16,6 +16,7 @@ import Badge from '../src/components/ui/badge.component.azeroth';
 import Button from '../src/components/ui/button.component.azeroth';
 import EmptyState from '../src/components/ui/empty-state.component.azeroth';
 import FilterGroup from '../src/components/ui/filter-group.component.azeroth';
+import SeriesChart from '../src/components/chain/series-chart.component.azeroth';
 import Input from '../src/components/ui/input.component.azeroth';
 import Pagination from '../src/components/ui/pagination.component.azeroth';
 import { useLocale } from '../src/stores/locale.store.ts';
@@ -274,6 +275,112 @@ describe('FilterGroup', () =>
             expect(input.className).toContain('sr-only');
             expect(input.hasAttribute('hidden')).toBe(false);
         }
+    });
+});
+
+describe('SeriesChart', () =>
+{
+    const POINTS = [
+        { at: '2026-08-01T00:00:00.000Z', value: '10' },
+        { at: '2026-08-02T00:00:00.000Z', value: '40' },
+        { at: '2026-08-03T00:00:00.000Z', value: '20' }
+    ];
+
+    function chart(overrides: Record<string, unknown> = {}): { container: HTMLElement; unmount: () => void }
+    {
+        return renderTest(() => SeriesChart({
+            title: 'Daily transactions',
+            points: POINTS,
+            format: (value: string) => value,
+            summary: 'Daily transactions over three days',
+            latest: 'Latest',
+            empty: 'Nothing yet',
+            ...overrides
+        }) as Rendered);
+    }
+
+    it('says what the picture shows, because a plot says nothing on its own', () =>
+    {
+        const { container } = chart();
+        const plot = container.querySelector('[role="img"]')!;
+        expect(plot.getAttribute('aria-label')).toBe('Daily transactions over three days');
+    });
+
+    it('names its one series in the title and draws no legend for it', () =>
+    {
+        // One series needs no key - a legend would repeat the heading directly above it.
+        const { container } = chart();
+        expect(container.querySelector('h3')!.textContent).toBe('Daily transactions');
+    });
+
+    it('draws one command per point, left to right', () =>
+    {
+        const { container } = chart();
+        const line = container.querySelectorAll('path')[1]!;
+        const drawn = line.getAttribute('d')!;
+        expect(drawn.startsWith('M0.00')).toBe(true);
+        expect(drawn.match(/L/g)).toHaveLength(2);
+    });
+
+    it('puts the peak at the top of the plot and the floor at the bottom', () =>
+    {
+        // The scale is relative to the largest reading, so the shape of a quiet series still
+        // reads - and the peak is labelled, so nobody has to guess what the top means.
+        const { container } = chart();
+        const drawn = container.querySelectorAll('path')[1]!.getAttribute('d')!;
+        const ys = [...drawn.matchAll(/[ML][\d.]+ ([\d.]+)/g)].map((match) => Number(match[1]));
+        expect(Math.min(...ys)).toBeLessThan(Math.max(...ys));
+        // The 40 is the peak and sits highest on the plot, which is the SMALLEST y.
+        expect(ys[1]).toBe(Math.min(...ys));
+    });
+
+    it('mirrors the time axis when the layout is mirrored', () =>
+    {
+        // The cadence strip already runs oldest-to-newest with the reading direction, because it
+        // is a flex row. An SVG mirrors for nobody, so this has to do it itself.
+        const locale = useLocale();
+        locale.setLocale('fa');
+        const { container, unmount } = chart();
+        expect(container.querySelectorAll('path')[1]!.getAttribute('d')!.startsWith('M1000.00')).toBe(true);
+        unmount();
+        locale.setLocale('en');
+    });
+
+    it('reads the LATEST point when nothing is under the pointer', () =>
+    {
+        const { container } = chart();
+        expect(container.querySelector('figcaption')!.textContent).toContain('Latest');
+        expect(container.querySelector('figcaption')!.textContent).toContain('20');
+    });
+
+    it('hands the formatter the raw string, never a number', () =>
+    {
+        // Two of these series are wei. A value that reached the formatter as a double would
+        // already have been rounded before anybody chose how to print it.
+        const seen: string[] = [];
+        const wei = '5185185138518518476000';
+        const record = (value: string): string =>
+        {
+            seen.push(value);
+            return value;
+        };
+        const { container } = renderTest(() => SeriesChart({
+            title: 'Daily fees',
+            points: [{ at: '2026-08-01T00:00:00.000Z', value: wei }],
+            format: record,
+            summary: 'Daily fees',
+            latest: 'Latest',
+            empty: 'Nothing yet'
+        }) as Rendered);
+        expect(seen).toContain(wei);
+        expect(container.textContent).toContain(wei);
+    });
+
+    it('says so rather than drawing an empty box when there is nothing to plot', () =>
+    {
+        const { container } = chart({ points: [] });
+        expect(container.textContent).toContain('Nothing yet');
+        expect(container.querySelector('svg')).toBeNull();
     });
 });
 

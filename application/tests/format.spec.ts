@@ -5,7 +5,7 @@
 // misreports a balance has failed at its only job, so the arithmetic is pinned here.
 import { describe, it, expect } from 'vitest';
 
-import { elapsed, formatAmount, formatCount, formatDateTime, formatGwei, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
+import { elapsed, formatAmount, formatCount, formatDate, formatDateTime, formatGwei, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
 
 describe('parseAmount - what someone typed, into wei', () =>
 {
@@ -179,5 +179,21 @@ describe('locale-aware prose numbers and dates', () =>
         const stamp = formatDateTime('2026-08-03T12:00:00.000Z', 'fa-IR');
         expect(stamp).toContain('۱۴۰۵');
         expect(stamp).not.toContain('۲۰۲۶');
+    });
+
+    it('prints a date with no time on it, for a series whose points are days', () =>
+    {
+        // A chart axis that printed 00:00:00 under every point would spend a third of its width
+        // saying midnight thirty times.
+        const day = formatDate('2026-08-03T00:00:00.000Z');
+        expect(day).toContain('2026');
+        expect(day).not.toContain('00:00');
+    });
+
+    it('gives a date the reader\'s own calendar, as a timestamp does', () =>
+    {
+        const day = formatDate('2026-08-03T00:00:00.000Z', 'fa-IR');
+        expect(day).toContain('۱۴۰۵');
+        expect(day).not.toContain('۲۰۲۶');
     });
 });

@@ -1,6 +1,6 @@
 import { createStore, createSignal, type Getter } from 'azerothjs';
 
-import { elapsed, formatCount, formatDateTime, scaleBytes } from '../lib/format.ts';
+import { elapsed, formatCount, formatDate, formatDateTime, scaleBytes } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
 import { fa } from '../locales/fa.ts';
 import { ar } from '../locales/ar.ts';
@@ -175,6 +175,9 @@ export interface LocaleApi
     /** An absolute timestamp; Persian gets the Jalali calendar from Intl. */
     dateTime(iso: string): string;
 
+    /** The same instant as a calendar date alone - for a series whose points are days. */
+    date(iso: string): string;
+
     /** How long ago, in words. */
     ago(iso: string, now?: number): string;
 
@@ -223,6 +226,7 @@ export const useLocale = createStore((): LocaleApi =>
         n: (value) => formatCount(value, LOCALE_TAG[locale()]),
         chainName: (name) => CHAIN_NAMES[locale()][name] ?? name,
         dateTime: (iso) => formatDateTime(iso, LOCALE_TAG[locale()]),
+        date: (iso) => formatDate(iso, LOCALE_TAG[locale()]),
         ago: (iso, now) =>
         {
             const { unit, count } = elapsed(iso, now);

@@ -139,6 +139,17 @@ export function formatDateTime(iso: string, tag = 'en-US'): string
     });
 }
 
+/**
+ * A calendar date with no time on it - what a daily series labels its points with.
+ *
+ * Separate from formatDateTime rather than an option on it: a chart axis that printed 00:00:00
+ * under every point would spend a third of its width saying midnight thirty times.
+ */
+export function formatDate(iso: string, tag = 'en-US'): string
+{
+    return new Date(iso).toLocaleDateString(tag, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 /** Bytes scaled to the unit they should be shown in; the unit's name is in the catalog. */
 export function scaleBytes(bytes: number): { unit: 'bytes' | 'kilobytes'; count: number }
 {
