@@ -30,6 +30,25 @@ const HEX = /^0x[0-9a-fA-F]*$/;
 const INTEGER = /^-?\d+$/;
 
 /**
+ * The bit width a `uintN`/`intN` names, or null when the type does not name a valid one.
+ *
+ * Bare `uint` and `int` are the ABI's own aliases for the 256-bit forms. Anything that is not a
+ * multiple of eight between 8 and 256 is not an ABI integer at all, and returning null there
+ * leaves it to the encoder to refuse by name rather than having this file invent a range for a
+ * type that does not exist.
+ */
+function integerWidth(type: string): number | null
+{
+    const suffix = type.startsWith('uint') ? type.slice(4) : type.slice(3);
+    if (suffix === '')
+    {
+        return 256;
+    }
+    const width = Number(suffix);
+    return Number.isInteger(width) && width >= 8 && width <= 256 && width % 8 === 0 ? width : null;
+}
+
+/**
  * One field's text as the value its type means.
  *
  * Strict on purpose. A wrong address silently accepted here becomes a transaction someone signs,
@@ -92,9 +111,31 @@ export function coerce(type: string, text: string, at = 0): unknown
         try
         {
             const parsed = BigInt(value);
-            if (type.startsWith('uint') && parsed < 0n)
+            const width = integerWidth(type);
+            if (type.startsWith('uint'))
             {
-                throw new ArgumentError(at, 'expected a number of zero or more');
+                if (parsed < 0n)
+                {
+                    throw new ArgumentError(at, 'expected a number of zero or more');
+                }
+                // Checked HERE and not left to the encoder. viem refuses an out-of-range value
+                // too, but it throws its own error type, and inspect.ts only turns an
+                // ArgumentError into the 400 that names the field - so a `999` typed into a
+                // uint8 came back as a 500 with nothing to point at.
+                if (width !== null && parsed > (1n << BigInt(width)) - 1n)
+                {
+                    throw new ArgumentError(at, `expected at most ${ (1n << BigInt(width)) - 1n } - a ${ type } holds ${ width } bits`);
+                }
+            }
+            else if (width !== null)
+            {
+                // Signed: two's complement, so the negative side reaches one further than the
+                // positive one.
+                const limit = 1n << BigInt(width - 1);
+                if (parsed < -limit || parsed > limit - 1n)
+                {
+                    throw new ArgumentError(at, `expected between ${ -limit } and ${ limit - 1n } - a ${ type } holds ${ width } bits`);
+                }
             }
             return parsed;
         }
@@ -109,6 +150,14 @@ export function coerce(type: string, text: string, at = 0): unknown
         if (!HEX.test(value))
         {
             throw new ArgumentError(at, 'expected hex, starting 0x');
+        }
+        // Hex comes in PAIRS. An odd number of digits is not a short value the encoder can pad -
+        // it pads on the right, so `0xabc` went in and `0xabc0` came out, which is a different
+        // value than the one that was typed. This is the calldata a wallet signs; it does not get
+        // to be approximately what was asked for.
+        if (value.length % 2 !== 0)
+        {
+            throw new ArgumentError(at, 'expected whole bytes - hex digits come in pairs');
         }
         // The width, and ONLY when the type names one. `'bytes'.slice(5)` is '', and `Number('')`
         // is 0 - so a plain dynamic `bytes` used to be checked as `bytes0` and every non-empty
