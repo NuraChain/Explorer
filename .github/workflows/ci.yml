@@ -1,4 +1,12 @@
-# The same gates you run locally, on every push: check, build, test.
+# The same gates you run locally, on every push: check, build, test, coverage.
+#
+# Split into jobs so a failure names itself in the run list rather than being one red step in a
+# long one - a lint error and a failing integration test are different problems and are triaged by
+# different people.
+#
+# Nothing here needs a secret, a database service or a network: the whole suite runs against an
+# in-memory sqlite index and a stubbed chain, so a fork's pull request gets exactly the same
+# result as a push to main.
 name: CI
 on:
   push:
@@ -6,14 +14,76 @@ on:
   pull_request:
 
 jobs:
-  verify:
+  check:
+    name: Types and lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
       - run: npm ci
       - run: npx azeroth check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npx azeroth build
-      - run: npx azeroth test
+
+  test-server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Unit, integration, API, data-layer, security, property and RPC-client suites - the whole
+      # server surface, with coverage so a drop is visible in the log rather than discovered later.
+      - run: npm run test:coverage --workspace server
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-coverage
+          path: server/coverage
+          if-no-files-found: ignore
+
+  test-application:
+    name: Application tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test --workspace application
+
+  test-shuffled:
+    name: Tests in random order
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # The isolation gate. Every suite here shares module-level singletons - the stores in the
+      # browser half, the signature table in the server half - and a test that only passes in
+      # declaration order is a test that will fail for somebody else at random. Running shuffled
+      # on every push is what keeps that from being discovered on an unrelated pull request.
+      - run: npm run test:shuffle --workspace server
+      - run: npm run test:shuffle --workspace application

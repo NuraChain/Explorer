@@ -10,7 +10,12 @@
         "dev": "azeroth dev",
         "check": "azeroth check",
         "build": "azeroth build",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:shuffle": "vitest run --sequence.shuffle",
+        "test:unit": "vitest run tests/format.spec.ts tests/locale.spec.ts",
+        "test:components": "vitest run tests/components.spec.ts",
+        "test:stores": "vitest run tests/stores.spec.ts tests/wallet.spec.ts"
     },
     "dependencies": {
         "@azerothjs/http": "2.0.0-beta.2",

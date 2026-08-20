@@ -10,6 +10,14 @@
         "dev": "azeroth dev",
         "check": "azeroth check",
         "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "test:shuffle": "vitest run --sequence.shuffle",
+        "test:unit": "vitest run tests/values.spec.ts tests/contract.spec.ts tests/cache.spec.ts tests/config.spec.ts",
+        "test:integration": "vitest run tests/store.spec.ts tests/indexer.spec.ts tests/client.spec.ts",
+        "test:api": "vitest run tests/http.spec.ts tests/etherscan.spec.ts tests/app.spec.ts",
+        "test:security": "vitest run -t security",
+        "test:property": "vitest run -t property",
         "start": "node src/main.ts"
     },
     "dependencies": {
@@ -27,6 +35,7 @@
         "@azerothjs/ws": "2.0.0-beta.2",
         "@eslint/js": "^10.0.1",
         "@types/node": "^26.1.0",
+        "@vitest/coverage-v8": "^4.1.11",
         "eslint": "^10.7.0",
         "globals": "^17.7.0",
         "jiti": "^2.7.0",
