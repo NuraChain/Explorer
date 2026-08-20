@@ -29,6 +29,7 @@ export const en = {
     'nav.blocks': 'Blocks',
     'nav.transactions': 'Transactions',
     'nav.accounts': 'Accounts',
+    'nav.charts': 'Charts',
     'nav.overview': 'Overview',
     'nav.menu': 'Menu',
     'nav.open': 'Open navigation',
@@ -241,6 +242,40 @@ export const en = {
     'wallet.switch': 'Switch to {chain}',
     'wallet.switchFailed': 'Your wallet did not switch to {chain}. Add the network first, then try again.',
 
+    // --- Charts -------------------------------------------------------------------------------
+    // One name per METRIC, shared by the tile and the chart under it - two strings for the same
+    // measure is how a page ends up calling it two different things on the same screen.
+    'charts.title': 'Charts and statistics',
+    'charts.hint': 'Everything below is counted from this explorer’s own index of the chain, and refreshed as the indexer reads it.',
+    'charts.range': 'Range',
+    'charts.range.days': 'Last {count} days',
+    'charts.section.totals': 'Totals',
+    'charts.section.day': 'Last 24 hours',
+    'charts.section.blockchain': 'Blockchain data',
+    'charts.section.network': 'Network data',
+    'charts.section.contracts': 'Tokens and contracts',
+    'charts.change.total': 'Added in the last 24 hours',
+    'charts.change.day': 'Against the 24 hours before',
+    'charts.chart.latest': 'Latest',
+    'charts.chart.empty': 'No days indexed in this range yet.',
+    'charts.chart.summary': '{title} over {count} days. Peak {peak}, latest {latest}.',
+    'charts.footnote': 'Every figure here is counted from this explorer’s own index. It has no price feed, no mempool subscription and no verification service, so there is no market chart, no pending-transaction count and no verified-contract figure - a chart of a number nobody measured would be worse than none.',
+    'charts.metric.blocks': 'Blocks',
+    'charts.metric.transactions': 'Transactions',
+    'charts.metric.transfers': 'Token transfers',
+    'charts.metric.addresses': 'Addresses',
+    'charts.metric.activeAddresses': 'Active addresses',
+    'charts.metric.newAddresses': 'New addresses',
+    'charts.metric.tokens': 'Tokens',
+    'charts.metric.contracts': 'Contracts deployed',
+    'charts.metric.fees': 'Transaction fees',
+    'charts.metric.averageFee': 'Average transaction fee',
+    'charts.metric.gasUsed': 'Gas used',
+    'charts.metric.gasPrice': 'Average gas price',
+    'charts.metric.utilization': 'Network utilization',
+    'charts.metric.blockTime': 'Average block time',
+    'charts.metric.blockSize': 'Average block size',
+
     // --- Filters ------------------------------------------------------------------------------
     // `filter.all` is shared by every filter on every page: it means "no narrowing", which is the
     // same thought whatever is being narrowed. It stays gender-free in the Romance languages for
@@ -298,6 +333,8 @@ export const en = {
     'unit.bytes': '{count} B',
     'unit.kilobytes': '{count} KB',
     'unit.gwei': '{amount} gwei',
+    'unit.seconds': '{count}s',
+    'unit.percent': '{count}%',
 
     // --- Page titles --------------------------------------------------------------------------
     'title.chainExplorer': '{chain} explorer',

@@ -140,6 +140,18 @@ export function formatDateTime(iso: string, tag = 'en-US'): string
 }
 
 /**
+ * A large count, shortened the way the reader's own language shortens one.
+ *
+ * For a chart caption and nowhere a figure has to be exact: a day of gas is thirteen digits, and
+ * thirteen digits in a caption is a wall rather than a reading. Intl does the shortening, so
+ * Persian gets its own word for a million rather than a Latin M bolted onto Persian digits.
+ */
+export function formatCompact(value: number, tag = 'en-US'): string
+{
+    return value.toLocaleString(tag, { notation: 'compact', maximumFractionDigits: 1 });
+}
+
+/**
  * A calendar date with no time on it - what a daily series labels its points with.
  *
  * Separate from formatDateTime rather than an option on it: a chart axis that printed 00:00:00

@@ -7,6 +7,7 @@ import AccountsPage from './pages/accounts.page.azeroth';
 import AddressPage from './pages/address.page.azeroth';
 import BlockPage from './pages/block.page.azeroth';
 import BlocksPage from './pages/blocks.page.azeroth';
+import ChartsPage from './pages/charts.page.azeroth';
 import Home from './pages/home.page.azeroth';
 import TransactionPage from './pages/tx.page.azeroth';
 import TransactionsPage from './pages/txs.page.azeroth';
@@ -17,6 +18,7 @@ import TransactionsPage from './pages/txs.page.azeroth';
 export const routes: PageRoute[] = [
     { path: '/', component: Home, render: 'server' },
     { path: '/accounts', component: AccountsPage, render: 'server' },
+    { path: '/charts', component: ChartsPage, render: 'server' },
     { path: '/blocks', component: BlocksPage, render: 'server' },
     { path: '/block/:number', component: BlockPage, render: 'server' },
     { path: '/txs', component: TransactionsPage, render: 'server' },

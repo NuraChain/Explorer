@@ -48,6 +48,7 @@ export default component SiteFooter()
                     <li><Link to="/" class="text-muted no-underline hover:text-text">{ locale.t('nav.home') }</Link></li>
                     <li><Link to="/blocks" class="text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link></li>
                     <li><Link to="/txs" class="text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link></li>
+                    <li><Link to="/charts" class="text-muted no-underline hover:text-text">{ locale.t('nav.charts') }</Link></li>
                 </ul>
             </nav>
 

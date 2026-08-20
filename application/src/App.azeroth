@@ -53,6 +53,11 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                             class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
                             activeClass="active"
                         >{ locale.t('nav.accounts') }</Link>
+                        <Link
+                            to="/charts"
+                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            activeClass="active"
+                        >{ locale.t('nav.charts') }</Link>
                     </nav>
 
                     {/* Search lives in the chrome, on every page. It is the one place it appears,

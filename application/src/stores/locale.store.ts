@@ -1,6 +1,6 @@
 import { createStore, createSignal, type Getter } from 'azerothjs';
 
-import { elapsed, formatCount, formatDate, formatDateTime, scaleBytes } from '../lib/format.ts';
+import { elapsed, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
 import { fa } from '../locales/fa.ts';
 import { ar } from '../locales/ar.ts';
@@ -166,6 +166,9 @@ export interface LocaleApi
     /** A count in the reader's digits. NOT for chain amounts - those stay Latin, see format.ts. */
     n(value: number): string;
 
+    /** The same count shortened - for a chart caption, never for a figure that has to be exact. */
+    compact(value: number): string;
+
     /**
      * A chain name as the reader should SEE it, which is not always how it is configured. An
      * untranslated name comes back unchanged. Never use this for a value leaving the page.
@@ -224,6 +227,7 @@ export const useLocale = createStore((): LocaleApi =>
         },
         t,
         n: (value) => formatCount(value, LOCALE_TAG[locale()]),
+        compact: (value) => formatCompact(value, LOCALE_TAG[locale()]),
         chainName: (name) => CHAIN_NAMES[locale()][name] ?? name,
         dateTime: (iso) => formatDateTime(iso, LOCALE_TAG[locale()]),
         date: (iso) => formatDate(iso, LOCALE_TAG[locale()]),

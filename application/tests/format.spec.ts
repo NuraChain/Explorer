@@ -5,7 +5,7 @@
 // misreports a balance has failed at its only job, so the arithmetic is pinned here.
 import { describe, it, expect } from 'vitest';
 
-import { elapsed, formatAmount, formatCount, formatDate, formatDateTime, formatGwei, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
+import { elapsed, formatAmount, formatCompact, formatCount, formatDate, formatDateTime, formatGwei, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
 
 describe('parseAmount - what someone typed, into wei', () =>
 {
@@ -179,6 +179,18 @@ describe('locale-aware prose numbers and dates', () =>
         const stamp = formatDateTime('2026-08-03T12:00:00.000Z', 'fa-IR');
         expect(stamp).toContain('۱۴۰۵');
         expect(stamp).not.toContain('۲۰۲۶');
+    });
+
+    it('shortens a large count the way a reader of that language would', () =>
+    {
+        // A day of gas is a thirteen-digit number, and thirteen digits in a chart caption is a
+        // wall rather than a reading. This is for captions only - never for a figure owed to
+        // anybody, which is why the tiles beside the charts still print the count in full.
+        expect(formatCompact(3_790_585_270_000)).toBe('3.8T');
+        expect(formatCompact(1500)).toBe('1.5K');
+        expect(formatCompact(42)).toBe('42');
+        // Persian gets its own word for the scale, not a Latin M stapled to Persian digits.
+        expect(formatCompact(3_800_000, 'fa-IR')).not.toContain('M');
     });
 
     it('prints a date with no time on it, for a series whose points are days', () =>

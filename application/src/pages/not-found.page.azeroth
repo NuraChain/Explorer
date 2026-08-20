@@ -32,6 +32,7 @@ export default component NotFoundPage()
             <Link to="/" class="inline-flex min-h-11 items-center px-2 text-nur no-underline hover:underline">{ locale.t('nav.overview') }</Link>
             <Link to="/blocks" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link>
             <Link to="/txs" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link>
+            <Link to="/charts" class="inline-flex min-h-11 items-center px-2 text-muted no-underline hover:text-text">{ locale.t('nav.charts') }</Link>
         </nav>
     </div>
 }

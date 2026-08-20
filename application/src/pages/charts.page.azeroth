@@ -1,0 +1,265 @@
+import { client, type ChartSeries, type ChartSeriesKey, type ChartUnit, type StatFigure } from '../api.ts';
+import { formatGwei, formatValue } from '../lib/format.ts';
+import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
+import type { MessageKey } from '../locales/en.ts';
+
+import SeriesChart from '../components/chain/series-chart.component.azeroth';
+import FilterGroup from '../components/ui/filter-group.component.azeroth';
+import Skeleton from '../components/ui/skeleton.component.azeroth';
+import Tooltip from '../components/ui/tooltip.component.azeroth';
+
+// What the index adds up to, over time.
+//
+// Every figure here is COUNTED, from this explorer's own index and from nothing else. There is no
+// price feed, no mempool subscription and no verification service behind this deployment, so the
+// market chart, the pending-transaction count and the "contracts verified" figure that a hosted
+// explorer opens with are absent rather than estimated. The footnote says so; a chart of a number
+// nobody measured is worse than no chart.
+
+/** How far back the page can look. More than a quarter is a scan, not a page view. */
+const RANGES = ['7', '30', '90'];
+
+/** One name per metric, so a tile and the chart under it never disagree about what it is. */
+const METRIC: Record<ChartSeriesKey, MessageKey> = {
+    transactions: 'charts.metric.transactions',
+    blocks: 'charts.metric.blocks',
+    activeAddresses: 'charts.metric.activeAddresses',
+    newAddresses: 'charts.metric.newAddresses',
+    blockTime: 'charts.metric.blockTime',
+    blockSize: 'charts.metric.blockSize',
+    gasPrice: 'charts.metric.gasPrice',
+    gasUsed: 'charts.metric.gasUsed',
+    utilization: 'charts.metric.utilization',
+    fees: 'charts.metric.fees',
+    averageFee: 'charts.metric.averageFee',
+    transfers: 'charts.metric.transfers',
+    contracts: 'charts.metric.contracts'
+};
+
+/** The charts, grouped the way somebody reading them would group them. */
+const SECTIONS: Array<{ heading: MessageKey; series: ChartSeriesKey[] }> = [
+    { heading: 'charts.section.blockchain', series: ['transactions', 'blocks', 'activeAddresses', 'newAddresses', 'blockTime', 'blockSize'] },
+    { heading: 'charts.section.network', series: ['gasPrice', 'gasUsed', 'utilization', 'fees', 'averageFee'] },
+    { heading: 'charts.section.contracts', series: ['transfers', 'contracts'] }
+];
+
+export default component ChartsPage()
+{
+    const locale = useLocale();
+
+    state days = '30';
+
+    resource stats = () => client.stats.summary();
+    resource charts = (at: string) => client.stats.charts({ query: { days: Number(at) } })
+        with { source: days };
+
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+
+    /**
+     * One value, printed for its UNIT and never for its key.
+     *
+     * Wei goes through formatValue from the decimal string it arrived as; everything else is a
+     * count the reader is meant to read, so it is printed in the reader's own digits.
+     */
+    const render = (unit: ChartUnit, value: string): string =>
+    {
+        switch (unit)
+        {
+            case 'native':
+                return formatValue(value, symbol, decimals);
+            case 'gwei':
+                return formatGwei(value);
+            case 'bytes':
+                return locale.bytes(Math.round(Number(value)));
+            case 'seconds':
+                return locale.t('unit.seconds', { count: Number(value).toFixed(2) });
+            case 'percent':
+                return locale.t('unit.percent', { count: Number(value).toFixed(1) });
+            // A day of gas on a busy chain is a thirteen-digit number, and thirteen digits in a
+            // chart caption is a wall. Compact is the reader's own shortening of it - "3.8M" in
+            // English, "۳٫۸ میلیون" in Persian - so nobody has to count the separators.
+            case 'gas':
+                return locale.compact(Number(value));
+            default:
+                return locale.n(Number(value));
+        }
+    };
+
+    const seriesOf = (key: ChartSeriesKey): ChartSeries | undefined =>
+        charts.data()?.series.find((series) => series.key === key);
+
+    /** What a screen reader is told a plot shows: its extent, its peak and where it ended. */
+    const summaryOf = (key: ChartSeriesKey): string =>
+    {
+        const series = seriesOf(key);
+        if (series === undefined || series.points.length === 0)
+        {
+            return locale.t(METRIC[key]);
+        }
+        const peak = series.points.reduce((top, point) => (Number(point.value) > Number(top.value) ? point : top), series.points[0]!);
+        return locale.t('charts.chart.summary', {
+            title: locale.t(METRIC[key]),
+            count: locale.n(series.points.length),
+            peak: render(series.unit, peak.value),
+            latest: render(series.unit, series.points[series.points.length - 1]!.value)
+        });
+    };
+
+    /**
+     * A percentage of movement.
+     *
+     * NOT in inflow or outflow. Those two colours answer where value went, and this explorer
+     * spends them on nothing else - a transaction count that rose is not value arriving. The sign
+     * carries the direction instead, which also means the reading survives being read by someone
+     * who cannot separate two hues. It stays INSIDE the isolate: a bare +/- is bidi-neutral and
+     * would jump to the far side of its own digits in a mirrored line.
+     */
+    const movement = (change: number): string =>
+        `${ change < 0 ? '−' : '+' }${ locale.n(Math.round(Math.abs(change) * 1000) / 10) }%`;
+
+    derived totals = ((): Array<{ label: string; figure: StatFigure; unit: ChartUnit }> =>
+    {
+        const data = charts.data();
+        if (data === undefined)
+        {
+            return [];
+        }
+        return [
+            { label: locale.t('charts.metric.blocks'), figure: data.total.blocks, unit: 'count' },
+            { label: locale.t('charts.metric.transactions'), figure: data.total.transactions, unit: 'count' },
+            { label: locale.t('charts.metric.transfers'), figure: data.total.transfers, unit: 'count' },
+            { label: locale.t('charts.metric.addresses'), figure: data.total.addresses, unit: 'count' },
+            { label: locale.t('charts.metric.tokens'), figure: data.total.tokens, unit: 'count' },
+            { label: locale.t('charts.metric.contracts'), figure: data.total.contracts, unit: 'count' }
+        ];
+    })();
+
+    derived lastDay = ((): Array<{ label: string; figure: StatFigure; unit: ChartUnit }> =>
+    {
+        const data = charts.data();
+        if (data === undefined)
+        {
+            return [];
+        }
+        return [
+            { label: locale.t('charts.metric.transactions'), figure: data.day.transactions, unit: 'count' },
+            { label: locale.t('charts.metric.blocks'), figure: data.day.blocks, unit: 'count' },
+            { label: locale.t('charts.metric.activeAddresses'), figure: data.day.activeAddresses, unit: 'count' },
+            { label: locale.t('charts.metric.newAddresses'), figure: data.day.newAddresses, unit: 'count' },
+            { label: locale.t('charts.metric.transfers'), figure: data.day.transfers, unit: 'count' },
+            { label: locale.t('charts.metric.contracts'), figure: data.day.contracts, unit: 'count' },
+            { label: locale.t('charts.metric.fees'), figure: data.day.fees, unit: 'native' },
+            { label: locale.t('charts.metric.averageFee'), figure: data.day.averageFee, unit: 'native' },
+            { label: locale.t('charts.metric.gasUsed'), figure: data.day.gasUsed, unit: 'gas' },
+            // Both arrive scaled so the wire carries integers: basis points of one, and
+            // milliseconds. The page is where they turn back into a percentage and a duration.
+            { label: locale.t('charts.metric.utilization'), figure: { value: String(Number(data.day.utilization.value) / 100), change: data.day.utilization.change }, unit: 'percent' },
+            { label: locale.t('charts.metric.blockTime'), figure: { value: String(Number(data.day.blockTime.value) / 1000), change: data.day.blockTime.change }, unit: 'seconds' }
+        ];
+    })();
+
+    useTitle(() => locale.t('charts.title'));
+
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('charts.title') }</h1>
+                <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('charts.hint') }</p>
+            </div>
+            <FilterGroup
+                label={ locale.t('charts.range') }
+                name="chart-range"
+                value={ days }
+                options={ RANGES.map((range) => ({ value: range, label: locale.t('charts.range.days', { count: locale.n(Number(range)) }) })) }
+                onChange={ (next) => days = next }
+            />
+        </div>
+
+        <Show when={ charts.data() === undefined }>
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+                <Skeleton class="h-[74px] w-full" />
+                <Skeleton class="h-[74px] w-full" />
+                <Skeleton class="h-[74px] w-full" />
+                <Skeleton class="h-[74px] w-full" />
+            </div>
+        </Show>
+
+        <Show when={ totals.length > 0 }>
+            <section class="flex flex-col gap-3">
+                <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('charts.section.totals') }</h2>
+                <dl class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
+                    <For each={ totals } key={ (tile) => tile.label } let={ tile }>
+                        <div class="panel px-4 py-3">
+                            <dt class="text-[13px] text-muted">{ tile.label }</dt>
+                            <dd class="mt-0.5 text-[17px] font-bold"><span class="amount">{ render(tile.unit, tile.figure.value) }</span></dd>
+                            {/* A total's movement is what the last day ADDED to it - a different
+                                reading from the 24-hour tiles below, so it is labelled apart. */}
+                            <Show when={ tile.figure.change !== null }>
+                            { () =>
+                                <Tooltip label={ locale.t('charts.change.total') } class="flex">
+                                    <p class="text-[12px] text-muted"><span class="amount">{ movement(tile.figure.change!) }</span></p>
+                                </Tooltip>
+                            }
+                            </Show>
+                        </div>
+                    </For>
+                </dl>
+            </section>
+        </Show>
+
+        <Show when={ lastDay.length > 0 }>
+            <section class="flex flex-col gap-3">
+                <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('charts.section.day') }</h2>
+                <dl class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
+                    <For each={ lastDay } key={ (tile) => tile.label } let={ tile }>
+                        <div class="panel px-4 py-3">
+                            <dt class="text-[13px] text-muted">{ tile.label }</dt>
+                            <dd class="mt-0.5 text-[17px] font-bold"><span class="amount">{ render(tile.unit, tile.figure.value) }</span></dd>
+                            <Show when={ tile.figure.change !== null }>
+                            { () =>
+                                <Tooltip label={ locale.t('charts.change.day') } class="flex">
+                                    <p class="text-[12px] text-muted"><span class="amount">{ movement(tile.figure.change!) }</span></p>
+                                </Tooltip>
+                            }
+                            </Show>
+                        </div>
+                    </For>
+                </dl>
+            </section>
+        </Show>
+
+        {/* One guard around every section rather than one inside each row: a <For> row has to
+            be a single host element, and a row rooted at <Show> is a fragment. */}
+        <Show when={ charts.data() !== undefined }>
+            <For each={ SECTIONS } key={ (section) => section.heading } let={ section }>
+                <section class="flex flex-col gap-3">
+                    <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t(section.heading) }</h2>
+                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <For each={ section.series } key={ (key) => key } let={ key }>
+                            {/* `contents` for the same reason the cadence strip uses it: the row
+                                needs an element the reconciler can move, and this one must not
+                                also become a grid cell of its own. */}
+                            <div class="contents">
+                                <SeriesChart
+                                    title={ locale.t(METRIC[key]) }
+                                    points={ seriesOf(key)?.points ?? [] }
+                                    format={ (value) => render(seriesOf(key)?.unit ?? 'count', value) }
+                                    summary={ summaryOf(key) }
+                                    latest={ locale.t('charts.chart.latest') }
+                                    empty={ locale.t('charts.chart.empty') }
+                                />
+                            </div>
+                        </For>
+                    </div>
+                </section>
+            </For>
+        </Show>
+
+        {/* Said out loud rather than left as a gap. Somebody arriving from a hosted explorer will
+            look for the price chart, and "this deployment cannot measure that" is a better answer
+            than a number quietly invented to fill the space. */}
+        <p class="text-[13px] leading-relaxed text-faint">{ locale.t('charts.footnote') }</p>
+    </div>
+}
