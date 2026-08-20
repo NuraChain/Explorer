@@ -1,0 +1,49 @@
+// One narrowing a list offers, drawn as a row of chips: the status of a transaction, the
+// direction of a movement, whether a block carried anything at all.
+//
+// Native radios inside a fieldset rather than buttons wearing `role="radio"`. The browser then
+// gives the group its accessible name from the legend, moves between the options on the arrow
+// keys, and announces "2 of 3" - none of which has to be written again on the next page that
+// wants a filter. The input is visually hidden but NOT display:none, because a control hidden
+// that way cannot be focused, which is the whole reason to have reached for a radio.
+//
+// The chosen option is never said in colour alone: it takes the accent border, the raised ground
+// and the heavier weight, and underneath all of that it is the checked radio, which is what a
+// screen reader actually reads.
+export default component FilterGroup(props: {
+    /** The group's accessible name. There is no visible legend - the chips speak for themselves. */
+    label: string;
+
+    /** Radios key on `name`; two filters on one page must not share one or they fight. */
+    name: string;
+
+    options: Array<{ value: string; label: string }>;
+    value: string;
+    onChange: (value: string) => void;
+})
+{
+    // The focus ring lands on the chip rather than on the hidden input inside it - `:focus-visible`
+    // is styled globally in base.css, but on an element nobody can see it draws nothing.
+    const CHIP = 'inline-flex h-8 shrink-0 items-center rounded-lg border px-3.5 text-[14px] transition-colors duration-150'
+        + ' has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-nur';
+
+    <fieldset class="flex min-w-0 flex-wrap items-center gap-2">
+        <legend class="sr-only">{ props.label }</legend>
+        <For each={ props.options } key={ (option) => option.value } let={ option }>
+            <label class={ option.value === props.value
+                ? `${ CHIP } cursor-default border-nur bg-raised font-semibold text-nur`
+                : `${ CHIP } cursor-pointer border-line text-muted hover:text-text` }
+            >
+                <input
+                    class="sr-only"
+                    type="radio"
+                    name={ props.name }
+                    value={ option.value }
+                    checked={ option.value === props.value }
+                    onChange={ () => props.onChange(option.value) }
+                />
+                { option.label }
+            </label>
+        </For>
+    </fieldset>
+}

@@ -15,6 +15,7 @@ import { cleanup, fire, renderTest } from '@azerothjs/testing';
 import Badge from '../src/components/ui/badge.component.azeroth';
 import Button from '../src/components/ui/button.component.azeroth';
 import EmptyState from '../src/components/ui/empty-state.component.azeroth';
+import FilterGroup from '../src/components/ui/filter-group.component.azeroth';
 import Input from '../src/components/ui/input.component.azeroth';
 import Pagination from '../src/components/ui/pagination.component.azeroth';
 import { useLocale } from '../src/stores/locale.store.ts';
@@ -181,6 +182,98 @@ describe('Input', () =>
     {
         const { container } = renderTest(() => Input({ label: 'Search', placeholder: 'Address, hash or height' }) as Rendered);
         expect(container.querySelector('input')!.getAttribute('placeholder')).toBe('Address, hash or height');
+    });
+});
+
+describe('FilterGroup', () =>
+{
+    const OPTIONS = [
+        { value: 'all', label: 'All' },
+        { value: 'success', label: 'Succeeded' },
+        { value: 'reverted', label: 'Reverted' }
+    ];
+
+    /** Every label in the group, in the order they are drawn. */
+    function chips(container: HTMLElement): HTMLLabelElement[]
+    {
+        return [...container.querySelectorAll('label')];
+    }
+
+    it('names the group once, for a screen reader only', () =>
+    {
+        // The chips are the visible label. A legend printed above them would say it twice.
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'all', onChange: () => undefined
+        }) as Rendered);
+        expect(container.querySelector('legend')!.textContent).toBe('Status');
+        expect(container.querySelector('legend')!.className).toContain('sr-only');
+    });
+
+    it('puts every option under one radio name, so the browser keeps them exclusive', () =>
+    {
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'all', onChange: () => undefined
+        }) as Rendered);
+        const inputs = [...container.querySelectorAll('input')];
+        expect(inputs).toHaveLength(3);
+        expect(new Set(inputs.map((input) => input.getAttribute('name'))).size).toBe(1);
+        expect(inputs.every((input) => input.getAttribute('type') === 'radio')).toBe(true);
+    });
+
+    it('checks the chosen option and no other', () =>
+    {
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'reverted', onChange: () => undefined
+        }) as Rendered);
+        const checked = [...container.querySelectorAll('input')].filter((input) => input.checked);
+        expect(checked).toHaveLength(1);
+        expect(checked[0]!.value).toBe('reverted');
+    });
+
+    it('says which option is current in more than colour', () =>
+    {
+        // Underneath the accent it is the CHECKED radio, which is what a screen reader reads;
+        // the border and the weight are what a reader who cannot separate two accents has left.
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'success', onChange: () => undefined
+        }) as Rendered);
+        const selected = chips(container)[1]!;
+        expect(selected.className).toContain('border-nur');
+        expect(selected.className).toContain('font-semibold');
+    });
+
+    it('leaves the already-chosen option without a pointer cursor', () =>
+    {
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'all', onChange: () => undefined
+        }) as Rendered);
+        expect(chips(container)[0]!.className).toContain('cursor-default');
+        expect(chips(container)[1]!.className).toContain('cursor-pointer');
+    });
+
+    it('reports the option that was chosen', () =>
+    {
+        const onChange = vi.fn();
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'all', onChange
+        }) as Rendered);
+        const reverted = [...container.querySelectorAll('input')].find((input) => input.value === 'reverted')!;
+        fire(reverted, 'change');
+        expect(onChange).toHaveBeenCalledWith('reverted');
+    });
+
+    it('keeps the hidden input focusable - sr-only, never display:none', () =>
+    {
+        // A radio hidden with `display: none` cannot be reached by the keyboard at all, which
+        // throws away the only reason to have used a radio instead of a button.
+        const { container } = renderTest(() => FilterGroup({
+            label: 'Status', name: 'status', options: OPTIONS, value: 'all', onChange: () => undefined
+        }) as Rendered);
+        for (const input of container.querySelectorAll('input'))
+        {
+            expect(input.className).toContain('sr-only');
+            expect(input.hasAttribute('hidden')).toBe(false);
+        }
     });
 });
 
