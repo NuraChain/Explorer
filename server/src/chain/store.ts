@@ -2,7 +2,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import type { TxStatusFilter } from '../schemas.ts';
+import type { BlockFilter, TxStatusFilter } from '../schemas.ts';
 
 // The index. Everything here is DERIVED from the chain, so a schema change is a rebuild, not a
 // migration: bump SCHEMA_VERSION and the tables drop and replay from START_BLOCK.
@@ -407,10 +407,18 @@ export class IndexStore
         return this.#stmt('SELECT * FROM blocks ORDER BY number DESC LIMIT ?').all(limit) as unknown as BlockRow[];
     }
 
-    public blocksPage(limit: number, offset: number): { rows: BlockRow[]; total: number }
+    /**
+     * One page of blocks, newest first, optionally only the ones that carried a transaction.
+     *
+     * `tx_count` is read off the row rather than counted through the transactions table: it was
+     * written down as the block was indexed, so the narrowing costs a scan of one small column
+     * instead of a join per row.
+     */
+    public blocksPage(limit: number, offset: number, content: BlockFilter = 'all'): { rows: BlockRow[]; total: number }
     {
-        const total = (this.#stmt('SELECT COUNT(*) AS n FROM blocks').get() as { n: number }).n;
-        const rows = this.#stmt('SELECT * FROM blocks ORDER BY number DESC LIMIT ? OFFSET ?')
+        const where = content === 'filled' ? 'WHERE tx_count > 0' : '';
+        const total = (this.#stmt(`SELECT COUNT(*) AS n FROM blocks ${ where }`).get() as { n: number }).n;
+        const rows = this.#stmt(`SELECT * FROM blocks ${ where } ORDER BY number DESC LIMIT ? OFFSET ?`)
             .all(limit, offset) as unknown as BlockRow[];
         return { rows, total };
     }

@@ -1,10 +1,11 @@
 import { Link } from 'azerothjs';
 
-import { client } from '../api.ts';
+import { client, type BlockFilter } from '../api.ts';
 import { gasShare } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
+import FilterGroup from '../components/ui/filter-group.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
@@ -16,14 +17,40 @@ export default component BlocksPage()
     const locale = useLocale();
 
     state page = 1;
+    state content: BlockFilter = 'all';
 
-    resource blocks = (at: string) => client.blocks.list({ query: { page: Number(at), limit: 25 } })
-        with { source: String(page) };
+    // One key for both, because they are one question - page 4 of the blocks that carried
+    // something is a different list from page 4 of every block.
+    resource blocks = (key: string) =>
+    {
+        const [at = '1', narrowed = 'all'] = key.split('|');
+        return client.blocks.list({ query: { page: Number(at), limit: 25, content: narrowed as BlockFilter } });
+    } with { source: `${ page }|${ content }` };
+
+    // Back to the first page: on a quiet chain the filled blocks are a small fraction of the
+    // list, so page 40 of everything is usually past the end of them.
+    const narrow = (next: string): void =>
+    {
+        content = next as BlockFilter;
+        page = 1;
+    };
 
     useTitle(() => locale.t('blocks.title'));
 
     <div class="flex flex-col gap-4">
-        <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('blocks.title') }</h1>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('blocks.title') }</h1>
+            <FilterGroup
+                label={ locale.t('filter.content') }
+                name="block-content"
+                value={ content }
+                options={ [
+                    { value: 'all', label: locale.t('filter.all') },
+                    { value: 'filled', label: locale.t('filter.content.filled') }
+                ] }
+                onChange={ narrow }
+            />
+        </div>
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
@@ -46,16 +73,25 @@ export default component BlocksPage()
             <Show when={ blocks.data() === undefined }>
                 <div class="flex flex-col gap-2 px-4 py-4"><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /></div>
             </Show>
+            {/* Two empty states: "nothing indexed yet" under an active filter tells a reader
+                the chain has not started when what is empty is their own narrowing of it. */}
             <Show when={ blocks.data()?.rows.length === 0 }>
-                <EmptyState icon="block" title={ locale.t('blocks.empty.title') } hint={ locale.t('blocks.empty.hint') } />
+                <Show
+                    when={ content === 'all' }
+                    fallback={ <EmptyState icon="filter" title={ locale.t('blocks.empty.filtered.title') } hint={ locale.t('blocks.empty.filtered.hint') } /> }
+                >
+                    <EmptyState icon="block" title={ locale.t('blocks.empty.title') } hint={ locale.t('blocks.empty.hint') } />
+                </Show>
             </Show>
             <Show when={ blocks.data() !== undefined }>
             { () => <Pagination page={ blocks.data()!.page } pages={ blocks.data()!.pages } onChange={ (next) => page = next } /> }
             </Show>
         </section>
 
+        {/* The count follows the filter: with one on, `total` is what MATCHED, and calling that
+            "indexed" misreports the size of the index every time somebody narrows it. */}
         <Show when={ blocks.data() !== undefined }>
-        { () => <p class="text-[13px] text-muted">{ locale.t('blocks.total', { count: locale.n(blocks.data()!.total) }) }</p> }
+        { () => <p class="text-[13px] text-muted">{ locale.t(content === 'all' ? 'blocks.total' : 'blocks.total.filtered', { count: locale.n(blocks.data()!.total) }) }</p> }
         </Show>
     </div>
 }

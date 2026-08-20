@@ -76,7 +76,10 @@ export const en = {
     'blocks.title': 'Blocks',
     'blocks.empty.title': 'No blocks indexed yet',
     'blocks.empty.hint': 'Blocks appear here as the indexer reads them from the chain.',
+    'blocks.empty.filtered.title': 'No blocks carried anything',
+    'blocks.empty.filtered.hint': 'Every block in the index is empty. Clear the filter to see them.',
     'blocks.total': '{count} blocks indexed.',
+    'blocks.total.filtered': '{count} blocks carry transactions.',
     'blocks.gasTooltip': '{used} of {limit} gas used',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -239,6 +242,8 @@ export const en = {
     'filter.status': 'Status',
     'filter.status.success': 'Succeeded',
     'filter.status.reverted': 'Reverted',
+    'filter.content': 'Block contents',
+    'filter.content.filled': 'With transactions',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Pagination',
     'pagination.first': 'First page',

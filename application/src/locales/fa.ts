@@ -68,7 +68,10 @@ export const fa: Dictionary = {
     'blocks.title': 'بلاک‌ها',
     'blocks.empty.title': 'هنوز بلاکی نمایه نشده است',
     'blocks.empty.hint': 'بلاک‌ها به‌محض خوانده‌شدن از زنجیره اینجا ظاهر می‌شوند.',
+    'blocks.empty.filtered.title': 'هیچ بلاکی تراکنشی نداشت',
+    'blocks.empty.filtered.hint': 'همهٔ بلاک‌های نمایه خالی‌اند. برای دیدنشان فیلتر را بردارید.',
     'blocks.total': '{count} بلاک نمایه شده است.',
+    'blocks.total.filtered': '{count} بلاک تراکنش دارد.',
     'blocks.gasTooltip': '{used} از {limit} گس مصرف شده',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -225,6 +228,8 @@ export const fa: Dictionary = {
     'filter.status': 'وضعیت',
     'filter.status.success': 'موفق',
     'filter.status.reverted': 'برگشت‌خورده',
+    'filter.content': 'محتوای بلاک',
+    'filter.content.filled': 'دارای تراکنش',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'صفحه‌بندی',
     'pagination.first': 'صفحهٔ نخست',

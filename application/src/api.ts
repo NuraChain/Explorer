@@ -11,6 +11,7 @@ import type { Api } from '../../server/src/app.ts';
 export type {
     Account,
     Block,
+    BlockFilter,
     BlockDetail,
     BlockPage,
     ChainInfo,

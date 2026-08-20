@@ -413,12 +413,31 @@ describe('the API over the index', () =>
         expect(paged.pages).toBe(succeeded.total);
     });
 
+    it('narrows the block list to the blocks that carried something', async () =>
+    {
+        // CHAIN's block 0 and 2 hold one transaction each and block 1 holds two, so nothing is
+        // filtered out here - what is under test is that the envelope agrees with itself.
+        const empty = block(3, '0xb2', '0xb3', 0);
+        const { store, chain } = await indexed([...CHAIN, empty]);
+        const app = buildApp({ dev: false, store, chain });
+        const at = (path: string): Promise<Response> => app.handle(new Request(`http://local${ path }`));
+
+        const all = (await (await at('/api/blocks?limit=50')).json()) as BlockPage;
+        const filled = (await (await at('/api/blocks?limit=50&content=filled')).json()) as BlockPage;
+
+        expect(all.total).toBe(4);
+        expect(filled.total).toBe(3);
+        expect(filled.rows.every((row) => row.txCount > 0)).toBe(true);
+        expect(filled.rows.map((row) => row.number)).not.toContain(3);
+    });
+
     it('refuses a narrowing it does not know rather than quietly ignoring it', async () =>
     {
         // Silently serving the whole list back is the worst answer: the control says "reverted"
         // and the page shows everything, so the reader trusts a list that was never filtered.
         const get = await api();
         expect((await get('/api/txs?status=maybe')).status).toBe(422);
+        expect((await get('/api/blocks?content=some')).status).toBe(422);
     });
 
     it('404s an unknown block rather than inventing one', async () =>

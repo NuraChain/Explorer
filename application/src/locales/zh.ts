@@ -63,7 +63,10 @@ export const zh: Dictionary = {
     'blocks.title': '区块',
     'blocks.empty.title': '尚未索引任何区块',
     'blocks.empty.hint': '索引器从链上读到区块后，就会显示在这里。',
+    'blocks.empty.filtered.title': '没有含交易的区块',
+    'blocks.empty.filtered.hint': '索引中的每个区块都是空的。清除筛选即可看到它们。',
     'blocks.total': '已索引 {count} 个区块。',
+    'blocks.total.filtered': '{count} 个区块含有交易。',
     'blocks.gasTooltip': '已用 {used} / {limit} Gas',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -220,6 +223,8 @@ export const zh: Dictionary = {
     'filter.status': '状态',
     'filter.status.success': '成功',
     'filter.status.reverted': '已回滚',
+    'filter.content': '区块内容',
+    'filter.content.filled': '含交易',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': '分页',
     'pagination.first': '第一页',

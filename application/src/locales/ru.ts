@@ -64,7 +64,10 @@ export const ru: Dictionary = {
     'blocks.title': 'Блоки',
     'blocks.empty.title': 'Блоки ещё не проиндексированы',
     'blocks.empty.hint': 'Блоки появляются здесь по мере того, как индексатор читает их из цепочки.',
+    'blocks.empty.filtered.title': 'Ни один блок ничего не нёс',
+    'blocks.empty.filtered.hint': 'Все блоки в индексе пусты. Снимите фильтр, чтобы увидеть их.',
     'blocks.total': 'Проиндексировано блоков: {count}.',
+    'blocks.total.filtered': 'Блоков с транзакциями: {count}.',
     'blocks.gasTooltip': 'Использовано {used} из {limit} газа',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -221,6 +224,8 @@ export const ru: Dictionary = {
     'filter.status': 'Статус',
     'filter.status.success': 'Успешные',
     'filter.status.reverted': 'Откаченные',
+    'filter.content': 'Содержимое блока',
+    'filter.content.filled': 'С транзакциями',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Пагинация',
     'pagination.first': 'Первая страница',

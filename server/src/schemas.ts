@@ -52,6 +52,17 @@ export const block = object({
 });
 export type Block = Infer<typeof block>;
 
+/**
+ * What a list of blocks can be narrowed to. `filled` is a block that carried at least one
+ * transaction.
+ *
+ * A chain produces blocks whether or not anybody is using it, so on a quiet one the empty blocks
+ * ARE the list - twenty-five rows of nothing between the reader and the two that mattered. This
+ * is the narrowing that makes the block list readable on such a chain.
+ */
+export const BLOCK_FILTER = ['all', 'filled'] as const;
+export type BlockFilter = (typeof BLOCK_FILTER)[number];
+
 export const TX_STATUS = ['success', 'reverted', 'unknown'] as const;
 
 /**
@@ -291,5 +302,8 @@ export const pageQuery = object(pageShape);
 /** A page of transactions, optionally narrowed to one outcome. Spread, because there is no
     `.extend` on a schema and re-typing the bounds above is how the two drift apart. */
 export const transactionListQuery = object({ ...pageShape, status: enumOf(TX_STATUS_FILTER).optional() });
+
+/** A page of blocks, optionally narrowed to the ones that carried something. */
+export const blockListQuery = object({ ...pageShape, content: enumOf(BLOCK_FILTER).optional() });
 
 export const searchQuery = object({ q: string() });

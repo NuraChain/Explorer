@@ -64,7 +64,10 @@ export const ar: Dictionary = {
     'blocks.title': 'الكتل',
     'blocks.empty.title': 'لا كتل مفهرسة بعد',
     'blocks.empty.hint': 'تظهر الكتل هنا فور قراءتها من السلسلة.',
+    'blocks.empty.filtered.title': 'لا كتلة حملت شيئًا',
+    'blocks.empty.filtered.hint': 'كل كتلة في الفهرس فارغة. أزِل المرشّح لرؤيتها.',
     'blocks.total': '{count} كتلة مفهرسة.',
+    'blocks.total.filtered': '{count} كتلة تحمل معاملات.',
     'blocks.gasTooltip': 'استُهلك {used} من {limit} غاز',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -221,6 +224,8 @@ export const ar: Dictionary = {
     'filter.status': 'الحالة',
     'filter.status.success': 'ناجحة',
     'filter.status.reverted': 'مرتدة',
+    'filter.content': 'محتوى الكتلة',
+    'filter.content.filled': 'ذات معاملات',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'التصفح',
     'pagination.first': 'الصفحة الأولى',

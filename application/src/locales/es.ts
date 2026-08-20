@@ -63,7 +63,10 @@ export const es: Dictionary = {
     'blocks.title': 'Bloques',
     'blocks.empty.title': 'Aún no hay bloques indexados',
     'blocks.empty.hint': 'Los bloques aparecen aquí a medida que el indexador los lee de la cadena.',
+    'blocks.empty.filtered.title': 'Ningún bloque llevó nada',
+    'blocks.empty.filtered.hint': 'Todos los bloques del índice están vacíos. Quita el filtro para verlos.',
     'blocks.total': '{count} bloques indexados.',
+    'blocks.total.filtered': '{count} bloques llevan transacciones.',
     'blocks.gasTooltip': '{used} de {limit} de gas usado',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -220,6 +223,8 @@ export const es: Dictionary = {
     'filter.status': 'Estado',
     'filter.status.success': 'Exitosas',
     'filter.status.reverted': 'Revertidas',
+    'filter.content': 'Contenido del bloque',
+    'filter.content.filled': 'Con transacciones',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Paginación',
     'pagination.first': 'Primera página',

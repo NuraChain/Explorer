@@ -571,6 +571,43 @@ describe('reads: ordering, paging and filtering', () =>
         expect(index.transactionsPage(1, 1, 'success').rows.map((row) => row.hash)).toEqual(['0xok1']);
     });
 
+    /** A chain where most blocks carried nothing - what a quiet chain's block list looks like. */
+    function quiet(): IndexStore
+    {
+        const index = store();
+        for (const number of [0, 1, 2, 3])
+        {
+            const carries = number === 1 || number === 3;
+            index.insertBlock(
+                blockRow(number, { tx_count: carries ? 1 : 0 }),
+                carries ? [txRow(`0x${ number }a`, number)] : [],
+                []);
+        }
+        return index;
+    }
+
+    it('narrows the block list to the blocks that carried something', () =>
+    {
+        const page = quiet().blocksPage(10, 0, 'filled');
+        expect(page.rows.map((row) => row.number)).toEqual([3, 1]);
+        expect(page.total).toBe(2);
+    });
+
+    it('defaults to every block, so an old caller keeps the answer it had', () =>
+    {
+        expect(quiet().blocksPage(10, 0).rows.map((row) => row.number)).toEqual([3, 2, 1, 0]);
+        expect(quiet().blocksPage(10, 0, 'all').total).toBe(4);
+    });
+
+    it('counts and pages the narrowed set of blocks', () =>
+    {
+        const index = quiet();
+        const first = index.blocksPage(1, 0, 'filled');
+        expect(first.rows.map((row) => row.number)).toEqual([3]);
+        expect(first.total).toBe(2);
+        expect(index.blocksPage(1, 1, 'filled').rows.map((row) => row.number)).toEqual([1]);
+    });
+
     it('finds a block by hash, case-insensitively, and null for an unknown one', () =>
     {
         const index = filled();

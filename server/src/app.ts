@@ -10,6 +10,7 @@ import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransacti
 import {
     account,
     blockDetail,
+    blockListQuery,
     blockPage,
     contractCalldata,
     contractCallInput,
@@ -124,10 +125,10 @@ function build({ store, chain }: ApiDeps)
         })),
 
         blocks: feature('/blocks', (routes) => ({
-            list: routes.get('/', { query: pageQuery, output: blockPage }, ({ query }) =>
+            list: routes.get('/', { query: blockListQuery, output: blockPage }, ({ query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.blocksPage(limit, offset);
+                const { rows, total } = store.blocksPage(limit, offset, query.content ?? 'all');
                 return { rows: rows.map(presentBlock), total, page, pages: pageCount(total, limit) };
             }),
 

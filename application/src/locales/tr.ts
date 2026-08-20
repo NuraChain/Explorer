@@ -64,7 +64,10 @@ export const tr: Dictionary = {
     'blocks.title': 'Bloklar',
     'blocks.empty.title': 'Henüz dizinlenmiş blok yok',
     'blocks.empty.hint': 'Dizinleyici zincirden okudukça bloklar burada görünür.',
+    'blocks.empty.filtered.title': 'Hiçbir blok bir şey taşımadı',
+    'blocks.empty.filtered.hint': 'Dizindeki her blok boş. Onları görmek için filtreyi kaldırın.',
     'blocks.total': '{count} blok dizinlendi.',
+    'blocks.total.filtered': '{count} blok işlem taşıyor.',
     'blocks.gasTooltip': '{limit} gazın {used} kadarı kullanıldı',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -221,6 +224,8 @@ export const tr: Dictionary = {
     'filter.status': 'Durum',
     'filter.status.success': 'Başarılı',
     'filter.status.reverted': 'Geri alınan',
+    'filter.content': 'Blok içeriği',
+    'filter.content.filled': 'İşlem içeren',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Sayfalama',
     'pagination.first': 'İlk sayfa',

@@ -64,7 +64,10 @@ export const hi: Dictionary = {
     'blocks.title': 'ब्लॉक',
     'blocks.empty.title': 'अभी कोई ब्लॉक इंडेक्स नहीं हुआ',
     'blocks.empty.hint': 'इंडेक्सर जैसे-जैसे चेन से ब्लॉक पढ़ता है, वे यहाँ दिखते हैं।',
+    'blocks.empty.filtered.title': 'किसी ब्लॉक में कुछ नहीं था',
+    'blocks.empty.filtered.hint': 'सूचकांक का हर ब्लॉक खाली है। उन्हें देखने के लिए फ़िल्टर हटाएँ।',
     'blocks.total': '{count} ब्लॉक इंडेक्स हुए।',
+    'blocks.total.filtered': '{count} ब्लॉक में लेनदेन हैं।',
     'blocks.gasTooltip': '{limit} में से {used} गैस खर्च',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -221,6 +224,8 @@ export const hi: Dictionary = {
     'filter.status': 'स्थिति',
     'filter.status.success': 'सफल',
     'filter.status.reverted': 'रिवर्ट',
+    'filter.content': 'ब्लॉक सामग्री',
+    'filter.content.filled': 'लेनदेन वाले',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'पृष्ठांकन',
     'pagination.first': 'पहला पृष्ठ',
