@@ -1,5 +1,5 @@
 import { client, type TxStatusFilter } from '../api.ts';
-import { formatValue, shortHash } from '../lib/format.ts';
+import { formatValue } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -69,8 +69,16 @@ export default component TransactionsPage()
                         </Badge>
                         <div class="min-w-0 flex-1">
                             <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
+                            {/* The pair the same way the address ledger draws it: a HashLink
+                                each, so the whole value is one hover away and the counterparty is
+                                one click away. Copy is off on both - the row already carries one
+                                copy button, and three of them turn a list into a toolbar. */}
                             <p class="text-[12px] text-muted">
-                                { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
+                                <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
+                                <Show when={ row.to } fallback={ <span>{ locale.t('chain.contractCreation') }</span> } let={ to }>
+                                    <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                </Show>
                             </p>
                         </div>
                         <div class="min-w-0 max-w-[45%] text-end">

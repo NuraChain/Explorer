@@ -133,7 +133,10 @@ export default component Home()
                             </div>
                             <div class="text-end">
                                 <p class="data text-[13px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
-                                <p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p>
+                                {/* The percentage is a rounding of two numbers the reader cannot
+                                    see, exactly as on the blocks list - so it carries the same
+                                    bubble rather than being the one place they are hidden. */}
+                                <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
                             </div>
                         </li>
                     </For>
@@ -159,9 +162,19 @@ export default component Home()
                             </Badge>
                             <div class="min-w-0 flex-1">
                                 <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 12 } tail={ 6 } />
-                                <p class="text-[12px] text-muted">
-                                    { row.to === null ? locale.t('chain.contractCreation') : locale.t('chain.to', { address: shortHash(row.to, 8, 6) }) }
-                                </p>
+                                {/* The counterparty is shortened INSIDE a sentence, so it stays a
+                                    sentence and the bubble carries the whole address. A HashLink
+                                    here would put a second link in a row whose hash is already
+                                    one, and split the phrase around it. */}
+                                <Show
+                                    when={ row.to }
+                                    fallback={ <p class="text-[12px] text-muted">{ locale.t('chain.contractCreation') }</p> }
+                                    let={ to }
+                                >
+                                    <Tooltip label={ to } class="flex">
+                                        <p class="text-[12px] text-muted">{ locale.t('chain.to', { address: shortHash(to, 8, 6) }) }</p>
+                                    </Tooltip>
+                                </Show>
                             </div>
                             {/* Capped rather than shrink-0: an unbounded value column pushed the
                                 hash beside it down to nothing and then ran off the card anyway. */}

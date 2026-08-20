@@ -1,7 +1,7 @@
 import { Link, useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
-import { formatGwei, formatValue, gasShare, shortHash } from '../lib/format.ts';
+import { formatGwei, formatValue, gasShare } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -109,12 +109,20 @@ export default component BlockPage()
                     </h2>
                     <ul class="divide-y divide-line">
                         <For each={ detail.data()!.transactions } key={ (row) => row.hash } let={ row }>
-                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
                                 <Icon name={ row.status === 'reverted' ? 'alert' : 'success' } size={ 15 } class={ row.status === 'reverted' ? 'text-outflow' : 'text-inflow' } />
                                 <div class="min-w-0 flex-1">
                                     <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
+                                    {/* The pair as the address ledger draws it: a HashLink each,
+                                        so the whole value is one hover away and the counterparty
+                                        one click. Copy is off on both - the row already carries
+                                        one copy button, and three turn a list into a toolbar. */}
                                     <p class="text-[12px] text-muted">
-                                        { shortHash(row.from, 8, 6) } <span class="icon-flip inline-block">&rarr;</span> { row.to === null ? locale.t('chain.contractCreation') : shortHash(row.to, 8, 6) }
+                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                        <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
+                                        <Show when={ row.to } fallback={ <span>{ locale.t('chain.contractCreation') }</span> } let={ to }>
+                                            <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                        </Show>
                                     </p>
                                 </div>
                                 <p class="amount max-w-[45%] shrink-0 text-end text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>
