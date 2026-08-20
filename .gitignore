@@ -13,3 +13,6 @@ Thumbs.db
 .vscode
 .claude
 .data
+
+# Playwright MCP scratch output (page snapshots, traces) - never part of the app.
+.playwright-mcp/
