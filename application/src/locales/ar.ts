@@ -68,7 +68,7 @@ export const ar: Dictionary = {
     'blocks.empty.filtered.title': 'لا كتلة حملت شيئًا',
     'blocks.empty.filtered.hint': 'كل كتلة في الفهرس فارغة. أزِل المرشّح لرؤيتها.',
     'blocks.total': '{count} كتلة مفهرسة.',
-    'blocks.total.filtered': '{count} كتلة تحمل معاملات.',
+    'blocks.total.filtered': 'الكتل ذات المعاملات: {count}.',
     'blocks.gasTooltip': 'استُهلك {used} من {limit} غاز',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -78,7 +78,7 @@ export const ar: Dictionary = {
     'txs.empty.filtered.title': 'لا معاملات مطابقة',
     'txs.empty.filtered.hint': 'لا شيء في الفهرس يحمل هذه الحالة. أزِل المرشّح لرؤية الباقي.',
     'txs.total': '{count} معاملة مفهرسة.',
-    'txs.total.filtered': '{count} معاملة مطابقة.',
+    'txs.total.filtered': 'المعاملات المطابقة: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'الكتلة #{number}',
@@ -143,7 +143,7 @@ export const ar: Dictionary = {
     'accounts.search.empty.title': 'لا حساب مطابق',
     'accounts.search.empty.hint': 'لا عنوان مرتّب يحتوي على ذلك. تظهر هنا العناوين التي رآها المستكشف تحمل رصيدًا فقط.',
     'accounts.total': '{count} حساب مرتّب.',
-    'accounts.total.filtered': '{count} حساب مطابق.',
+    'accounts.total.filtered': 'الحسابات المطابقة: {count}.',
 
     // --- العقد -----------------------------------------
     'contract.compiler': 'المُصرِّف',
@@ -240,6 +240,7 @@ export const ar: Dictionary = {
     'charts.change.total': 'المضاف في آخر ٢٤ ساعة',
     'charts.change.day': 'مقابل الـ٢٤ ساعة التي سبقتها',
     'charts.chart.latest': 'الأحدث',
+    'charts.chart.peak': 'الذروة',
     'charts.chart.empty': 'لا أيام مفهرسة في هذا المدى بعد.',
     'charts.chart.summary': '{title} على مدى {count} يوم. الذروة {peak}، والأحدث {latest}.',
     'charts.footnote': 'كل رقم هنا محسوب من فهرس هذا المستكشف نفسه. لا تغذية أسعار لديه ولا اشتراك في مجمّع المعاملات ولا خدمة توثيق، فلا رسم للسوق ولا عدّ للمعاملات المعلّقة ولا رقم للعقود الموثّقة - ورسمٌ لرقم لم يقسه أحد أسوأ من غيابه.',

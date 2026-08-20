@@ -294,6 +294,7 @@ describe('SeriesChart', () =>
             format: (value: string) => value,
             summary: 'Daily transactions over three days',
             latest: 'Latest',
+            peakLabel: 'Peak',
             empty: 'Nothing yet',
             ...overrides
         }) as Rendered);
@@ -370,6 +371,7 @@ describe('SeriesChart', () =>
             format: record,
             summary: 'Daily fees',
             latest: 'Latest',
+            peakLabel: 'Peak',
             empty: 'Nothing yet'
         }) as Rendered);
         expect(seen).toContain(wei);

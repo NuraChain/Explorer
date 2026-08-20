@@ -68,7 +68,7 @@ export const hi: Dictionary = {
     'blocks.empty.filtered.title': 'किसी ब्लॉक में कुछ नहीं था',
     'blocks.empty.filtered.hint': 'सूचकांक का हर ब्लॉक खाली है। उन्हें देखने के लिए फ़िल्टर हटाएँ।',
     'blocks.total': '{count} ब्लॉक इंडेक्स हुए।',
-    'blocks.total.filtered': '{count} ब्लॉक में लेनदेन हैं।',
+    'blocks.total.filtered': 'लेनदेन वाले ब्लॉक: {count}.',
     'blocks.gasTooltip': '{limit} में से {used} गैस खर्च',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -78,7 +78,7 @@ export const hi: Dictionary = {
     'txs.empty.filtered.title': 'कोई लेनदेन मेल नहीं खाता',
     'txs.empty.filtered.hint': 'सूचकांक में इस स्थिति वाला कुछ नहीं है। बाकी देखने के लिए फ़िल्टर हटाएँ।',
     'txs.total': '{count} लेनदेन इंडेक्स हुए।',
-    'txs.total.filtered': '{count} लेनदेन मेल खाते हैं।',
+    'txs.total.filtered': 'मेल खाते लेनदेन: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'ब्लॉक #{number}',
@@ -143,7 +143,7 @@ export const hi: Dictionary = {
     'accounts.search.empty.title': 'कोई खाता मेल नहीं खाता',
     'accounts.search.empty.hint': 'किसी रैंक किए गए पते में वह नहीं है। यहाँ केवल वे पते आते हैं जिन्हें एक्सप्लोरर ने शेष के साथ देखा है।',
     'accounts.total': '{count} खाते रैंक किए गए।',
-    'accounts.total.filtered': '{count} खाते मेल खाते हैं।',
+    'accounts.total.filtered': 'मेल खाते खाते: {count}.',
 
     // --- कॉन्ट्रैक्ट -----------------------------------------
     'contract.compiler': 'कंपाइलर',
@@ -240,6 +240,7 @@ export const hi: Dictionary = {
     'charts.change.total': 'पिछले 24 घंटों में जुड़ा',
     'charts.change.day': 'उससे पहले के 24 घंटों की तुलना में',
     'charts.chart.latest': 'नवीनतम',
+    'charts.chart.peak': 'शिखर',
     'charts.chart.empty': 'इस दायरे में अभी कोई दिन अनुक्रमित नहीं है।',
     'charts.chart.summary': '{count} दिनों में {title}। शिखर {peak}, नवीनतम {latest}।',
     'charts.footnote': 'यहाँ का हर आँकड़ा इस एक्सप्लोरर के अपने सूचकांक से गिना गया है। इसके पास न मूल्य फ़ीड है, न मेमपूल सदस्यता, न सत्यापन सेवा - इसलिए यहाँ न बाज़ार चार्ट है, न लंबित लेनदेन की गिनती, न सत्यापित अनुबंधों का आँकड़ा। जिस संख्या को किसी ने मापा ही नहीं, उसका चार्ट न होने से बुरा होता।',

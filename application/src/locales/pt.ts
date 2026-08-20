@@ -66,7 +66,7 @@ export const pt: Dictionary = {
     'blocks.empty.filtered.title': 'Nenhum bloco levou nada',
     'blocks.empty.filtered.hint': 'Todos os blocos do índice estão vazios. Remova o filtro para vê-los.',
     'blocks.total': '{count} blocos indexados.',
-    'blocks.total.filtered': '{count} blocos levam transações.',
+    'blocks.total.filtered': 'Blocos com transações: {count}.',
     'blocks.gasTooltip': '{used} de {limit} de gás usado',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -76,7 +76,7 @@ export const pt: Dictionary = {
     'txs.empty.filtered.title': 'Nenhuma transação corresponde',
     'txs.empty.filtered.hint': 'Nada no índice tem este estado. Remova o filtro para ver o resto.',
     'txs.total': '{count} transações indexadas.',
-    'txs.total.filtered': '{count} transações correspondem.',
+    'txs.total.filtered': 'Transações correspondentes: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Bloco #{number}',
@@ -141,7 +141,7 @@ export const pt: Dictionary = {
     'accounts.search.empty.title': 'Nenhuma conta corresponde',
     'accounts.search.empty.hint': 'Nenhum endereço classificado contém isso. Aqui só aparecem os endereços que o explorador viu com saldo.',
     'accounts.total': '{count} contas classificadas.',
-    'accounts.total.filtered': '{count} contas correspondem.',
+    'accounts.total.filtered': 'Contas correspondentes: {count}.',
 
     // --- Contrato -----------------------------------------
     'contract.compiler': 'Compilador',
@@ -238,6 +238,7 @@ export const pt: Dictionary = {
     'charts.change.total': 'Adicionado nas últimas 24 horas',
     'charts.change.day': 'Em relação às 24 horas anteriores',
     'charts.chart.latest': 'Mais recente',
+    'charts.chart.peak': 'Pico',
     'charts.chart.empty': 'Ainda não há dias indexados neste intervalo.',
     'charts.chart.summary': '{title} ao longo de {count} dias. Pico {peak}, mais recente {latest}.',
     'charts.footnote': 'Cada número aqui é contado a partir do índice do próprio explorador. Ele não tem fonte de preços, nem assinatura da mempool, nem serviço de verificação, então não há gráfico de mercado, nem contagem de transações pendentes, nem número de contratos verificados - um gráfico de um número que ninguém mediu seria pior do que nenhum.',

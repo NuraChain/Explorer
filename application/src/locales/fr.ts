@@ -67,7 +67,7 @@ export const fr: Dictionary = {
     'blocks.empty.filtered.title': 'Aucun bloc n’a rien porté',
     'blocks.empty.filtered.hint': 'Tous les blocs de l’index sont vides. Retirez le filtre pour les voir.',
     'blocks.total': '{count} blocs indexés.',
-    'blocks.total.filtered': '{count} blocs portent des transactions.',
+    'blocks.total.filtered': 'Blocs portant des transactions : {count}.',
     'blocks.gasTooltip': '{used} sur {limit} de gaz consommé',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -77,7 +77,7 @@ export const fr: Dictionary = {
     'txs.empty.filtered.title': 'Aucune transaction ne correspond',
     'txs.empty.filtered.hint': 'Rien dans l’index ne porte ce statut. Retirez le filtre pour voir le reste.',
     'txs.total': '{count} transactions indexées.',
-    'txs.total.filtered': '{count} transactions correspondent.',
+    'txs.total.filtered': 'Transactions correspondantes : {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Bloc #{number}',
@@ -142,7 +142,7 @@ export const fr: Dictionary = {
     'accounts.search.empty.title': 'Aucun compte ne correspond',
     'accounts.search.empty.hint': 'Aucune adresse classée ne contient cela. Seules les adresses que l’explorateur a vues avec un solde apparaissent ici.',
     'accounts.total': '{count} comptes classés.',
-    'accounts.total.filtered': '{count} comptes correspondent.',
+    'accounts.total.filtered': 'Comptes correspondants : {count}.',
 
     // --- Contrat -----------------------------------------
     'contract.compiler': 'Compilateur',
@@ -239,6 +239,7 @@ export const fr: Dictionary = {
     'charts.change.total': 'Ajouté durant les dernières 24 heures',
     'charts.change.day': 'Face aux 24 heures précédentes',
     'charts.chart.latest': 'Dernier',
+    'charts.chart.peak': 'Pic',
     'charts.chart.empty': 'Aucun jour indexé dans cette plage pour l’instant.',
     'charts.chart.summary': '{title} sur {count} jours. Pic {peak}, dernier {latest}.',
     'charts.footnote': 'Chaque chiffre ici est compté depuis l’index propre à cet explorateur. Il n’a ni flux de prix, ni abonnement au mempool, ni service de vérification : donc pas de graphique de marché, pas de compte de transactions en attente, pas de chiffre de contrats vérifiés - le graphique d’un nombre que personne n’a mesuré vaudrait moins que rien.',

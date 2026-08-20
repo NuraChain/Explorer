@@ -72,7 +72,7 @@ export const fa: Dictionary = {
     'blocks.empty.filtered.title': 'هیچ بلاکی تراکنشی نداشت',
     'blocks.empty.filtered.hint': 'همهٔ بلاک‌های نمایه خالی‌اند. برای دیدنشان فیلتر را بردارید.',
     'blocks.total': '{count} بلاک نمایه شده است.',
-    'blocks.total.filtered': '{count} بلاک تراکنش دارد.',
+    'blocks.total.filtered': 'بلاک‌های دارای تراکنش: {count}.',
     'blocks.gasTooltip': '{used} از {limit} گس مصرف شده',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -82,7 +82,7 @@ export const fa: Dictionary = {
     'txs.empty.filtered.title': 'تراکنشی هم‌خوان نیست',
     'txs.empty.filtered.hint': 'هیچ چیزی در نمایه این وضعیت را ندارد. برای دیدن بقیه، فیلتر را بردارید.',
     'txs.total': '{count} تراکنش نمایه شده است.',
-    'txs.total.filtered': '{count} تراکنش هم‌خوان است.',
+    'txs.total.filtered': 'تراکنش‌های هم‌خوان: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'بلاک #{number}',
@@ -147,7 +147,7 @@ export const fa: Dictionary = {
     'accounts.search.empty.title': 'حسابی هم‌خوان نیست',
     'accounts.search.empty.hint': 'هیچ نشانی رتبه‌بندی‌شده‌ای این را ندارد. تنها نشانی‌هایی اینجا می‌آیند که کاوشگر آن‌ها را با موجودی دیده باشد.',
     'accounts.total': '{count} حساب رتبه‌بندی شده است.',
-    'accounts.total.filtered': '{count} حساب هم‌خوان است.',
+    'accounts.total.filtered': 'حساب‌های هم‌خوان: {count}.',
 
     // --- قرارداد -----------------------------------------
     'contract.compiler': 'کامپایلر',
@@ -244,6 +244,7 @@ export const fa: Dictionary = {
     'charts.change.total': 'افزودهٔ ۲۴ ساعت گذشته',
     'charts.change.day': 'در برابر ۲۴ ساعت پیش از آن',
     'charts.chart.latest': 'آخرین',
+    'charts.chart.peak': 'اوج',
     'charts.chart.empty': 'هنوز روزی در این بازه نمایه نشده است.',
     'charts.chart.summary': '{title} در {count} روز. اوج {peak}، آخرین {latest}.',
     'charts.footnote': 'هر عدد اینجا از نمایهٔ خودِ این کاوشگر شمرده شده است. این کاوشگر نه خوراک قیمت دارد، نه اشتراک استخر تراکنش و نه سرویس تأیید قرارداد؛ پس نمودار بازار، شمار تراکنش‌های در انتظار و شمار قراردادهای تأییدشده اینجا نیست - نمودارِ عددی که کسی نسنجیده، از نبودش بدتر است.',

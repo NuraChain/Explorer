@@ -67,7 +67,7 @@ export const zh: Dictionary = {
     'blocks.empty.filtered.title': '没有含交易的区块',
     'blocks.empty.filtered.hint': '索引中的每个区块都是空的。清除筛选即可看到它们。',
     'blocks.total': '已索引 {count} 个区块。',
-    'blocks.total.filtered': '{count} 个区块含有交易。',
+    'blocks.total.filtered': '含交易的区块：{count}。',
     'blocks.gasTooltip': '已用 {used} / {limit} Gas',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -77,7 +77,7 @@ export const zh: Dictionary = {
     'txs.empty.filtered.title': '没有匹配的交易',
     'txs.empty.filtered.hint': '索引中没有该状态的交易。清除筛选即可看到其余交易。',
     'txs.total': '已索引 {count} 笔交易。',
-    'txs.total.filtered': '{count} 笔交易匹配。',
+    'txs.total.filtered': '匹配的交易：{count}。',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': '区块 #{number}',
@@ -142,7 +142,7 @@ export const zh: Dictionary = {
     'accounts.search.empty.title': '没有匹配的账户',
     'accounts.search.empty.hint': '排行中没有包含该内容的地址。这里只列出浏览器见过且持有余额的地址。',
     'accounts.total': '已排行 {count} 个账户。',
-    'accounts.total.filtered': '{count} 个账户匹配。',
+    'accounts.total.filtered': '匹配的账户：{count}。',
 
     // --- 合约 -----------------------------------------
     'contract.compiler': '编译器',
@@ -239,6 +239,7 @@ export const zh: Dictionary = {
     'charts.change.total': '最近 24 小时新增',
     'charts.change.day': '相较于之前的 24 小时',
     'charts.chart.latest': '最新',
+    'charts.chart.peak': '峰值',
     'charts.chart.empty': '此范围内尚无已索引的日期。',
     'charts.chart.summary': '{count} 天的{title}。峰值 {peak}，最新 {latest}。',
     'charts.footnote': '这里的每个数字都来自本浏览器自己的索引。它没有价格源、没有内存池订阅、也没有合约验证服务，因此没有行情图、没有待处理交易数、也没有已验证合约数——为一个无人测量的数字画图，比不画更糟。',

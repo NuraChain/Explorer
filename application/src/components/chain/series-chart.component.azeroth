@@ -37,11 +37,26 @@ export default component SeriesChart(props: {
     /** What the readout is labelled when nothing is under the pointer - "Latest", translated. */
     latest: string;
 
+    /** How the top of the scale is labelled under the plot - "Peak", translated. */
+    peakLabel: string;
+
+    /**
+     * True when these values are chain AMOUNTS, which are pinned left-to-right in the mono face.
+     *
+     * False for everything a reader counts. A count is printed in their own digits and, for the
+     * scaled units, with their own word for the scale - and the mono stack has no Persian digits
+     * to set either in, so "2.2 million" came out as the word before the number in a face that
+     * was not the one the rest of the caption was in.
+     */
+    amount?: boolean;
+
     /** What to say when the index has no days to draw. */
     empty: string;
 })
 {
     const locale = useLocale();
+
+    derived face = props.amount === true ? 'amount' : 'tabular-nums';
 
     /** Which point the crosshair is on; -1 for none. */
     state active = -1;
@@ -98,8 +113,16 @@ export default component SeriesChart(props: {
     /** The point being read: the crosshair's, or the most recent when there is no crosshair. */
     derived reading = props.points[active] ?? props.points[props.points.length - 1];
 
-    /** The day the series peaked on, so the figure printed against the top of the plot is real. */
-    derived peakPoint = props.points[values.indexOf(peak)];
+    /**
+     * The day the series reached its highest reading on.
+     *
+     * By comparison and not by `indexOf(peak)`: `peak` is floored at 1 so a flat run of zeros
+     * still draws a baseline, and on such a series there is no point holding that value at all -
+     * the label vanished on exactly the charts a reader most needs a scale for.
+     */
+    derived peakPoint = props.points.length === 0
+        ? undefined
+        : props.points.reduce((top, point) => (Number(point.value) > Number(top.value) ? point : top), props.points[0]!);
 
     /**
      * Which point the pointer is over.
@@ -124,15 +147,18 @@ export default component SeriesChart(props: {
     <figure class="panel px-4 py-4">
         <figcaption class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h3 class="text-[14px] font-semibold text-text">{ props.title }</h3>
+            {/* A flex row and not a margin on the value: `amount` gives that span a direction of
+                its own, so a logical margin on it resolves against LTR and puts the gap on the far
+                side of the pair. A gap belongs to the row, and a row has no direction of its own. */}
             <Show when={ reading }>
             { () =>
-                <p class="text-[13px]">
+                <p class="flex items-baseline gap-2 text-[13px]">
                     {/* The date only while a point is under the pointer - the rest of the time
                         this reads the latest, which is the figure the title implies. */}
                     <span class="text-muted">
                         { active >= 0 ? locale.date(reading!.at) : props.latest }
                     </span>
-                    <span class="amount ms-2 font-semibold text-text">{ props.format(reading!.value) }</span>
+                    <span class={ `${ face } font-semibold text-text` }>{ props.format(reading!.value) }</span>
                 </p>
             }
             </Show>
@@ -178,16 +204,6 @@ export default component SeriesChart(props: {
                     />
                 </svg>
 
-                {/* The peak, named at the top of the scale it sets. Logical `start`, so it sits at
-                    the reader's own edge - which is the edge a y axis belongs on either way. */}
-                <Show when={ peakPoint }>
-                { () =>
-                    <span class="pointer-events-none absolute start-0 top-0 text-[11px] text-faint">
-                        <span class="amount">{ props.format(peakPoint!.value) }</span>
-                    </span>
-                }
-                </Show>
-
                 <Show when={ active >= 0 && plotted[active] !== undefined }>
                 { () =>
                     <span class="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -206,9 +222,19 @@ export default component SeriesChart(props: {
                 </Show>
             </div>
 
-            {/* A flex row, so its ends swap with the layout - and the plot above swapped with it. */}
-            <div class="mt-2 flex items-baseline justify-between gap-2 text-[12px] text-faint">
+            {/* A flex row, so its ends swap with the layout - and the plot above swapped with it.
+                The peak names the top of the scale, which is the only anchor a reader has for
+                magnitude. It sits BELOW the plot rather than inside it: on a flat series the line
+                runs along the top of its own scale, and a label up there lay across it. */}
+            <div class="mt-2 flex items-baseline justify-between gap-x-2 gap-y-1 text-[12px] text-faint">
                 <span>{ locale.date(props.points[0]!.at) }</span>
+                <Show when={ peakPoint }>
+                { () =>
+                    <span class="flex items-baseline gap-1">
+                        { props.peakLabel }<span class={ face }>{ props.format(peakPoint!.value) }</span>
+                    </span>
+                }
+                </Show>
                 <span>{ locale.date(props.points[props.points.length - 1]!.at) }</span>
             </div>
         </Show>

@@ -80,7 +80,7 @@ export const en = {
     'blocks.empty.filtered.title': 'No blocks carried anything',
     'blocks.empty.filtered.hint': 'Every block in the index is empty. Clear the filter to see them.',
     'blocks.total': '{count} blocks indexed.',
-    'blocks.total.filtered': '{count} blocks carry transactions.',
+    'blocks.total.filtered': 'Blocks with transactions: {count}.',
     'blocks.gasTooltip': '{used} of {limit} gas used',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -90,7 +90,7 @@ export const en = {
     'txs.empty.filtered.title': 'No transactions match',
     'txs.empty.filtered.hint': 'Nothing in the index carries this status. Clear the filter to see the rest.',
     'txs.total': '{count} transactions indexed.',
-    'txs.total.filtered': '{count} transactions match.',
+    'txs.total.filtered': 'Matching transactions: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Block #{number}',
@@ -155,7 +155,7 @@ export const en = {
     'accounts.search.empty.title': 'No account matches',
     'accounts.search.empty.hint': 'No ranked address contains that. Only addresses the explorer has seen holding a balance appear here.',
     'accounts.total': '{count} accounts ranked.',
-    'accounts.total.filtered': '{count} accounts match.',
+    'accounts.total.filtered': 'Matching accounts: {count}.',
 
     // --- Contract -----------------------------------------------------------------------------
     'contract.compiler': 'Compiler',
@@ -257,6 +257,7 @@ export const en = {
     'charts.change.total': 'Added in the last 24 hours',
     'charts.change.day': 'Against the 24 hours before',
     'charts.chart.latest': 'Latest',
+    'charts.chart.peak': 'Peak',
     'charts.chart.empty': 'No days indexed in this range yet.',
     'charts.chart.summary': '{title} over {count} days. Peak {peak}, latest {latest}.',
     'charts.footnote': 'Every figure here is counted from this explorer’s own index. It has no price feed, no mempool subscription and no verification service, so there is no market chart, no pending-transaction count and no verified-contract figure - a chart of a number nobody measured would be worse than none.',

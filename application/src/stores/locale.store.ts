@@ -1,6 +1,6 @@
 import { createStore, createSignal, type Getter } from 'azerothjs';
 
-import { elapsed, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes } from '../lib/format.ts';
+import { elapsed, formatChange, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
 import { fa } from '../locales/fa.ts';
 import { ar } from '../locales/ar.ts';
@@ -163,8 +163,16 @@ export interface LocaleApi
     /** A translated string, with `{name}` placeholders filled from `vars`. */
     t(key: MessageKey, vars?: Record<string, string | number>): string;
 
-    /** A count in the reader's digits. NOT for chain amounts - those stay Latin, see format.ts. */
-    n(value: number): string;
+    /**
+     * A count in the reader's digits. NOT for chain amounts - those stay Latin, see format.ts.
+     *
+     * `fractionDigits` is for the measured counts that are not whole: a mean block time of 2.98
+     * seconds is the reading, and rounding it to 3 flattens the one figure that moves.
+     */
+    n(value: number, fractionDigits?: number): string;
+
+    /** A movement against an earlier reading, as the reader's own signed percentage. */
+    change(ratio: number): string;
 
     /** The same count shortened - for a chart caption, never for a figure that has to be exact. */
     compact(value: number): string;
@@ -226,7 +234,8 @@ export const useLocale = createStore((): LocaleApi =>
             apply(next);
         },
         t,
-        n: (value) => formatCount(value, LOCALE_TAG[locale()]),
+        n: (value, fractionDigits) => formatCount(value, LOCALE_TAG[locale()], fractionDigits),
+        change: (ratio) => formatChange(ratio, LOCALE_TAG[locale()]),
         compact: (value) => formatCompact(value, LOCALE_TAG[locale()]),
         chainName: (name) => CHAIN_NAMES[locale()][name] ?? name,
         dateTime: (iso) => formatDateTime(iso, LOCALE_TAG[locale()]),

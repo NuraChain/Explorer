@@ -68,7 +68,7 @@ export const tr: Dictionary = {
     'blocks.empty.filtered.title': 'Hiçbir blok bir şey taşımadı',
     'blocks.empty.filtered.hint': 'Dizindeki her blok boş. Onları görmek için filtreyi kaldırın.',
     'blocks.total': '{count} blok dizinlendi.',
-    'blocks.total.filtered': '{count} blok işlem taşıyor.',
+    'blocks.total.filtered': 'İşlem taşıyan blok: {count}.',
     'blocks.gasTooltip': '{limit} gazın {used} kadarı kullanıldı',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -78,7 +78,7 @@ export const tr: Dictionary = {
     'txs.empty.filtered.title': 'Eşleşen işlem yok',
     'txs.empty.filtered.hint': 'Dizinde bu durumda bir şey yok. Geri kalanını görmek için filtreyi kaldırın.',
     'txs.total': '{count} işlem dizinlendi.',
-    'txs.total.filtered': '{count} işlem eşleşiyor.',
+    'txs.total.filtered': 'Eşleşen işlem: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Blok #{number}',
@@ -143,7 +143,7 @@ export const tr: Dictionary = {
     'accounts.search.empty.title': 'Eşleşen hesap yok',
     'accounts.search.empty.hint': 'Sıralamadaki hiçbir adres bunu içermiyor. Burada yalnızca gezginin bakiyeyle gördüğü adresler yer alır.',
     'accounts.total': '{count} hesap sıralandı.',
-    'accounts.total.filtered': '{count} hesap eşleşiyor.',
+    'accounts.total.filtered': 'Eşleşen hesap: {count}.',
 
     // --- Sözleşme -----------------------------------------
     'contract.compiler': 'Derleyici',
@@ -240,6 +240,7 @@ export const tr: Dictionary = {
     'charts.change.total': 'Son 24 saatte eklenen',
     'charts.change.day': 'Ondan önceki 24 saate karşı',
     'charts.chart.latest': 'En son',
+    'charts.chart.peak': 'Zirve',
     'charts.chart.empty': 'Bu aralıkta henüz dizinlenmiş gün yok.',
     'charts.chart.summary': '{count} gün boyunca {title}. Zirve {peak}, en son {latest}.',
     'charts.footnote': 'Buradaki her sayı bu gezginin kendi dizininden sayılır. Fiyat beslemesi, mempool aboneliği ve doğrulama hizmeti yoktur; bu yüzden piyasa grafiği, bekleyen işlem sayısı ve doğrulanmış sözleşme sayısı da yoktur - kimsenin ölçmediği bir sayının grafiği, hiç olmamasından kötüdür.',

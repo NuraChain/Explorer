@@ -67,7 +67,7 @@ export const es: Dictionary = {
     'blocks.empty.filtered.title': 'Ningún bloque llevó nada',
     'blocks.empty.filtered.hint': 'Todos los bloques del índice están vacíos. Quita el filtro para verlos.',
     'blocks.total': '{count} bloques indexados.',
-    'blocks.total.filtered': '{count} bloques llevan transacciones.',
+    'blocks.total.filtered': 'Bloques con transacciones: {count}.',
     'blocks.gasTooltip': '{used} de {limit} de gas usado',
 
     // --- Transactions list --------------------------------------------------------------------
@@ -77,7 +77,7 @@ export const es: Dictionary = {
     'txs.empty.filtered.title': 'Ninguna transacción coincide',
     'txs.empty.filtered.hint': 'Nada en el índice tiene este estado. Quita el filtro para ver el resto.',
     'txs.total': '{count} transacciones indexadas.',
-    'txs.total.filtered': '{count} transacciones coinciden.',
+    'txs.total.filtered': 'Transacciones coincidentes: {count}.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Bloque #{number}',
@@ -142,7 +142,7 @@ export const es: Dictionary = {
     'accounts.search.empty.title': 'Ninguna cuenta coincide',
     'accounts.search.empty.hint': 'Ninguna dirección clasificada contiene eso. Aquí solo aparecen las direcciones que el explorador ha visto con saldo.',
     'accounts.total': '{count} cuentas clasificadas.',
-    'accounts.total.filtered': '{count} cuentas coinciden.',
+    'accounts.total.filtered': 'Cuentas coincidentes: {count}.',
 
     // --- Contrato -----------------------------------------
     'contract.compiler': 'Compilador',
@@ -239,6 +239,7 @@ export const es: Dictionary = {
     'charts.change.total': 'Añadido en las últimas 24 horas',
     'charts.change.day': 'Frente a las 24 horas anteriores',
     'charts.chart.latest': 'Último',
+    'charts.chart.peak': 'Máximo',
     'charts.chart.empty': 'Aún no hay días indexados en este rango.',
     'charts.chart.summary': '{title} durante {count} días. Máximo {peak}, último {latest}.',
     'charts.footnote': 'Cada cifra aquí se cuenta desde el propio índice de este explorador. No tiene fuente de precios, ni suscripción a la mempool, ni servicio de verificación, así que no hay gráfico de mercado, ni recuento de transacciones pendientes, ni cifra de contratos verificados: un gráfico de un número que nadie midió sería peor que ninguno.',

@@ -94,9 +94,26 @@ export function shortHash(value: string, lead = 10, tail = 8): string
  * formatAmount and stay in Latin digits: they sit inside `.data`, which is forced to LTR, and a
  * balance a reader cannot paste back into another tool is not doing its job.
  */
-export function formatCount(value: number, tag = 'en-US'): string
+export function formatCount(value: number, tag = 'en-US', fractionDigits = 0): string
 {
-    return value.toLocaleString(tag);
+    // The no-fraction call is left EXACTLY as it was rather than routed through the options
+    // below: `{ maximumFractionDigits: 0 }` is not the same as no options at all, and every
+    // existing caller of this function is counting whole things.
+    return fractionDigits === 0
+        ? value.toLocaleString(tag)
+        : value.toLocaleString(tag, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
+}
+
+/**
+ * A change against an earlier reading, as the reader's own signed percentage.
+ *
+ * Assembled by Intl and never by hand. A `+` glued onto a formatted number is bidi-neutral and
+ * lands on the far side of its own digits in a mirrored line; the percent sign is not `%` in
+ * every language; and a change of zero must read as "did not move" rather than as "+0%".
+ */
+export function formatChange(ratio: number, tag = 'en-US'): string
+{
+    return ratio.toLocaleString(tag, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 });
 }
 
 export type ElapsedUnit = 'justNow' | 'second' | 'minute' | 'hour' | 'day';

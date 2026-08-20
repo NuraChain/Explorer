@@ -73,10 +73,12 @@ export default component ChartsPage()
                 return formatGwei(value);
             case 'bytes':
                 return locale.bytes(Math.round(Number(value)));
+            // Through the locale and not `toFixed`, which prints Latin digits whatever language
+            // the page is in - a Persian page read "3.00 ثانیه" with the digits of another script.
             case 'seconds':
-                return locale.t('unit.seconds', { count: Number(value).toFixed(2) });
+                return locale.t('unit.seconds', { count: locale.n(Number(value), 2) });
             case 'percent':
-                return locale.t('unit.percent', { count: Number(value).toFixed(1) });
+                return locale.t('unit.percent', { count: locale.n(Number(value), 1) });
             // A day of gas on a busy chain is a thirteen-digit number, and thirteen digits in a
             // chart caption is a wall. Compact is the reader's own shortening of it - "3.8M" in
             // English, "۳٫۸ میلیون" in Persian - so nobody has to count the separators.
@@ -108,16 +110,13 @@ export default component ChartsPage()
     };
 
     /**
-     * A percentage of movement.
+     * Whether a unit is a chain AMOUNT, which is pinned left-to-right in the mono face.
      *
-     * NOT in inflow or outflow. Those two colours answer where value went, and this explorer
-     * spends them on nothing else - a transaction count that rose is not value arriving. The sign
-     * carries the direction instead, which also means the reading survives being read by someone
-     * who cannot separate two hues. It stays INSIDE the isolate: a bare +/- is bidi-neutral and
-     * would jump to the far side of its own digits in a mirrored line.
+     * Everything else here is a figure the reader counts, and those are printed in the reader's
+     * own digits - which the mono stack does not have, and whose scale words ("million", "KB",
+     * "seconds") come out reversed once something forces the run left-to-right.
      */
-    const movement = (change: number): string =>
-        `${ change < 0 ? '−' : '+' }${ locale.n(Math.round(Math.abs(change) * 1000) / 10) }%`;
+    const isChainValue = (unit: ChartUnit): boolean => unit === 'native' || unit === 'gwei';
 
     derived totals = ((): Array<{ label: string; figure: StatFigure; unit: ChartUnit }> =>
     {
@@ -193,13 +192,13 @@ export default component ChartsPage()
                     <For each={ totals } key={ (tile) => tile.label } let={ tile }>
                         <div class="panel px-4 py-3">
                             <dt class="text-[13px] text-muted">{ tile.label }</dt>
-                            <dd class="mt-0.5 text-[17px] font-bold"><span class="amount">{ render(tile.unit, tile.figure.value) }</span></dd>
+                            <dd class="mt-0.5 text-[17px] font-bold"><span class={ isChainValue(tile.unit) ? 'amount' : 'tabular-nums' }>{ render(tile.unit, tile.figure.value) }</span></dd>
                             {/* A total's movement is what the last day ADDED to it - a different
                                 reading from the 24-hour tiles below, so it is labelled apart. */}
                             <Show when={ tile.figure.change !== null }>
                             { () =>
                                 <Tooltip label={ locale.t('charts.change.total') } class="flex">
-                                    <p class="text-[12px] text-muted"><span class="amount">{ movement(tile.figure.change!) }</span></p>
+                                    <p class="text-[12px] tabular-nums text-muted">{ locale.change(tile.figure.change!) }</p>
                                 </Tooltip>
                             }
                             </Show>
@@ -216,11 +215,11 @@ export default component ChartsPage()
                     <For each={ lastDay } key={ (tile) => tile.label } let={ tile }>
                         <div class="panel px-4 py-3">
                             <dt class="text-[13px] text-muted">{ tile.label }</dt>
-                            <dd class="mt-0.5 text-[17px] font-bold"><span class="amount">{ render(tile.unit, tile.figure.value) }</span></dd>
+                            <dd class="mt-0.5 text-[17px] font-bold"><span class={ isChainValue(tile.unit) ? 'amount' : 'tabular-nums' }>{ render(tile.unit, tile.figure.value) }</span></dd>
                             <Show when={ tile.figure.change !== null }>
                             { () =>
                                 <Tooltip label={ locale.t('charts.change.day') } class="flex">
-                                    <p class="text-[12px] text-muted"><span class="amount">{ movement(tile.figure.change!) }</span></p>
+                                    <p class="text-[12px] tabular-nums text-muted">{ locale.change(tile.figure.change!) }</p>
                                 </Tooltip>
                             }
                             </Show>
@@ -246,8 +245,10 @@ export default component ChartsPage()
                                     title={ locale.t(METRIC[key]) }
                                     points={ seriesOf(key)?.points ?? [] }
                                     format={ (value) => render(seriesOf(key)?.unit ?? 'count', value) }
+                                    amount={ isChainValue(seriesOf(key)?.unit ?? 'count') }
                                     summary={ summaryOf(key) }
                                     latest={ locale.t('charts.chart.latest') }
+                                    peakLabel={ locale.t('charts.chart.peak') }
                                     empty={ locale.t('charts.chart.empty') }
                                 />
                             </div>
