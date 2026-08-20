@@ -11,7 +11,12 @@ coverage/
 Thumbs.db
 .idea
 .vscode
-.claude
+# Editor state and local Claude Code settings stay out, but the skills and agents that encode
+# this repository's own conventions are shared - they are as much project documentation as
+# CLAUDE.md is, and a rule only one machine knows is a rule the team does not have.
+.claude/*
+!.claude/skills/
+!.claude/agents/
 .data
 
 # Playwright MCP scratch output (page snapshots, traces) - never part of the app.
