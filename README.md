@@ -225,12 +225,73 @@ What to know before running it for real:
 | `npm run build` | Client bundle, SSR bundle, prerender |
 | `npm start` | Run the built app (set `NODE_ENV=production`) |
 | `npm run check` | Typecheck and lint every workspace |
-| `npm test` | Server and unit suites |
+| `npm test` | Every suite in every workspace |
+| `npm run test:coverage` | Server suite with a coverage report |
+| `npm run test:shuffle` | Every suite in random order - the isolation gate |
 | `npm run service:deploy` | Rebuild and restart (root) |
 | `npm run service:install` | Write and load the systemd unit (root) |
 | `npm run service:uninstall` | Stop, disable and remove the unit (root) |
 | `npm run service:start` / `:stop` / `:restart` | Control the service (root) |
 | `npm run service:status` | What systemd thinks of it |
+
+---
+
+## Tests
+
+Everything runs offline. No suite binds a port, reaches a network or touches a file the repository
+does not own: the index is sqlite `:memory:` per test, the node is a stubbed gateway or a stubbed
+`fetch` answering JSON-RPC, and the browser half runs under happy-dom. That is what makes the same
+command give the same answer on a laptop, on a fork's pull request, and at three in the morning.
+
+| Command | Scope |
+| --- | --- |
+| `npm test` | Everything, both workspaces |
+| `npm run test:coverage` | Server suite plus a coverage report in `server/coverage` |
+| `npm run test:shuffle` | Everything, in random order |
+| `npm test --workspace server` | Server only |
+| `npm test --workspace application` | Browser half only |
+
+Narrower slices, from within a workspace:
+
+| Command | Scope |
+| --- | --- |
+| `npm run test:unit -w server` | ABI coercion, bytecode analysis, the cache, configuration |
+| `npm run test:integration -w server` | The sqlite index, the sync loop, the RPC client |
+| `npm run test:api -w server` | Both HTTP surfaces - the typed API and the Etherscan shim |
+| `npm run test:security -w server` | Only the security suites |
+| `npm run test:property -w server` | Only the property and fuzz suites |
+| `npm run test:components -w application` | Component rendering and interaction |
+| `npm run test:stores -w application` | The browser stores, wallet included |
+| `npm run test:watch -w server` | Re-run on change |
+
+**`test:shuffle` is a gate, not a curiosity.** Both halves lean on module-level singletons - the
+stores in the browser, the signature table on the server - so a test that only passes in
+declaration order is one that will fail for somebody else, on an unrelated pull request, with no
+way to reproduce it. CI runs the shuffled pass on every push for that reason.
+
+Where the suites live:
+
+```
+server/tests/
+    support/fixtures.ts     a chain, an index and an app, built the same way by every spec
+    values.spec.ts          ABI coercion and encoding - unit, boundary, property, fuzz
+    contract.spec.ts        bytecode analysis - unit and fuzz over arbitrary bytes
+    store.spec.ts           the sqlite index: constraints, transactions, ordering, concurrency
+    indexer.spec.ts         sync state transitions, reorgs, partial failure
+    client.spec.ts          the JSON-RPC client, against a stubbed node
+    cache.spec.ts           the read-through cache in front of the node
+    http.spec.ts            the typed API: status codes, validation, security
+    etherscan.spec.ts       the wallet-facing compatibility surface
+    config.spec.ts          environment and configuration
+    app.spec.ts             the original end-to-end suite over the index
+
+application/tests/
+    format.spec.ts          amount arithmetic - the highest-risk code in the explorer
+    locale.spec.ts          the ten dictionaries and everything that reads them
+    components.spec.ts      components mounted in a DOM, driven by real events
+    stores.spec.ts          scroll lock, theme, toasts
+    wallet.spec.ts          the EIP-1193 wallet store, against a fake provider
+```
 
 ---
 
@@ -262,11 +323,12 @@ same declaration - `client.blocks.one(...)` is checked against the handler's own
 Issues and pull requests are welcome. For anything larger than a fix, open an issue first so the
 approach can be agreed before you spend the time.
 
-Before opening a pull request, both gates must pass:
+Before opening a pull request, all three gates must pass:
 
 ```sh
 npm run check
 npm test
+npm run test:shuffle
 ```
 
 House style is enforced by the linter and visible in any neighbouring file: Allman braces, one
