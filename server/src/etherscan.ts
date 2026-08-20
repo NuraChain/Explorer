@@ -79,27 +79,39 @@ function paging(query: URLSearchParams): Paging | string
     const page = Number(query.get('page') ?? '1');
     const size = Number(query.get('offset') ?? '100');
 
-    if (!Number.isInteger(page) || page < 1)
+    // SAFE integers, not merely integral ones. `Number('999999999999999999999')` is 1e21, which
+    // `Number.isInteger` calls an integer because it is integral as a double - and it then rode
+    // through the page arithmetic into a bound sqlite parameter, which refuses a non-safe integer
+    // with "datatype mismatch". That is an unhandled throw, so an absurd page number answered
+    // with a 500 from the one function whose whole job is to refuse absurd input.
+    if (!Number.isSafeInteger(page) || page < 1)
     {
         return 'Error! Invalid page';
     }
-    if (!Number.isInteger(size) || size < 1 || size > MAX_OFFSET)
+    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_OFFSET)
     {
         return `Error! Invalid offset, must be between 1 and ${ MAX_OFFSET }`;
     }
 
     const from = Number(query.get('startblock') ?? '0');
     const to = Number(query.get('endblock') ?? String(MAX_BLOCK));
-    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0)
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < 0)
     {
         return 'Error! Invalid block range';
+    }
+
+    // Both operands are safe on their own; their PRODUCT need not be.
+    const offset = (page - 1) * size;
+    if (!Number.isSafeInteger(offset))
+    {
+        return 'Error! Invalid page';
     }
 
     return {
         from,
         to,
         limit: size,
-        offset: (page - 1) * size,
+        offset,
         // Etherscan's default is ascending; a wallet paging forward from its last seen height
         // depends on it, so an unrecognised value takes the documented default rather than
         // silently reversing the history.
