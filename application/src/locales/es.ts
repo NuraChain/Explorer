@@ -70,7 +70,10 @@ export const es: Dictionary = {
     'txs.title': 'Transacciones',
     'txs.empty.title': 'Aún no hay transacciones indexadas',
     'txs.empty.hint': 'Cada transacción que la cadena mina llega aquí.',
+    'txs.empty.filtered.title': 'Ninguna transacción coincide',
+    'txs.empty.filtered.hint': 'Nada en el índice tiene este estado. Quita el filtro para ver el resto.',
     'txs.total': '{count} transacciones indexadas.',
+    'txs.total.filtered': '{count} transacciones coinciden.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Bloque #{number}',
@@ -212,6 +215,11 @@ export const es: Dictionary = {
     'wallet.switch': 'Cambiar a {chain}',
     'wallet.switchFailed': 'Tu cartera no cambió a {chain}. Añade la red primero y vuelve a intentarlo.',
 
+    // --- Filters ------------------------------------------------------------------------------
+    'filter.all': 'Todo',
+    'filter.status': 'Estado',
+    'filter.status.success': 'Exitosas',
+    'filter.status.reverted': 'Revertidas',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Paginación',
     'pagination.first': 'Primera página',

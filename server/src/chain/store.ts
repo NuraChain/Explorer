@@ -2,6 +2,8 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+import type { TxStatusFilter } from '../schemas.ts';
+
 // The index. Everything here is DERIVED from the chain, so a schema change is a rebuild, not a
 // migration: bump SCHEMA_VERSION and the tables drop and replay from START_BLOCK.
 //
@@ -423,11 +425,28 @@ export class IndexStore
         return (this.#stmt('SELECT * FROM blocks WHERE hash = ?').get(hash.toLowerCase()) as BlockRow | undefined) ?? null;
     }
 
-    public transactionsPage(limit: number, offset: number): { rows: TransactionRow[]; total: number }
+    /**
+     * One page of the whole chain's transactions, newest first, optionally narrowed to an outcome.
+     *
+     * `total` counts the NARROWED set rather than the table, because it is what the pager divides
+     * into pages - a count of everything would draw pages that are empty the moment a filter is on.
+     *
+     * A status of `unknown` (-1, a receipt the node never returned) belongs to neither side: it is
+     * reachable only with no filter, and a reader asking for reverted transactions must not be
+     * handed the ones nobody can say anything about.
+     */
+    public transactionsPage(limit: number, offset: number, status: TxStatusFilter = 'all'): { rows: TransactionRow[]; total: number }
     {
-        const total = (this.#stmt('SELECT COUNT(*) AS n FROM transactions').get() as { n: number }).n;
-        const rows = this.#stmt('SELECT * FROM transactions ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?')
-            .all(limit, offset) as unknown as TransactionRow[];
+        // Bound rather than interpolated. `status` is already a closed union off a validated enum,
+        // so nothing hostile can reach here - but a clause assembled by concatenation is the shape
+        // that stops being safe the day somebody widens the type, and there is nothing to gain.
+        const where = status === 'all' ? '' : 'WHERE status = ?';
+        const bound = status === 'all' ? [] : [status === 'success' ? 1 : 0];
+        const total = (this.#stmt(`SELECT COUNT(*) AS n FROM transactions ${ where }`).get(...bound) as { n: number }).n;
+        const rows = this.#stmt(`
+            SELECT * FROM transactions ${ where }
+            ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?`)
+            .all(...bound, limit, offset) as unknown as TransactionRow[];
         return { rows, total };
     }
 

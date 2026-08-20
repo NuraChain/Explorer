@@ -71,7 +71,10 @@ export const ar: Dictionary = {
     'txs.title': 'المعاملات',
     'txs.empty.title': 'لا معاملات مفهرسة بعد',
     'txs.empty.hint': 'كل معاملة تعدّنها السلسلة تصل إلى هنا.',
+    'txs.empty.filtered.title': 'لا معاملات مطابقة',
+    'txs.empty.filtered.hint': 'لا شيء في الفهرس يحمل هذه الحالة. أزِل المرشّح لرؤية الباقي.',
     'txs.total': '{count} معاملة مفهرسة.',
+    'txs.total.filtered': '{count} معاملة مطابقة.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'الكتلة #{number}',
@@ -213,6 +216,11 @@ export const ar: Dictionary = {
     'wallet.switch': 'التبديل إلى {chain}',
     'wallet.switchFailed': 'لم تنتقل محفظتك إلى {chain}. أضف الشبكة أولًا ثم أعد المحاولة.',
 
+    // --- Filters ------------------------------------------------------------------------------
+    'filter.all': 'الكل',
+    'filter.status': 'الحالة',
+    'filter.status.success': 'ناجحة',
+    'filter.status.reverted': 'مرتدة',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'التصفح',
     'pagination.first': 'الصفحة الأولى',

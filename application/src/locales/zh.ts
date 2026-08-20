@@ -70,7 +70,10 @@ export const zh: Dictionary = {
     'txs.title': '交易',
     'txs.empty.title': '尚未索引任何交易',
     'txs.empty.hint': '链上打包的每笔交易都会来到这里。',
+    'txs.empty.filtered.title': '没有匹配的交易',
+    'txs.empty.filtered.hint': '索引中没有该状态的交易。清除筛选即可看到其余交易。',
     'txs.total': '已索引 {count} 笔交易。',
+    'txs.total.filtered': '{count} 笔交易匹配。',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': '区块 #{number}',
@@ -212,6 +215,11 @@ export const zh: Dictionary = {
     'wallet.switch': '切换到 {chain}',
     'wallet.switchFailed': '你的钱包没有切换到 {chain}。请先添加该网络，然后重试。',
 
+    // --- Filters ------------------------------------------------------------------------------
+    'filter.all': '全部',
+    'filter.status': '状态',
+    'filter.status.success': '成功',
+    'filter.status.reverted': '已回滚',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': '分页',
     'pagination.first': '第一页',

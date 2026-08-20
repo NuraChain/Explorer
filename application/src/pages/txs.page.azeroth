@@ -1,10 +1,11 @@
-import { client } from '../api.ts';
+import { client, type TxStatusFilter } from '../api.ts';
 import { formatValue, shortHash } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import Badge from '../components/ui/badge.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
+import FilterGroup from '../components/ui/filter-group.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
@@ -15,18 +16,46 @@ export default component TransactionsPage()
     const locale = useLocale();
 
     state page = 1;
+    state status: TxStatusFilter = 'all';
 
     resource stats = () => client.stats.summary();
-    resource txs = (at: string) => client.txs.list({ query: { page: Number(at), limit: 25 } })
-        with { source: String(page) };
+    // Both in the source key, because they are one question: page 4 of the reverted transactions
+    // is a different list from page 4 of all of them, and a resource keyed on the page alone
+    // would serve the second while the control said the first.
+    resource txs = (key: string) =>
+    {
+        const [at = '1', narrowed = 'all'] = key.split('|');
+        return client.txs.list({ query: { page: Number(at), limit: 25, status: narrowed as TxStatusFilter } });
+    } with { source: `${ page }|${ status }` };
 
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
 
+    // Back to the first page, always: page 7 of everything is usually past the end of one status,
+    // and landing on a blank list reads as a filter that found nothing rather than one that moved.
+    const narrow = (next: string): void =>
+    {
+        status = next as TxStatusFilter;
+        page = 1;
+    };
+
     useTitle(() => locale.t('txs.title'));
 
     <div class="flex flex-col gap-4">
-        <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('txs.title') }</h1>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('txs.title') }</h1>
+            <FilterGroup
+                label={ locale.t('filter.status') }
+                name="tx-status"
+                value={ status }
+                options={ [
+                    { value: 'all', label: locale.t('filter.all') },
+                    { value: 'success', label: locale.t('filter.status.success') },
+                    { value: 'reverted', label: locale.t('filter.status.reverted') }
+                ] }
+                onChange={ narrow }
+            />
+        </div>
 
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
@@ -54,16 +83,26 @@ export default component TransactionsPage()
             <Show when={ txs.data() === undefined }>
                 <div class="flex flex-col gap-2 px-4 py-4"><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /><Skeleton class="h-10 w-full" /></div>
             </Show>
+            {/* Two empty states, because they are two different facts. "Nothing indexed yet"
+                under an active filter tells a reader the chain is empty when what is empty is
+                their own narrowing of it. */}
             <Show when={ txs.data()?.rows.length === 0 }>
-                <EmptyState icon="activity" title={ locale.t('txs.empty.title') } hint={ locale.t('txs.empty.hint') } />
+                <Show
+                    when={ status === 'all' }
+                    fallback={ <EmptyState icon="filter" title={ locale.t('txs.empty.filtered.title') } hint={ locale.t('txs.empty.filtered.hint') } /> }
+                >
+                    <EmptyState icon="activity" title={ locale.t('txs.empty.title') } hint={ locale.t('txs.empty.hint') } />
+                </Show>
             </Show>
             <Show when={ txs.data() !== undefined }>
             { () => <Pagination page={ txs.data()!.page } pages={ txs.data()!.pages } onChange={ (next) => page = next } /> }
             </Show>
         </section>
 
+        {/* The count follows the filter: with one on, `total` is what MATCHED, and calling that
+            "indexed" would misreport the size of the index every time somebody narrowed it. */}
         <Show when={ txs.data() !== undefined }>
-        { () => <p class="text-[13px] text-muted">{ locale.t('txs.total', { count: locale.n(txs.data()!.total) }) }</p> }
+        { () => <p class="text-[13px] text-muted">{ locale.t(status === 'all' ? 'txs.total' : 'txs.total.filtered', { count: locale.n(txs.data()!.total) }) }</p> }
         </Show>
     </div>
 }

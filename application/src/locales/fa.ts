@@ -75,7 +75,10 @@ export const fa: Dictionary = {
     'txs.title': 'تراکنش‌ها',
     'txs.empty.title': 'هنوز تراکنشی نمایه نشده است',
     'txs.empty.hint': 'هر تراکنشی که زنجیره استخراج کند اینجا می‌آید.',
+    'txs.empty.filtered.title': 'تراکنشی هم‌خوان نیست',
+    'txs.empty.filtered.hint': 'هیچ چیزی در نمایه این وضعیت را ندارد. برای دیدن بقیه، فیلتر را بردارید.',
     'txs.total': '{count} تراکنش نمایه شده است.',
+    'txs.total.filtered': '{count} تراکنش هم‌خوان است.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'بلاک #{number}',
@@ -217,6 +220,11 @@ export const fa: Dictionary = {
     'wallet.switch': 'تغییر به {chain}',
     'wallet.switchFailed': 'کیف پول شما به {chain} تغییر نکرد. اول شبکه را اضافه کنید، بعد دوباره تلاش کنید.',
 
+    // --- Filters ------------------------------------------------------------------------------
+    'filter.all': 'همه',
+    'filter.status': 'وضعیت',
+    'filter.status.success': 'موفق',
+    'filter.status.reverted': 'برگشت‌خورده',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'صفحه‌بندی',
     'pagination.first': 'صفحهٔ نخست',

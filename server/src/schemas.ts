@@ -54,6 +54,19 @@ export type Block = Infer<typeof block>;
 
 export const TX_STATUS = ['success', 'reverted', 'unknown'] as const;
 
+/**
+ * What a list of transactions can be narrowed to.
+ *
+ * `all` is the ABSENCE of a filter, named. A query string can only ever add a constraint, so
+ * without a word for "no constraint" there is no way to take one off again - the reader who
+ * clicked "reverted" would be stuck with it for the rest of the page's life.
+ *
+ * `unknown` is deliberately not offered. It means the node returned no receipt for a transaction,
+ * not that the chain decided anything, so it is a state to REPORT and never one to ask for.
+ */
+export const TX_STATUS_FILTER = ['all', 'success', 'reverted'] as const;
+export type TxStatusFilter = (typeof TX_STATUS_FILTER)[number];
+
 export const transaction = object({
     hash: string(),
     blockNumber: number({ int: true, min: 0 }),
@@ -268,9 +281,15 @@ export type SearchResult = Infer<typeof searchResult>;
  * two orders of magnitude to spare, and far beyond any row count this index will ever hold. The
  * cap refuses the absurd without ever refusing a page somebody could really be on.
  */
-export const pageQuery = object({
+const pageShape = {
     page: number({ int: true, min: 1, max: 1_000_000_000_000, coerce: true }).optional(),
     limit: number({ int: true, min: 1, max: 100, coerce: true }).optional()
-});
+};
+
+export const pageQuery = object(pageShape);
+
+/** A page of transactions, optionally narrowed to one outcome. Spread, because there is no
+    `.extend` on a schema and re-typing the bounds above is how the two drift apart. */
+export const transactionListQuery = object({ ...pageShape, status: enumOf(TX_STATUS_FILTER).optional() });
 
 export const searchQuery = object({ q: string() });

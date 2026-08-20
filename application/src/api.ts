@@ -24,7 +24,8 @@ export type {
     TopAccount,
     TopAccounts,
     Transfer,
-    TransferPage
+    TransferPage,
+    TxStatusFilter
 } from '../../server/src/schemas.ts';
 
 /**

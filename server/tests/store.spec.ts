@@ -504,6 +504,73 @@ describe('reads: ordering, paging and filtering', () =>
         expect(filled().blocksPage(0, 0).rows).toEqual([]);
     });
 
+    /** One block holding each outcome the index can record, including the one it cannot decide. */
+    function mixed(): IndexStore
+    {
+        const index = store();
+        index.insertBlock(
+            blockRow(1, { tx_count: 4 }),
+            [
+                txRow('0xok1', 1, { tx_index: 0, status: 1 }),
+                txRow('0xbad', 1, { tx_index: 1, status: 0 }),
+                txRow('0xok2', 1, { tx_index: 2, status: 1 }),
+                txRow('0xhuh', 1, { tx_index: 3, status: -1 })
+            ],
+            []);
+        return index;
+    }
+
+    it('returns every transaction when the filter is off', () =>
+    {
+        expect(mixed().transactionsPage(10, 0, 'all').total).toBe(4);
+    });
+
+    it('defaults to no filter, so an old caller keeps the answer it had', () =>
+    {
+        expect(mixed().transactionsPage(10, 0).total).toBe(4);
+    });
+
+    it('narrows to the successful transactions', () =>
+    {
+        const page = mixed().transactionsPage(10, 0, 'success');
+        expect(page.rows.map((row) => row.hash)).toEqual(['0xok2', '0xok1']);
+        expect(page.total).toBe(2);
+    });
+
+    it('narrows to the reverted transactions', () =>
+    {
+        const page = mixed().transactionsPage(10, 0, 'reverted');
+        expect(page.rows.map((row) => row.hash)).toEqual(['0xbad']);
+        expect(page.total).toBe(1);
+    });
+
+    it('leaves an undecided transaction out of BOTH narrowings', () =>
+    {
+        // status -1 is "the node returned no receipt", not "the chain said no". Handing it to a
+        // reader who asked for reverted transactions would report a failure that never happened.
+        const index = mixed();
+        const seen = [
+            ...index.transactionsPage(10, 0, 'success').rows,
+            ...index.transactionsPage(10, 0, 'reverted').rows
+        ].map((row) => row.hash);
+        expect(seen).not.toContain('0xhuh');
+        expect(index.transactionsPage(10, 0, 'all').rows.map((row) => row.hash)).toContain('0xhuh');
+    });
+
+    it('counts the narrowed set, not the table, so the pager draws the right number of pages', () =>
+    {
+        // A total taken from the whole table would page a filtered list into pages that are empty.
+        const page = mixed().transactionsPage(1, 0, 'success');
+        expect(page.rows).toHaveLength(1);
+        expect(page.total).toBe(2);
+    });
+
+    it('keeps ordering and paging under a filter', () =>
+    {
+        const index = mixed();
+        expect(index.transactionsPage(1, 1, 'success').rows.map((row) => row.hash)).toEqual(['0xok1']);
+    });
+
     it('finds a block by hash, case-insensitively, and null for an unknown one', () =>
     {
         const index = filled();

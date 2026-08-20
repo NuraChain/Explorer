@@ -387,6 +387,40 @@ describe('the API over the index', () =>
         expect(txs.total).toBe(4);
     });
 
+    it('narrows the transaction list to one outcome, and pages what is left', async () =>
+    {
+        const mixed = block(3, '0xb2', '0xb3', 2);
+        mixed.transactions[1]!.status = 0;
+        const { store, chain } = await indexed([...CHAIN, mixed]);
+        const app = buildApp({ dev: false, store, chain });
+        const at = (path: string): Promise<Response> => app.handle(new Request(`http://local${ path }`));
+        const list = async (query: string): Promise<TransactionPage> =>
+            (await (await at(`/api/txs?${ query }`)).json()) as TransactionPage;
+
+        const all = await list('limit=50');
+        const reverted = await list('limit=50&status=reverted');
+        const succeeded = await list('limit=50&status=success');
+
+        expect(reverted.total).toBe(1);
+        expect(reverted.rows.every((row) => row.status === 'reverted')).toBe(true);
+        expect(succeeded.total).toBe(all.total - 1);
+        expect(succeeded.rows.every((row) => row.status === 'success')).toBe(true);
+
+        // The envelope counts the NARROWED set: a pager fed the table's total draws pages that
+        // are empty the moment a filter is on.
+        const paged = await list('limit=1&status=success');
+        expect(paged.rows).toHaveLength(1);
+        expect(paged.pages).toBe(succeeded.total);
+    });
+
+    it('refuses a narrowing it does not know rather than quietly ignoring it', async () =>
+    {
+        // Silently serving the whole list back is the worst answer: the control says "reverted"
+        // and the page shows everything, so the reader trusts a list that was never filtered.
+        const get = await api();
+        expect((await get('/api/txs?status=maybe')).status).toBe(422);
+    });
+
     it('404s an unknown block rather than inventing one', async () =>
     {
         const get = await api();

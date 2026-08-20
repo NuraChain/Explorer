@@ -83,7 +83,10 @@ export const en = {
     'txs.title': 'Transactions',
     'txs.empty.title': 'No transactions indexed yet',
     'txs.empty.hint': 'Every transaction the chain mines lands here.',
+    'txs.empty.filtered.title': 'No transactions match',
+    'txs.empty.filtered.hint': 'Nothing in the index carries this status. Clear the filter to see the rest.',
     'txs.total': '{count} transactions indexed.',
+    'txs.total.filtered': '{count} transactions match.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Block #{number}',
@@ -228,6 +231,14 @@ export const en = {
     'wallet.switch': 'Switch to {chain}',
     'wallet.switchFailed': 'Your wallet did not switch to {chain}. Add the network first, then try again.',
 
+    // --- Filters ------------------------------------------------------------------------------
+    // `filter.all` is shared by every filter on every page: it means "no narrowing", which is the
+    // same thought whatever is being narrowed. It stays gender-free in the Romance languages for
+    // exactly that reason - one string cannot agree with blocks and transactions at once.
+    'filter.all': 'All',
+    'filter.status': 'Status',
+    'filter.status.success': 'Succeeded',
+    'filter.status.reverted': 'Reverted',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Pagination',
     'pagination.first': 'First page',

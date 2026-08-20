@@ -71,7 +71,10 @@ export const hi: Dictionary = {
     'txs.title': 'लेनदेन',
     'txs.empty.title': 'अभी कोई लेनदेन इंडेक्स नहीं हुआ',
     'txs.empty.hint': 'चेन जो भी लेनदेन माइन करती है, वह यहाँ आता है।',
+    'txs.empty.filtered.title': 'कोई लेनदेन मेल नहीं खाता',
+    'txs.empty.filtered.hint': 'सूचकांक में इस स्थिति वाला कुछ नहीं है। बाकी देखने के लिए फ़िल्टर हटाएँ।',
     'txs.total': '{count} लेनदेन इंडेक्स हुए।',
+    'txs.total.filtered': '{count} लेनदेन मेल खाते हैं।',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'ब्लॉक #{number}',
@@ -213,6 +216,11 @@ export const hi: Dictionary = {
     'wallet.switch': '{chain} पर जाएँ',
     'wallet.switchFailed': 'आपका वॉलेट {chain} पर नहीं गया। पहले नेटवर्क जोड़ें, फिर दोबारा कोशिश करें।',
 
+    // --- Filters ------------------------------------------------------------------------------
+    'filter.all': 'सभी',
+    'filter.status': 'स्थिति',
+    'filter.status.success': 'सफल',
+    'filter.status.reverted': 'रिवर्ट',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'पृष्ठांकन',
     'pagination.first': 'पहला पृष्ठ',

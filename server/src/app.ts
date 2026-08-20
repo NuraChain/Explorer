@@ -20,6 +20,7 @@ import {
     searchResult,
     summary,
     transactionDetail,
+    transactionListQuery,
     transactionPage,
     topAccounts,
     transferPage,
@@ -150,10 +151,10 @@ function build({ store, chain }: ApiDeps)
         })),
 
         txs: feature('/txs', (routes) => ({
-            list: routes.get('/', { query: pageQuery, output: transactionPage }, ({ query }) =>
+            list: routes.get('/', { query: transactionListQuery, output: transactionPage }, ({ query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transactionsPage(limit, offset);
+                const { rows, total } = store.transactionsPage(limit, offset, query.status ?? 'all');
                 return { rows: rows.map(presentTransaction), total, page, pages: pageCount(total, limit) };
             }),
 

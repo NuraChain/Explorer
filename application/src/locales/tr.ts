@@ -71,7 +71,10 @@ export const tr: Dictionary = {
     'txs.title': 'İşlemler',
     'txs.empty.title': 'Henüz dizinlenmiş işlem yok',
     'txs.empty.hint': 'Zincirin kazdığı her işlem buraya düşer.',
+    'txs.empty.filtered.title': 'Eşleşen işlem yok',
+    'txs.empty.filtered.hint': 'Dizinde bu durumda bir şey yok. Geri kalanını görmek için filtreyi kaldırın.',
     'txs.total': '{count} işlem dizinlendi.',
+    'txs.total.filtered': '{count} işlem eşleşiyor.',
 
     // --- Block detail -------------------------------------------------------------------------
     'block.title': 'Blok #{number}',
@@ -213,6 +216,11 @@ export const tr: Dictionary = {
     'wallet.switch': '{chain} ağına geç',
     'wallet.switchFailed': 'Cüzdanınız {chain} ağına geçmedi. Önce ağı ekleyin, sonra yeniden deneyin.',
 
+    // --- Filters ------------------------------------------------------------------------------
+    'filter.all': 'Tümü',
+    'filter.status': 'Durum',
+    'filter.status.success': 'Başarılı',
+    'filter.status.reverted': 'Geri alınan',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Sayfalama',
     'pagination.first': 'İlk sayfa',
