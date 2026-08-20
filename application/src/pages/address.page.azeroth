@@ -1,6 +1,6 @@
 import { useParams } from 'azerothjs';
 
-import { client, type Transfer } from '../api.ts';
+import { client, type AddressDirection, type Transfer } from '../api.ts';
 import { formatAmount, formatValue } from '../lib/format.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
@@ -10,6 +10,7 @@ import Icon from '../icons/icon.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import FlowLedger from '../components/chain/flow-ledger.component.azeroth';
 import ContractPanel from '../components/chain/contract-panel.component.azeroth';
+import FilterGroup from '../components/ui/filter-group.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
@@ -39,8 +40,18 @@ export default component AddressPage()
 
     state page = 1;
     state tab: 'flow' | 'transfers' | 'contract' = 'flow';
+    state direction: AddressDirection = 'all';
 
     derived address = params()['address'] ?? '';
+
+    // Clicking a counterparty re-uses this component with a new param rather than mounting a
+    // fresh one, so without this the reader lands on page 6 of an account that has two pages,
+    // still narrowed to what the PREVIOUS address sent. Both read as a page that failed.
+    effect (address)
+    {
+        page = 1;
+        direction = 'all';
+    }
 
     // Every source below is gated on the address being PRESENT, and `?? ''` above is why it has
     // to be: navigating away clears the param, and an empty string is a perfectly good-looking
@@ -52,9 +63,12 @@ export default component AddressPage()
         with { source: address === '' ? false : address };
     resource txs = (key: string) =>
     {
-        const [value = '', at = '1'] = key.split('|');
-        return client.address.transactions({ params: { address: value }, query: { page: Number(at), limit: 25 } });
-    } with { source: address === '' ? false : `${ address }|${ page }` };
+        const [value = '', at = '1', way = 'all'] = key.split('|');
+        return client.address.transactions({
+            params: { address: value },
+            query: { page: Number(at), limit: 25, direction: way as AddressDirection }
+        });
+    } with { source: address === '' ? false : `${ address }|${ page }|${ direction }` };
     resource transfers = (key: string) =>
     {
         const [value = '', at = '1'] = key.split('|');
@@ -79,6 +93,17 @@ export default component AddressPage()
     const pick = (next: 'flow' | 'transfers' | 'contract'): void =>
     {
         tab = next;
+        page = 1;
+        // The transfers tab has no direction control, so a narrowing left on from the ledger
+        // would keep narrowing a list with nothing to say about it.
+        direction = 'all';
+    };
+
+    // Back to the first page: an address that sent twice and received five hundred times has one
+    // page of outgoing movements and twenty of incoming ones.
+    const turn = (next: string): void =>
+    {
+        direction = next as AddressDirection;
         page = 1;
     };
 
@@ -209,19 +234,33 @@ export default component AddressPage()
         </Show>
 
         <Show when={ active === 'flow' }>
-            <div>
+            <div class="flex flex-col gap-3">
+                {/* The same three words the ledger already draws in - `in` and `out` are this
+                    page's whole vocabulary, so the filter borrows it rather than inventing one. */}
+                <FilterGroup
+                    label={ locale.t('filter.direction') }
+                    name="ledger-direction"
+                    value={ direction }
+                    options={ [
+                        { value: 'all', label: locale.t('filter.all') },
+                        { value: 'in', label: locale.t('filter.direction.in') },
+                        { value: 'out', label: locale.t('filter.direction.out') }
+                    ] }
+                    onChange={ turn }
+                />
                 <FlowLedger
                     address={ address }
                     rows={ txs.data()?.rows ?? [] }
                     symbol={ symbol }
                     decimals={ decimals }
+                    empty={ direction === 'all' ? undefined : locale.t('flow.empty.filtered') }
                 />
                 {/* Guarded on the page COUNT, not on the data: Pagination draws nothing for a
                     single page, and an unguarded panel around nothing is an empty bordered strip
                     under the ledger. */}
                 <Show when={ (txs.data()?.pages ?? 0) > 1 }>
                 { () =>
-                    <div class="panel mt-3">
+                    <div class="panel">
                         <Pagination page={ txs.data()!.page } pages={ txs.data()!.pages } onChange={ (next) => page = next } />
                     </div>
                 }

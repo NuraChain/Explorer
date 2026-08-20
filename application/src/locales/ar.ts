@@ -189,6 +189,7 @@ export const ar: Dictionary = {
     'flow.in': 'وارد',
     'flow.out': 'صادر',
     'flow.empty': 'لا معاملات هنا بعد. عندما يرسل هذا العنوان أو يستقبل، تظهر الحركة هنا.',
+    'flow.empty.filtered': 'لم يتحرك شيء في هذا الاتجاه. أزِل المرشّح لرؤية بقية السجل.',
     'flow.legend': 'الأعمدة نسبية إلى أكبر حركة معروضة. المقادير بـ{symbol}.',
     'flow.call': 'استدعاء',
     'flow.contractCreated': 'أُنشئ عقد',
@@ -232,6 +233,9 @@ export const ar: Dictionary = {
     'filter.status.reverted': 'مرتدة',
     'filter.content': 'محتوى الكتلة',
     'filter.content.filled': 'ذات معاملات',
+    'filter.direction': 'الاتجاه',
+    'filter.direction.in': 'الوارد',
+    'filter.direction.out': 'الصادر',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'التصفح',
     'pagination.first': 'الصفحة الأولى',

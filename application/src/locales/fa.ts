@@ -193,6 +193,7 @@ export const fa: Dictionary = {
     'flow.in': 'ورودی',
     'flow.out': 'خروجی',
     'flow.empty': 'هنوز تراکنشی اینجا نیست. وقتی این آدرس ارسال یا دریافت کند، جابه‌جایی اینجا ظاهر می‌شود.',
+    'flow.empty.filtered': 'چیزی از این سو جابه‌جا نشده است. برای دیدن بقیهٔ دفتر، فیلتر را بردارید.',
     'flow.legend': 'میله‌ها نسبت به بزرگ‌ترین جابه‌جایی نمایش‌داده‌شده رسم شده‌اند. مقادیر به {symbol}.',
     'flow.call': 'فراخوانی',
     'flow.contractCreated': 'قرارداد ایجاد شد',
@@ -236,6 +237,9 @@ export const fa: Dictionary = {
     'filter.status.reverted': 'برگشت‌خورده',
     'filter.content': 'محتوای بلاک',
     'filter.content.filled': 'دارای تراکنش',
+    'filter.direction': 'جهت',
+    'filter.direction.in': 'دریافتی',
+    'filter.direction.out': 'ارسالی',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'صفحه‌بندی',
     'pagination.first': 'صفحهٔ نخست',

@@ -21,6 +21,13 @@ export default component FlowLedger(props: {
     rows: Transaction[];
     symbol: string;
     decimals: number;
+
+    /**
+     * What an empty ledger says. The default is "nothing has happened here yet", which is a
+     * claim about the ADDRESS - so a caller that emptied the list itself, by narrowing it, has
+     * to say so instead.
+     */
+    empty?: string;
 })
 {
     const locale = useLocale();
@@ -66,7 +73,7 @@ export default component FlowLedger(props: {
         </div>
 
         <Show when={ props.rows.length === 0 }>
-            <p class="px-4 py-10 text-center text-[15px] text-muted">{ locale.t('flow.empty') }</p>
+            <p class="px-4 py-10 text-center text-[15px] text-muted">{ props.empty ?? locale.t('flow.empty') }</p>
         </Show>
 
         <ul class="divide-y divide-line">

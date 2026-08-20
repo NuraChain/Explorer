@@ -188,6 +188,7 @@ export const es: Dictionary = {
     'flow.in': 'entrada',
     'flow.out': 'salida',
     'flow.empty': 'Aún no hay transacciones aquí. Cuando esta dirección envíe o reciba, el movimiento aparecerá aquí.',
+    'flow.empty.filtered': 'Nada se movió en ese sentido. Quita el filtro para ver el resto del libro.',
     'flow.legend': 'Las barras son relativas al mayor movimiento mostrado. Importes en {symbol}.',
     'flow.call': 'llamada',
     'flow.contractCreated': 'contrato creado',
@@ -231,6 +232,9 @@ export const es: Dictionary = {
     'filter.status.reverted': 'Revertidas',
     'filter.content': 'Contenido del bloque',
     'filter.content.filled': 'Con transacciones',
+    'filter.direction': 'Dirección del movimiento',
+    'filter.direction.in': 'Recibido',
+    'filter.direction.out': 'Enviado',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Paginación',
     'pagination.first': 'Primera página',

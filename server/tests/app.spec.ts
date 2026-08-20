@@ -470,6 +470,30 @@ describe('the API over the index', () =>
         expect(paged.pages).toBe(succeeded.total);
     });
 
+    it('narrows an address ledger to one direction', async () =>
+    {
+        // Every transaction in CHAIN goes Alice -> Bob, so the two narrowings partition it
+        // cleanly: everything for one of them, nothing for the other.
+        const get = await api();
+        const list = async (address: string, query: string): Promise<TransactionPage> =>
+            (await (await get(`/api/address/${ address }/txs?${ query }`)).json()) as TransactionPage;
+
+        const sent = await list(ALICE, 'direction=out');
+        const received = await list(ALICE, 'direction=in');
+        expect(sent.total).toBe(4);
+        expect(received.total).toBe(0);
+        expect(sent.rows.every((row) => row.from === ALICE)).toBe(true);
+
+        const arrived = await list(BOB, 'direction=in');
+        expect(arrived.total).toBe(4);
+        expect(arrived.rows.every((row) => row.to === BOB)).toBe(true);
+
+        // And the envelope counts the narrowed set, so the pager agrees with the list.
+        const paged = await list(ALICE, 'direction=out&limit=2');
+        expect(paged.rows).toHaveLength(2);
+        expect(paged.pages).toBe(2);
+    });
+
     it('narrows the block list to the blocks that carried something', async () =>
     {
         // CHAIN's block 0 and 2 hold one transaction each and block 1 holds two, so nothing is
@@ -495,6 +519,7 @@ describe('the API over the index', () =>
         const get = await api();
         expect((await get('/api/txs?status=maybe')).status).toBe(422);
         expect((await get('/api/blocks?content=some')).status).toBe(422);
+        expect((await get(`/api/address/${ ALICE }/txs?direction=sideways`)).status).toBe(422);
     });
 
     it('404s an unknown block rather than inventing one', async () =>

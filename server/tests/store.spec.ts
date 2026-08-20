@@ -686,6 +686,41 @@ describe('the address queries this index exists for', () =>
         expect(page).toEqual({ rows: [], total: 0 });
     });
 
+    it('narrows an address history to what ARRIVED', () =>
+    {
+        const page = withHistory().transactionsOfAddress(ALICE, 10, 0, 'in');
+        expect(page.rows.map((row) => row.hash)).toEqual(['0xt2']);
+        expect(page.total).toBe(1);
+    });
+
+    it('narrows an address history to what LEFT', () =>
+    {
+        const page = withHistory().transactionsOfAddress(ALICE, 10, 0, 'out');
+        expect(page.rows.map((row) => row.hash)).toEqual(['0xt1']);
+        expect(page.total).toBe(1);
+    });
+
+    it('defaults to both directions, so an old caller keeps the answer it had', () =>
+    {
+        expect(withHistory().transactionsOfAddress(ALICE, 10, 0).total).toBe(2);
+        expect(withHistory().transactionsOfAddress(ALICE, 10, 0, 'all').total).toBe(2);
+    });
+
+    it('shows a self-send under BOTH narrowings, because it really was both', () =>
+    {
+        const index = withHistory();
+        expect(index.transactionsOfAddress(CAROL, 10, 0, 'in').total).toBe(1);
+        expect(index.transactionsOfAddress(CAROL, 10, 0, 'out').total).toBe(1);
+        // Still once with no narrowing - the OR must not double it.
+        expect(index.transactionsOfAddress(CAROL, 10, 0, 'all').total).toBe(1);
+    });
+
+    it('matches a narrowed address whatever case it is asked for', () =>
+    {
+        const shouted = ALICE.toUpperCase().replace('0X', '0x');
+        expect(withHistory().transactionsOfAddress(shouted, 10, 0, 'out').total).toBe(1);
+    });
+
     it('finds a token\'s transfers on the TOKEN\'s own page', () =>
     {
         // A token contract is never a PARTY to its own transfers; keyed on from/to alone its page

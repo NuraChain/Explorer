@@ -189,6 +189,7 @@ export const tr: Dictionary = {
     'flow.in': 'giriş',
     'flow.out': 'çıkış',
     'flow.empty': 'Burada henüz işlem yok. Bu adres gönderdiğinde ya da aldığında hareket burada görünür.',
+    'flow.empty.filtered': 'Bu yönde hiçbir şey hareket etmedi. Defterin geri kalanını görmek için filtreyi kaldırın.',
     'flow.legend': 'Çubuklar gösterilen en büyük harekete görelidir. Tutarlar {symbol} cinsinden.',
     'flow.call': 'çağrı',
     'flow.contractCreated': 'kontrat oluşturuldu',
@@ -232,6 +233,9 @@ export const tr: Dictionary = {
     'filter.status.reverted': 'Geri alınan',
     'filter.content': 'Blok içeriği',
     'filter.content.filled': 'İşlem içeren',
+    'filter.direction': 'Yön',
+    'filter.direction.in': 'Alınan',
+    'filter.direction.out': 'Gönderilen',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Sayfalama',
     'pagination.first': 'İlk sayfa',

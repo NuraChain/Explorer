@@ -10,6 +10,7 @@ import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransacti
 import {
     account,
     accountListQuery,
+    addressListQuery,
     blockDetail,
     blockListQuery,
     blockPage,
@@ -197,10 +198,10 @@ function build({ store, chain }: ApiDeps)
                 };
             }),
 
-            transactions: routes.get('/:address/txs', { query: pageQuery, output: transactionPage }, ({ params, query }) =>
+            transactions: routes.get('/:address/txs', { query: addressListQuery, output: transactionPage }, ({ params, query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transactionsOfAddress(params.address, limit, offset);
+                const { rows, total } = store.transactionsOfAddress(params.address, limit, offset, query.direction ?? 'all');
                 return { rows: rows.map(presentTransaction), total, page, pages: pageCount(total, limit) };
             }),
 

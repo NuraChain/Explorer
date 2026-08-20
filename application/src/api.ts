@@ -10,6 +10,7 @@ import type { Api } from '../../server/src/app.ts';
 
 export type {
     Account,
+    AddressDirection,
     Block,
     BlockFilter,
     BlockDetail,

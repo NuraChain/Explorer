@@ -189,6 +189,7 @@ export const hi: Dictionary = {
     'flow.in': 'आवक',
     'flow.out': 'जावक',
     'flow.empty': 'यहाँ अभी कोई लेनदेन नहीं। जब यह पता भेजेगा या पाएगा, हलचल यहाँ दिखेगी।',
+    'flow.empty.filtered': 'इस दिशा में कुछ नहीं हिला। बाकी बही देखने के लिए फ़िल्टर हटाएँ।',
     'flow.legend': 'बार सबसे बड़ी दिखाई गई हलचल के सापेक्ष हैं। राशियाँ {symbol} में।',
     'flow.call': 'कॉल',
     'flow.contractCreated': 'कॉन्ट्रैक्ट बना',
@@ -232,6 +233,9 @@ export const hi: Dictionary = {
     'filter.status.reverted': 'रिवर्ट',
     'filter.content': 'ब्लॉक सामग्री',
     'filter.content.filled': 'लेनदेन वाले',
+    'filter.direction': 'दिशा',
+    'filter.direction.in': 'प्राप्त',
+    'filter.direction.out': 'भेजा गया',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'पृष्ठांकन',
     'pagination.first': 'पहला पृष्ठ',

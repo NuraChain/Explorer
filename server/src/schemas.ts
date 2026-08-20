@@ -318,6 +318,19 @@ export const transactionListQuery = object({ ...pageShape, status: enumOf(TX_STA
 export const blockListQuery = object({ ...pageShape, content: enumOf(BLOCK_FILTER).optional() });
 
 /**
+ * Which way a movement went, from the point of view of the address whose page it is.
+ *
+ * The address page's whole thesis is that direction is the layout, so it is also the narrowing
+ * that page offers: "what did this address receive" is a different question from "what did it
+ * spend", and reading one out of a ledger holding both is work the reader should not have to do.
+ */
+export const ADDRESS_DIRECTION = ['all', 'in', 'out'] as const;
+export type AddressDirection = (typeof ADDRESS_DIRECTION)[number];
+
+/** A page of one address's transactions, optionally narrowed to one direction. */
+export const addressListQuery = object({ ...pageShape, direction: enumOf(ADDRESS_DIRECTION).optional() });
+
+/**
  * A page of the rich list, optionally narrowed to the addresses containing `q`.
  *
  * A substring rather than an exact address: the ranking is the one list in the explorer a reader

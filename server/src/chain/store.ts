@@ -2,7 +2,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import type { BlockFilter, TxStatusFilter } from '../schemas.ts';
+import type { AddressDirection, BlockFilter, TxStatusFilter } from '../schemas.ts';
 
 // The index. Everything here is DERIVED from the chain, so a schema change is a rebuild, not a
 // migration: bump SCHEMA_VERSION and the tables drop and replay from START_BLOCK.
@@ -479,16 +479,30 @@ export class IndexStore
     /**
      * Every transaction touching an address, newest first - the query this whole index exists
      * for. One statement over both directional indexes.
+     *
+     * `direction` picks ONE of those indexes instead of both: an address's inbound history is
+     * `idx_tx_to` alone, so narrowing is a smaller seek than the unnarrowed query rather than a
+     * filter applied after it.
+     *
+     * A transaction an address sent to ITSELF answers to both, and appears under either narrowing.
+     * That is the honest reading: it really did send, and it really did receive.
      */
-    public transactionsOfAddress(address: string, limit: number, offset: number): { rows: TransactionRow[]; total: number }
+    public transactionsOfAddress(
+        address: string,
+        limit: number,
+        offset: number,
+        direction: AddressDirection = 'all'
+    ): { rows: TransactionRow[]; total: number }
     {
         const account = normalize(address);
-        const total = (this.#stmt('SELECT COUNT(*) AS n FROM transactions WHERE from_addr = ? OR to_addr = ?')
-            .get(account, account) as { n: number }).n;
+        const where = direction === 'in' ? 'to_addr = ?' : direction === 'out' ? 'from_addr = ?' : 'from_addr = ? OR to_addr = ?';
+        const bound = direction === 'all' ? [account, account] : [account];
+        const total = (this.#stmt(`SELECT COUNT(*) AS n FROM transactions WHERE ${ where }`)
+            .get(...bound) as { n: number }).n;
         const rows = this.#stmt(`
-            SELECT * FROM transactions WHERE from_addr = ? OR to_addr = ?
+            SELECT * FROM transactions WHERE ${ where }
             ORDER BY block_number DESC, tx_index DESC LIMIT ? OFFSET ?`)
-            .all(account, account, limit, offset) as unknown as TransactionRow[];
+            .all(...bound, limit, offset) as unknown as TransactionRow[];
         return { rows, total };
     }
 

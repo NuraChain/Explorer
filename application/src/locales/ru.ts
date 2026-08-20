@@ -189,6 +189,7 @@ export const ru: Dictionary = {
     'flow.in': 'вход',
     'flow.out': 'выход',
     'flow.empty': 'Транзакций здесь пока нет. Когда адрес отправит или получит, движение появится здесь.',
+    'flow.empty.filtered': 'В эту сторону ничего не двигалось. Снимите фильтр, чтобы увидеть остальную книгу.',
     'flow.legend': 'Столбцы относительны крупнейшего показанного движения. Суммы в {symbol}.',
     'flow.call': 'вызов',
     'flow.contractCreated': 'создан контракт',
@@ -232,6 +233,9 @@ export const ru: Dictionary = {
     'filter.status.reverted': 'Откаченные',
     'filter.content': 'Содержимое блока',
     'filter.content.filled': 'С транзакциями',
+    'filter.direction': 'Направление',
+    'filter.direction.in': 'Получено',
+    'filter.direction.out': 'Отправлено',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Пагинация',
     'pagination.first': 'Первая страница',

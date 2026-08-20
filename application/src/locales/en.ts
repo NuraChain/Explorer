@@ -204,6 +204,7 @@ export const en = {
     'flow.in': 'in',
     'flow.out': 'out',
     'flow.empty': 'No transactions here yet. When this address sends or receives, the movement appears here.',
+    'flow.empty.filtered': 'Nothing moved this way. Clear the filter to see the rest of the ledger.',
     'flow.legend': 'Bars are relative to the largest movement shown. Amounts in {symbol}.',
     'flow.call': 'call',
     'flow.contractCreated': 'contract created',
@@ -250,6 +251,9 @@ export const en = {
     'filter.status.reverted': 'Reverted',
     'filter.content': 'Block contents',
     'filter.content.filled': 'With transactions',
+    'filter.direction': 'Direction',
+    'filter.direction.in': 'Received',
+    'filter.direction.out': 'Sent',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': 'Pagination',
     'pagination.first': 'First page',

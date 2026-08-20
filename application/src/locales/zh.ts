@@ -188,6 +188,7 @@ export const zh: Dictionary = {
     'flow.in': '流入',
     'flow.out': '流出',
     'flow.empty': '这里还没有交易。当该地址发送或接收时，动向会显示在这里。',
+    'flow.empty.filtered': '这个方向上没有任何流动。清除筛选即可看到账目的其余部分。',
     'flow.legend': '柱形相对于所示最大动向绘制。金额以 {symbol} 计。',
     'flow.call': '调用',
     'flow.contractCreated': '已创建合约',
@@ -231,6 +232,9 @@ export const zh: Dictionary = {
     'filter.status.reverted': '已回滚',
     'filter.content': '区块内容',
     'filter.content.filled': '含交易',
+    'filter.direction': '方向',
+    'filter.direction.in': '收到',
+    'filter.direction.out': '发出',
     // --- Pagination ---------------------------------------------------------------------------
     'pagination.label': '分页',
     'pagination.first': '第一页',
