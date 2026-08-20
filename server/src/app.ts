@@ -9,6 +9,7 @@ import { calldataFor, inspectContract, readContract } from './inspect.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
 import {
     account,
+    accountListQuery,
     blockDetail,
     blockListQuery,
     blockPage,
@@ -25,6 +26,7 @@ import {
     transactionPage,
     topAccounts,
     transferPage,
+    type TopAccount,
     type Transfer
 } from './schemas.ts';
 
@@ -76,7 +78,7 @@ function build({ store, chain }: ApiDeps)
     // The rich list. Balances are live, and reading the node for every address on every request
     // would turn one page view into a balance storm, so the ranked list is cached for a few
     // seconds. The cache keeps every NON-zero balance; the route slices to the requested limit.
-    let rankedAccounts: { at: number; rows: Array<{ address: string; balance: string }> } | null = null;
+    let rankedAccounts: { at: number; rows: TopAccount[] } | null = null;
     const RANKED_TTL_MS = 10_000;
 
     return {
@@ -269,9 +271,9 @@ function build({ store, chain }: ApiDeps)
         })),
 
         accounts: feature('/accounts', (routes) => ({
-            top: routes.get('/top', { query: pageQuery, output: topAccounts }, async ({ query }) =>
+            top: routes.get('/top', { query: accountListQuery, output: topAccounts }, async ({ query }) =>
             {
-                const limit = Math.min(query.limit ?? DEFAULT_LIMIT, 100);
+                const { limit, offset, page } = paging(query);
                 const now = Date.now();
                 if (rankedAccounts === null || now - rankedAccounts.at >= RANKED_TTL_MS)
                 {
@@ -286,9 +288,26 @@ function build({ store, chain }: ApiDeps)
                         const b = BigInt(right.balance);
                         return a > b ? -1 : a < b ? 1 : 0;
                     });
-                    rankedAccounts = { at: now, rows: rows.filter((row) => row.balance !== '0') };
+                    // Ranked HERE, once, over the whole list - see `rank` in schemas.ts. Doing it
+                    // after the search would hand the first match the first place.
+                    rankedAccounts = {
+                        at: now,
+                        rows: rows.filter((row) => row.balance !== '0')
+                            .map((row, index) => ({ ...row, rank: index + 1 }))
+                    };
                 }
-                return { rows: rankedAccounts.rows.slice(0, limit) };
+                // Lower-cased on the way in: the index stores addresses lower-cased, and a
+                // checksummed address pasted into the field must not miss its own row.
+                const term = (query.q ?? '').trim().toLowerCase();
+                const matched = term === ''
+                    ? rankedAccounts.rows
+                    : rankedAccounts.rows.filter((row) => row.address.includes(term));
+                return {
+                    rows: matched.slice(offset, offset + limit),
+                    total: matched.length,
+                    page,
+                    pages: pageCount(matched.length, limit)
+                };
             })
         }))
     };

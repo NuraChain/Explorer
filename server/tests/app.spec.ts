@@ -344,12 +344,69 @@ describe('the API over the index', () =>
         const body = (await response.json()) as TopAccounts;
 
         expect(response.status).toBe(200);
-        expect(body.rows[0]).toEqual({ address: ALICE, balance: (10n * 10n ** 18n).toString() });
+        expect(body.rows[0]).toEqual({ address: ALICE, balance: (10n * 10n ** 18n).toString(), rank: 1 });
         // Every later row balances no higher than the one above it.
         for (let at = 1; at < body.rows.length; at++)
         {
             expect(BigInt(body.rows[at - 1]!.balance) >= BigInt(body.rows[at]!.balance)).toBe(true);
         }
+    });
+
+    it('pages the rich list in the same countable envelope as every other list', async () =>
+    {
+        const { store, chain } = await indexed(CHAIN, { balance: async () => 2n * 10n ** 18n });
+        const app = buildApp({ dev: false, store, chain });
+        const at = async (query: string): Promise<TopAccounts> =>
+            (await (await app.handle(new Request(`http://local/api/accounts/top?${ query }`))).json()) as TopAccounts;
+
+        const whole = await at('limit=50');
+        expect(whole.total).toBeGreaterThan(1);
+        expect(whole.page).toBe(1);
+
+        const first = await at('limit=1&page=1');
+        const second = await at('limit=1&page=2');
+        expect(first.rows).toHaveLength(1);
+        expect(second.rows).toHaveLength(1);
+        expect(first.rows[0]!.address).not.toBe(second.rows[0]!.address);
+        expect(first.pages).toBe(whole.total);
+    });
+
+    it('ranks over the WHOLE list, so a row keeps its place on page two', async () =>
+    {
+        // A rank counted from the row's position on screen restarts at 1 on every page, which
+        // would tell a reader the 26th richest address is the richest.
+        const { store, chain } = await indexed(CHAIN, {
+            balance: async (address) => address === ALICE ? 10n * 10n ** 18n : 2n * 10n ** 18n
+        });
+        const app = buildApp({ dev: false, store, chain });
+        const second = (await (await app.handle(new Request('http://local/api/accounts/top?limit=1&page=2'))).json()) as TopAccounts;
+        expect(second.rows[0]!.rank).toBe(2);
+    });
+
+    it('narrows the rich list to the addresses containing a term, keeping their real ranks', async () =>
+    {
+        const { store, chain } = await indexed(CHAIN, {
+            balance: async (address) => address === ALICE ? 10n * 10n ** 18n : 2n * 10n ** 18n
+        });
+        const app = buildApp({ dev: false, store, chain });
+        const at = async (query: string): Promise<TopAccounts> =>
+            (await (await app.handle(new Request(`http://local/api/accounts/top?${ query }`))).json()) as TopAccounts;
+
+        const found = await at(`limit=50&q=${ BOB.slice(2, 12) }`);
+        expect(found.rows.map((row) => row.address)).toEqual([BOB]);
+        expect(found.total).toBe(1);
+        // Bob is not the richest here, and searching for him must not say he is.
+        expect(found.rows[0]!.rank).toBeGreaterThan(1);
+
+        // A checksummed paste has to find its own row - the index stores addresses lower-cased.
+        const shouted = await at(`limit=50&q=${ BOB.toUpperCase().replace('0X', '0x') }`);
+        expect(shouted.rows.map((row) => row.address)).toEqual([BOB]);
+
+        const nothing = await at('limit=50&q=zzzz');
+        expect(nothing.rows).toEqual([]);
+        expect(nothing.total).toBe(0);
+        // Still one page, so the pager has something coherent to draw over an empty list.
+        expect(nothing.pages).toBe(1);
     });
 
     it('serves a token contract its OWN transfers rather than an empty ledger', async () =>

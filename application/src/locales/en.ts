@@ -149,6 +149,12 @@ export const en = {
     'accounts.hint': 'Ranked by native balance, read live from the node for every address the explorer has seen.',
     'accounts.empty.title': 'No accounts indexed yet',
     'accounts.empty.hint': 'Accounts appear here once the chain has seen its first transaction.',
+    'accounts.search.label': 'Search the ranking by address',
+    'accounts.search.placeholder': 'Address',
+    'accounts.search.empty.title': 'No account matches',
+    'accounts.search.empty.hint': 'No ranked address contains that. Only addresses the explorer has seen holding a balance appear here.',
+    'accounts.total': '{count} accounts ranked.',
+    'accounts.total.filtered': '{count} accounts match.',
 
     // --- Contract -----------------------------------------------------------------------------
     'contract.compiler': 'Compiler',

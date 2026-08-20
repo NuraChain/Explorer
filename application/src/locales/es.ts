@@ -136,6 +136,12 @@ export const es: Dictionary = {
     'accounts.hint': 'Ordenadas por saldo nativo, leído en vivo del nodo para cada dirección que el explorador ha visto.',
     'accounts.empty.title': 'Aún no hay cuentas indexadas',
     'accounts.empty.hint': 'Las cuentas aparecen aquí una vez la cadena registra su primera transacción.',
+    'accounts.search.label': 'Buscar en la clasificación por dirección',
+    'accounts.search.placeholder': 'Dirección',
+    'accounts.search.empty.title': 'Ninguna cuenta coincide',
+    'accounts.search.empty.hint': 'Ninguna dirección clasificada contiene eso. Aquí solo aparecen las direcciones que el explorador ha visto con saldo.',
+    'accounts.total': '{count} cuentas clasificadas.',
+    'accounts.total.filtered': '{count} cuentas coinciden.',
 
     // --- Contrato -----------------------------------------
     'contract.compiler': 'Compilador',

@@ -136,6 +136,12 @@ export const fr: Dictionary = {
     'accounts.hint': 'Classés par solde natif, lu en direct du nœud pour chaque adresse vue par l’explorateur.',
     'accounts.empty.title': 'Aucun compte indexé pour l’instant',
     'accounts.empty.hint': 'Les comptes apparaissent ici une fois la première transaction de la chaîne enregistrée.',
+    'accounts.search.label': 'Rechercher dans le classement par adresse',
+    'accounts.search.placeholder': 'Adresse',
+    'accounts.search.empty.title': 'Aucun compte ne correspond',
+    'accounts.search.empty.hint': 'Aucune adresse classée ne contient cela. Seules les adresses que l’explorateur a vues avec un solde apparaissent ici.',
+    'accounts.total': '{count} comptes classés.',
+    'accounts.total.filtered': '{count} comptes correspondent.',
 
     // --- Contrat -----------------------------------------
     'contract.compiler': 'Compilateur',

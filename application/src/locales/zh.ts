@@ -136,6 +136,12 @@ export const zh: Dictionary = {
     'accounts.hint': '按原生余额排序，余额从节点实时读取（针对浏览器所见过的每个地址）。',
     'accounts.empty.title': '暂无已索引账户',
     'accounts.empty.hint': '链上出现第一笔交易后，账户将显示在这里。',
+    'accounts.search.label': '按地址搜索排行',
+    'accounts.search.placeholder': '地址',
+    'accounts.search.empty.title': '没有匹配的账户',
+    'accounts.search.empty.hint': '排行中没有包含该内容的地址。这里只列出浏览器见过且持有余额的地址。',
+    'accounts.total': '已排行 {count} 个账户。',
+    'accounts.total.filtered': '{count} 个账户匹配。',
 
     // --- 合约 -----------------------------------------
     'contract.compiler': '编译器',

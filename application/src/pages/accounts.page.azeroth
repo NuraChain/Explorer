@@ -5,17 +5,49 @@ import { useLocale } from '../stores/locale.store.ts';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
+import Input from '../components/ui/input.component.azeroth';
+import Pagination from '../components/ui/pagination.component.azeroth';
 import Skeleton from '../components/ui/skeleton.component.azeroth';
 
 // The rich list: accounts ranked by native balance, read live from the node. It follows the
 // chain like the home page does - balances move on every block, so a stale leaderboard is a
 // wrong one - but on a slower timer, because a ranking is an overview, not a ticker.
+//
+// The ranking is the one list here a reader SCANS rather than looks something up in, so it gets
+// both a pager and a field to narrow it: on a chain of any age it is thousands of rows long, and
+// "is my address in this at all" is the question people bring to it.
 export default component AccountsPage()
 {
     const locale = useLocale();
 
+    state page = 1;
+    state term = '';
+
+    /** What has actually been asked for - `term` after it stops moving. See the effect below. */
+    state query = '';
+
+    // The request follows the field at a distance. Every answer here is a live read of every
+    // balance the chain has, so a forty-two character address pasted a keystroke at a time would
+    // otherwise ask that question forty-two times.
+    effect
+    {
+        const typed = term;
+        const timer = setTimeout(() =>
+        {
+            query = typed;
+            page = 1;
+        }, 200);
+        return () => clearTimeout(timer);
+    }
+
     resource stats = () => client.stats.summary();
-    resource accounts = () => client.accounts.top({ query: { limit: 50 } });
+    // Both in the source key: page 3 of the addresses containing 'dead' is a different list from
+    // page 3 of the whole ranking.
+    resource accounts = (key: string) =>
+    {
+        const [at = '1', wanted = ''] = key.split('|');
+        return client.accounts.top({ query: { page: Number(at), limit: 25, q: wanted } });
+    } with { source: `${ page }|${ query }` };
 
     effect
     {
@@ -25,7 +57,6 @@ export default component AccountsPage()
 
     derived symbol = stats.data()?.chain.symbol ?? '';
     derived decimals = stats.data()?.chain.decimals ?? 18;
-    derived ranked = (accounts.data()?.rows ?? []).map((row, index) => ({ row, rank: index + 1 }));
 
     useTitle(() => locale.t('accounts.title'));
 
@@ -35,15 +66,31 @@ export default component AccountsPage()
             <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('accounts.hint') }</p>
         </div>
 
+        <div class="max-w-md">
+            <Input
+                icon="search"
+                size="sm"
+                type="search"
+                label={ locale.t('accounts.search.label') }
+                placeholder={ locale.t('accounts.search.placeholder') }
+                value={ term }
+                onInput={ (next) => term = next }
+            />
+        </div>
+
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
-                <For each={ ranked } key={ (entry) => entry.row.address } let={ entry }>
+                <For each={ accounts.data()?.rows ?? [] } key={ (row) => row.address } let={ row }>
                     <li class="flex items-center gap-3 px-4 py-2.5">
-                        <span class="amount w-8 shrink-0 text-end text-[13px] text-muted">{ entry.rank }</span>
+                        {/* A rank is a number the READER counts, not a chain value, so it is
+                            printed in their own digits and NOT in the `amount` isolate - the mono
+                            stack has no Persian digits to set it in. Same reasoning as the page
+                            numbers in Pagination. */}
+                        <span class="w-8 shrink-0 text-end text-[13px] tabular-nums text-muted">{ locale.n(row.rank) }</span>
                         <div class="min-w-0 flex-1">
-                            <HashLink value={ entry.row.address } to={ `/address/${ entry.row.address }` } lead={ 16 } tail={ 10 } />
+                            <HashLink value={ row.address } to={ `/address/${ row.address }` } lead={ 16 } tail={ 10 } />
                         </div>
-                        <p class="amount shrink-0 text-end text-[14px]">{ formatValue(entry.row.balance, symbol, decimals) }</p>
+                        <p class="amount shrink-0 text-end text-[14px]">{ formatValue(row.balance, symbol, decimals) }</p>
                     </li>
                 </For>
             </ul>
@@ -54,9 +101,26 @@ export default component AccountsPage()
                     <Skeleton class="h-10 w-full" />
                 </div>
             </Show>
+            {/* Two empty states, because they are two different facts. "No accounts indexed yet"
+                under an active search tells a reader the chain has never been used, when what
+                found nothing was their own term. */}
             <Show when={ accounts.data()?.rows.length === 0 }>
-                <EmptyState icon="wallet" title={ locale.t('accounts.empty.title') } hint={ locale.t('accounts.empty.hint') } />
+                <Show
+                    when={ query === '' }
+                    fallback={ <EmptyState icon="search" title={ locale.t('accounts.search.empty.title') } hint={ locale.t('accounts.search.empty.hint') } /> }
+                >
+                    <EmptyState icon="wallet" title={ locale.t('accounts.empty.title') } hint={ locale.t('accounts.empty.hint') } />
+                </Show>
+            </Show>
+            <Show when={ accounts.data() !== undefined }>
+            { () => <Pagination page={ accounts.data()!.page } pages={ accounts.data()!.pages } onChange={ (next) => page = next } /> }
             </Show>
         </section>
+
+        {/* The count follows the search: with one on, `total` is what MATCHED, and calling that
+            the size of the ranking would misreport it every time somebody typed. */}
+        <Show when={ accounts.data() !== undefined }>
+        { () => <p class="text-[13px] text-muted">{ locale.t(query === '' ? 'accounts.total' : 'accounts.total.filtered', { count: locale.n(accounts.data()!.total) }) }</p> }
+        </Show>
     </div>
 }

@@ -135,6 +135,12 @@ export const pt: Dictionary = {
     'accounts.hint': 'Ordenadas pelo saldo nativo, lido ao vivo do nó para cada endereço que o explorador viu.',
     'accounts.empty.title': 'Nenhuma conta indexada ainda',
     'accounts.empty.hint': 'As contas aparecem aqui após a primeira transação da cadeia.',
+    'accounts.search.label': 'Buscar na classificação por endereço',
+    'accounts.search.placeholder': 'Endereço',
+    'accounts.search.empty.title': 'Nenhuma conta corresponde',
+    'accounts.search.empty.hint': 'Nenhum endereço classificado contém isso. Aqui só aparecem os endereços que o explorador viu com saldo.',
+    'accounts.total': '{count} contas classificadas.',
+    'accounts.total.filtered': '{count} contas correspondem.',
 
     // --- Contrato -----------------------------------------
     'contract.compiler': 'Compilador',

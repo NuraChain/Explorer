@@ -137,6 +137,12 @@ export const hi: Dictionary = {
     'accounts.hint': 'मूल शेष के अनुसार क्रमबद्ध, एक्सप्लोरर द्वारा देखे गए हर पते के लिए नोड से लाइव पढ़ा गया।',
     'accounts.empty.title': 'अभी कोई खाता अनुक्रमित नहीं',
     'accounts.empty.hint': 'चेन का पहला लेनदेन होने के बाद खाते यहाँ दिखेंगे।',
+    'accounts.search.label': 'पते से रैंकिंग खोजें',
+    'accounts.search.placeholder': 'पता',
+    'accounts.search.empty.title': 'कोई खाता मेल नहीं खाता',
+    'accounts.search.empty.hint': 'किसी रैंक किए गए पते में वह नहीं है। यहाँ केवल वे पते आते हैं जिन्हें एक्सप्लोरर ने शेष के साथ देखा है।',
+    'accounts.total': '{count} खाते रैंक किए गए।',
+    'accounts.total.filtered': '{count} खाते मेल खाते हैं।',
 
     // --- कॉन्ट्रैक्ट -----------------------------------------
     'contract.compiler': 'कंपाइलर',

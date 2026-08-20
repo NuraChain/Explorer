@@ -137,6 +137,12 @@ export const ar: Dictionary = {
     'accounts.hint': 'مرتّبة حسب الرصيد الأصلي، يُقرأ مباشرة من العقدة لكل عنوان رآه المستكشف.',
     'accounts.empty.title': 'لا حسابات مفهرسة بعد',
     'accounts.empty.hint': 'تظهر الحسابات هنا بعد أول معاملة على السلسلة.',
+    'accounts.search.label': 'ابحث في الترتيب بالعنوان',
+    'accounts.search.placeholder': 'العنوان',
+    'accounts.search.empty.title': 'لا حساب مطابق',
+    'accounts.search.empty.hint': 'لا عنوان مرتّب يحتوي على ذلك. تظهر هنا العناوين التي رآها المستكشف تحمل رصيدًا فقط.',
+    'accounts.total': '{count} حساب مرتّب.',
+    'accounts.total.filtered': '{count} حساب مطابق.',
 
     // --- العقد -----------------------------------------
     'contract.compiler': 'المُصرِّف',

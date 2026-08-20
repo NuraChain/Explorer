@@ -159,13 +159,24 @@ export type Account = Infer<typeof account>;
 /** One row of the rich list: an address and its LIVE native balance, in wei. */
 export const topAccount = object({
     address: string(),
-    balance: string()
+    balance: string(),
+    /**
+     * Position in the WHOLE ranking, not in the page or in a search's results.
+     *
+     * A rank counted from the row's position on screen would restart at 1 on every page and,
+     * worse, would tell a reader searching for one address that it is the richest on the chain.
+     * The rank is a property of the address, so it is decided where the ranking is.
+     */
+    rank: number({ int: true, min: 1 })
 });
 export type TopAccount = Infer<typeof topAccount>;
 
-/** The rich list, sorted highest balance first. */
+/** The rich list, sorted highest balance first, in the same countable envelope as every list. */
 export const topAccounts = object({
-    rows: array(topAccount)
+    rows: array(topAccount),
+    total: number({ int: true, min: 0 }),
+    page: number({ int: true, min: 1 }),
+    pages: number({ int: true, min: 1 })
 });
 export type TopAccounts = Infer<typeof topAccounts>;
 
@@ -305,5 +316,14 @@ export const transactionListQuery = object({ ...pageShape, status: enumOf(TX_STA
 
 /** A page of blocks, optionally narrowed to the ones that carried something. */
 export const blockListQuery = object({ ...pageShape, content: enumOf(BLOCK_FILTER).optional() });
+
+/**
+ * A page of the rich list, optionally narrowed to the addresses containing `q`.
+ *
+ * A substring rather than an exact address: the ranking is the one list in the explorer a reader
+ * scans rather than looks something up in, and the global search already answers "take me to
+ * this exact address".
+ */
+export const accountListQuery = object({ ...pageShape, q: string().optional() });
 
 export const searchQuery = object({ q: string() });

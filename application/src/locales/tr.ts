@@ -137,6 +137,12 @@ export const tr: Dictionary = {
     'accounts.hint': 'Gezginin gördüğü her adres için düğümden canlı okunan yerel bakiyeye göre sıralanır.',
     'accounts.empty.title': 'Henüz indekslenmiş hesap yok',
     'accounts.empty.hint': 'Zincir ilk işlemini gördükten sonra hesaplar burada görünür.',
+    'accounts.search.label': 'Sıralamada adrese göre ara',
+    'accounts.search.placeholder': 'Adres',
+    'accounts.search.empty.title': 'Eşleşen hesap yok',
+    'accounts.search.empty.hint': 'Sıralamadaki hiçbir adres bunu içermiyor. Burada yalnızca gezginin bakiyeyle gördüğü adresler yer alır.',
+    'accounts.total': '{count} hesap sıralandı.',
+    'accounts.total.filtered': '{count} hesap eşleşiyor.',
 
     // --- Sözleşme -----------------------------------------
     'contract.compiler': 'Derleyici',

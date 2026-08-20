@@ -141,6 +141,12 @@ export const fa: Dictionary = {
     'accounts.hint': 'رتبه‌بندی بر اساس موجودی بومی، که زنده از نود برای هر نشانی که کاوشگر دیده خوانده می‌شود.',
     'accounts.empty.title': 'هنوز حسابی نمایه نشده است',
     'accounts.empty.hint': 'وقتی زنجیره نخستین تراکنشش را ببیند، حساب‌ها اینجا ظاهر می‌شوند.',
+    'accounts.search.label': 'جست‌وجوی رتبه‌بندی بر پایهٔ نشانی',
+    'accounts.search.placeholder': 'نشانی',
+    'accounts.search.empty.title': 'حسابی هم‌خوان نیست',
+    'accounts.search.empty.hint': 'هیچ نشانی رتبه‌بندی‌شده‌ای این را ندارد. تنها نشانی‌هایی اینجا می‌آیند که کاوشگر آن‌ها را با موجودی دیده باشد.',
+    'accounts.total': '{count} حساب رتبه‌بندی شده است.',
+    'accounts.total.filtered': '{count} حساب هم‌خوان است.',
 
     // --- قرارداد -----------------------------------------
     'contract.compiler': 'کامپایلر',
