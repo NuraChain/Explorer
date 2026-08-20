@@ -126,13 +126,24 @@ export default component BlockPage()
                                     {/* The pair as the address ledger draws it: a HashLink each,
                                         so the whole value is one hover away and the counterparty
                                         one click. Copy is off on both - the row already carries
-                                        one copy button, and three turn a list into a toolbar. */}
-                                    <p class="text-[12px] text-muted">
-                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
-                                        <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
-                                        <Show when={ row.to } fallback={ <span>{ locale.t('chain.contractCreation') }</span> } let={ to }>
-                                            <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
-                                        </Show>
+                                        one copy button, and three turn a list into a toolbar.
+
+                                        Six and four, not the eight and six the address ledger
+                                        uses: this row also carries a status badge, and in a
+                                        language whose word for "reverted" is a third of a phone's
+                                        width there is no room for two fifteen-character values.
+                                        The whole address stays one hover and one click away. */}
+                                    <p class="flex flex-wrap items-center gap-x-1.5 text-[12px] text-muted">
+                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
+                                        {/* The arrow travels WITH the address it points at. On a phone the
+                                            pair is wider than the column holding it, and left loose the
+                                            arrow wrapped onto a line of its own pointing at nothing. */}
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <span class="icon-flip inline-block">&rarr;</span>
+                                            <Show when={ row.to } fallback={ <span>{ locale.t('chain.contractCreation') }</span> } let={ to }>
+                                                <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
+                                            </Show>
+                                        </span>
                                     </p>
                                 </div>
                                 <p class="amount max-w-[45%] shrink-0 text-end text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>

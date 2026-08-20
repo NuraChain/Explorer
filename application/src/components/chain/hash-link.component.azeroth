@@ -41,6 +41,12 @@ export default component HashLink(props: {
 
     // `hash` rather than `data` when whole: forty-two characters have to be allowed to wrap between
     // characters or they leave the panel, and a value shortened to fit never needs to.
+    //
+    // Deliberately NOT `whitespace-nowrap`, though the ellipsis in the middle is a break
+    // opportunity and a shortened value does sometimes split across two lines because of it. A
+    // column too narrow for the value then CLIPS it instead, and half a hash a reader cannot
+    // finish reading is worse than a whole one across two lines. Callers that cannot afford the
+    // second line shorten the value instead - see the transaction rows.
     derived face = `${ props.full === true ? 'hash' : 'data' } ${ props.class ?? 'text-[14px]' } ${ colour }`;
 
     // The confirmation is the toast, not a glyph swap on the button: a check that appears where
