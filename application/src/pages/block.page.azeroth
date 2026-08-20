@@ -8,6 +8,7 @@ import { useLocale } from '../stores/locale.store.ts';
 import Icon from '../icons/icon.component.azeroth';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
+import Badge from '../components/ui/badge.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
 import Pagination from '../components/ui/pagination.component.azeroth';
 
@@ -110,7 +111,16 @@ export default component BlockPage()
                     <ul class="divide-y divide-line">
                         <For each={ detail.data()!.transactions } key={ (row) => row.hash } let={ row }>
                             <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-                                <Icon name={ row.status === 'reverted' ? 'alert' : 'success' } size={ 15 } class={ row.status === 'reverted' ? 'text-outflow' : 'text-inflow' } />
+                                {/* The Badge the transactions list already uses, not a bare icon.
+                                    Icon is aria-hidden, so the outcome of every transaction in a
+                                    block was said in colour and shape alone - and not at all to a
+                                    screen reader. */}
+                                <Badge
+                                    tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
+                                    icon={ row.status === 'reverted' ? 'alert' : 'success' }
+                                >
+                                    { locale.t(`chain.status.${ row.status }`) }
+                                </Badge>
                                 <div class="min-w-0 flex-1">
                                     <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
                                     {/* The pair as the address ledger draws it: a HashLink each,
