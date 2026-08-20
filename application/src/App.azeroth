@@ -4,7 +4,9 @@ import type { LoaderHandoff } from 'azerothjs';
 import Icon from './icons/icon.component.azeroth';
 
 import { routes } from './routes.ts';
+import { sponsorFor } from './sponsors.ts';
 import { useLocale } from './stores/locale.store.ts';
+import AdSlot from './components/layout/ad-slot.component.azeroth';
 import BrandMark from './components/layout/brand-mark.component.azeroth';
 import SearchBar from './components/layout/search-bar.component.azeroth';
 import NavDrawer from './components/layout/nav-drawer.component.azeroth';
@@ -73,11 +75,24 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
             </header>
 
             <main class="mx-auto w-full max-w-5xl flex-1 px-4 py-5 sm:px-6 sm:py-8 motion-safe:animate-rise">
+                {/* The two advertising slots live HERE and nowhere else, so no page has to make
+                    room for one and none of them can be broken by one. Both render nothing at all
+                    until a deployment sells them - see sponsors.ts.
+
+                    Below the header rather than inside it: the header is sticky, and an
+                    advertisement that follows the reader down a transaction covers chain data. */}
+                <AdSlot sponsor={ sponsorFor('leaderboard') } eager class="mb-5 sm:mb-6" />
+
                 {/* Every render below is inside the boundary: a page that throws swaps in the
                     error page instead of unmounting the tree and leaving a blank screen. */}
                 <ErrorBoundary fallback={ (_error, reset) => <ErrorPage reset={ reset } /> }>
                     <Routes fallback={ () => <NotFoundPage /> } />
                 </ErrorBoundary>
+
+                {/* Beside the boundary rather than inside it: the boundary exists to swap a page
+                    that threw for the error page, and a slot belonging to no page has no business
+                    vanishing when one does. */}
+                <AdSlot sponsor={ sponsorFor('closing') } class="mt-6 sm:mt-8" />
             </main>
 
             <SiteFooter />

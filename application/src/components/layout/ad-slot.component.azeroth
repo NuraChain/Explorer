@@ -1,0 +1,80 @@
+import type { Sponsor } from '../../sponsors.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useTheme } from '../../stores/theme.store.ts';
+
+// An advertising slot.
+//
+// Both of them live in the SHELL rather than in any page, so no page has to know one exists and
+// no page layout can be broken by one. The component is handed its creative rather than looking
+// one up, which is what keeps that true - it renders an advertisement, it does not decide which.
+//
+// The height is RESERVED whether or not an image arrives to fill it. A slot that grows once its
+// creative loads shifts the whole page under the reader's cursor, and this app has no other
+// source of layout shift for that to hide behind.
+//
+// It does NOT wear `panel`. A panel is what chain data wears here, and an advertisement drawn as
+// one reads as another figure counted from the index - the one thing this explorer cannot afford
+// to say. Ground colour and a plain border instead, under a label that says what it is, which is
+// also what several jurisdictions require of it.
+export default component AdSlot(props: {
+    /** What runs here. Nothing renders at all when the slot is unsold. */
+    sponsor?: Sponsor;
+
+    /** True for the slot above the fold, whose creative must not wait for a scroll. */
+    eager?: boolean;
+
+    /** The slot's own spacing, which belongs to whoever placed it. */
+    class?: string;
+})
+{
+    const locale = useLocale();
+    const theme = useTheme();
+
+    // The pair to draw from: the light one where the reader chose that palette AND the advertiser
+    // supplied artwork for it. Artwork on a transparent ground reads on either and supplies none.
+    derived art = props.sponsor === undefined
+        ? { wide: '' }
+        : (theme.theme() === 'light' && props.sponsor.creativeLight !== undefined
+            ? props.sponsor.creativeLight
+            : props.sponsor.creative);
+
+    <Show when={ props.sponsor } let={ ad }>
+        <aside class={ `flex flex-col items-center gap-1.5 ${ props.class ?? '' }` }>
+            {/* Said in words, above the creative, before it is looked at. No aria-label on the
+                aside to go with it: `aside` is already a landmark, and naming it with the same
+                string would have a screen reader read the disclosure twice. */}
+            <span class="text-[11px] uppercase tracking-[0.14em] text-faint">{ locale.t('ad.label') }</span>
+
+            {/* `sponsored` is the declared value for a paid link and carries `nofollow` with it.
+                An explorer that hands its own authority to whoever bought the slot is selling
+                something it never meant to. */}
+            <a
+                class="flex h-[100px] w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-void transition-colors duration-150 hover:border-nur sm:h-[90px]"
+                href={ ad.href }
+                target="_blank"
+                rel="sponsored noreferrer"
+            >
+                {/* Two decisions, taken separately. The THEME picks the pair, here, because the
+                    palette is an attribute on the root rather than a media query. The WIDTH picks
+                    within it, below, in the markup - a `source` costs no JavaScript, no resize
+                    listener, and cannot disagree with the layout the way a measured breakpoint
+                    can. 639px is the pixel below `sm`, which is where this slot changes height. */}
+                <picture class="flex max-h-full max-w-full items-center justify-center">
+                    <Show when={ art.narrow }>
+                    { () => <source media="(max-width: 639px)" srcset={ art.narrow ?? '' } /> }
+                    </Show>
+                    {/* `object-contain`, so a creative cut to any of the standard units sits in
+                        the slot at its own proportions rather than stretched to fill it. */}
+                    <img
+                        class="max-h-full max-w-full object-contain"
+                        src={ art.wide }
+                        alt={ ad.alt }
+                        loading={ props.eager === true ? 'eager' : 'lazy' }
+                        decoding="async"
+                    />
+                </picture>
+            </a>
+        </aside>
+    </Show>
+}

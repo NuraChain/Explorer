@@ -17,6 +17,9 @@ import Button from '../src/components/ui/button.component.azeroth';
 import EmptyState from '../src/components/ui/empty-state.component.azeroth';
 import FilterGroup from '../src/components/ui/filter-group.component.azeroth';
 import SeriesChart from '../src/components/chain/series-chart.component.azeroth';
+import AdSlot from '../src/components/layout/ad-slot.component.azeroth';
+import { sponsorFor, SPONSORS, type Sponsor } from '../src/sponsors.ts';
+import { useTheme } from '../src/stores/theme.store.ts';
 import Input from '../src/components/ui/input.component.azeroth';
 import Pagination from '../src/components/ui/pagination.component.azeroth';
 import { useLocale } from '../src/stores/locale.store.ts';
@@ -383,6 +386,160 @@ describe('SeriesChart', () =>
         const { container } = chart({ points: [] });
         expect(container.textContent).toContain('Nothing yet');
         expect(container.querySelector('svg')).toBeNull();
+    });
+});
+
+describe('AdSlot', () =>
+{
+    const ACME: Sponsor = {
+        placement: 'leaderboard',
+        creative: { wide: '/sponsors/acme-970x90.png' },
+        href: 'https://acme.example',
+        alt: 'Acme Wallet - hold NURA on your phone'
+    };
+
+    it('renders NOTHING for a slot nobody bought', () =>
+    {
+        // Not an empty bordered box and not a house promo: an unsold slot costs the page no
+        // height at all, which is the only reason it is safe to put one above every page.
+        const { container } = renderTest(() => AdSlot({}) as Rendered);
+        expect(container.querySelector('aside')).toBeNull();
+        expect(container.querySelector('img')).toBeNull();
+        expect(container.textContent!.trim()).toBe('');
+    });
+
+    it('says it is an advertisement, in words, above the creative', () =>
+    {
+        const { container } = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        const aside = container.querySelector('aside')!;
+        expect(aside.textContent).toContain('Sponsored');
+        // The label comes first in the DOM, so it is read before the creative either way.
+        expect(aside.firstElementChild!.textContent).toBe('Sponsored');
+    });
+
+    it('reserves its height whether or not the creative has arrived', () =>
+    {
+        // A slot that grows once its image loads shifts the whole page under the reader.
+        const { container } = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        const box = container.querySelector('a')!;
+        expect(box.className).toContain('h-[100px]');
+        expect(box.className).toContain('sm:h-[90px]');
+    });
+
+    it('marks the link as paid, so the explorer does not hand over its own authority', () =>
+    {
+        const { container } = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        const link = container.querySelector('a')!;
+        expect(link.getAttribute('rel')).toContain('sponsored');
+        expect(link.getAttribute('rel')).toContain('noreferrer');
+        expect(link.getAttribute('target')).toBe('_blank');
+        expect(link.getAttribute('href')).toBe('https://acme.example');
+    });
+
+    it('is not drawn as a panel, which is what chain data wears here', () =>
+    {
+        const { container } = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        expect(container.querySelector('.panel')).toBeNull();
+    });
+
+    it('names the advertiser for a screen reader, never the format', () =>
+    {
+        const { container } = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        expect(container.querySelector('img')!.getAttribute('alt')).toBe(ACME.alt);
+    });
+
+    it('waits for a scroll unless it is the slot above the fold', () =>
+    {
+        const below = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        expect(below.container.querySelector('img')!.getAttribute('loading')).toBe('lazy');
+        below.unmount();
+
+        const above = renderTest(() => AdSlot({ sponsor: ACME, eager: true }) as Rendered);
+        expect(above.container.querySelector('img')!.getAttribute('loading')).toBe('eager');
+    });
+
+    it('takes the light artwork only on the light theme, and only when there is some', () =>
+    {
+        // The two themes are complete scales rather than tints of each other, so artwork drawn
+        // for near-black often does not survive the move to white.
+        const theme = useTheme();
+        const paired: Sponsor = { ...ACME, creativeLight: { wide: '/sponsors/acme-light.png' } };
+
+        theme.setTheme('light');
+        const light = renderTest(() => AdSlot({ sponsor: paired }) as Rendered);
+        expect(light.container.querySelector('img')!.getAttribute('src')).toBe('/sponsors/acme-light.png');
+        light.unmount();
+
+        // No light pair means the one set serves both, rather than nothing being shown at all.
+        const only = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        expect(only.container.querySelector('img')!.getAttribute('src')).toBe('/sponsors/acme-970x90.png');
+        only.unmount();
+
+        theme.setTheme('dark');
+        const dark = renderTest(() => AdSlot({ sponsor: paired }) as Rendered);
+        expect(dark.container.querySelector('img')!.getAttribute('src')).toBe('/sponsors/acme-970x90.png');
+        dark.unmount();
+        theme.setTheme('dark');
+    });
+
+    it('offers a phone its own unit, and letterboxes the wide one when there is none', () =>
+    {
+        // A 970x90 on a 358px screen is scaled to a third of the height reserved for it, and
+        // reads as a slot nobody bought. The choice is a media query rather than a measurement:
+        // no resize listener, and it cannot disagree with the layout it is matching.
+        const both: Sponsor = { ...ACME, creative: { wide: '/w.png', narrow: '/n.png' } };
+        const paired = renderTest(() => AdSlot({ sponsor: both }) as Rendered);
+        const source = paired.container.querySelector('source')!;
+        expect(source.getAttribute('srcset')).toBe('/n.png');
+        expect(source.getAttribute('media')).toBe('(max-width: 639px)');
+        // The wide one stays the img, so a desktop and anything without picture support get it.
+        expect(paired.container.querySelector('img')!.getAttribute('src')).toBe('/w.png');
+        paired.unmount();
+
+        const alone = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
+        expect(alone.container.querySelector('source')).toBeNull();
+    });
+});
+
+describe('the sponsor table', () =>
+{
+    it('ships empty, so an explorer carries no advertising until somebody sells it', () =>
+    {
+        expect(SPONSORS).toEqual([]);
+        expect(sponsorFor('leaderboard')).toBeUndefined();
+        expect(sponsorFor('closing')).toBeUndefined();
+    });
+
+    it('answers a placement nobody bought with nothing, not with the other one', () =>
+    {
+        const closing: Sponsor = { placement: 'closing', creative: { wide: '/c.png' }, href: 'https://c.example', alt: 'C' };
+        SPONSORS.push(closing);
+        try
+        {
+            expect(sponsorFor('leaderboard')).toBeUndefined();
+        }
+        finally
+        {
+            SPONSORS.length = 0;
+        }
+    });
+
+    it('answers with the FIRST match, so the server and the browser agree', () =>
+    {
+        // This renders once on the server and again on hydration. A slot that picked at random
+        // would hydrate onto a different advertisement than the page was rendered with.
+        const first: Sponsor = { placement: 'closing', creative: { wide: '/a.png' }, href: 'https://a.example', alt: 'A' };
+        const second: Sponsor = { placement: 'closing', creative: { wide: '/b.png' }, href: 'https://b.example', alt: 'B' };
+        SPONSORS.push(first, second);
+        try
+        {
+            expect(sponsorFor('closing')).toBe(first);
+            expect(sponsorFor('leaderboard')).toBeUndefined();
+        }
+        finally
+        {
+            SPONSORS.length = 0;
+        }
     });
 });
 

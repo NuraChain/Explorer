@@ -298,6 +298,11 @@ export const en = {
     'pagination.last': 'Last page',
     'pagination.page': 'Page {number}',
 
+    // --- Advertising --------------------------------------------------------------------------
+    // The disclosure on an ad slot, in each language's own standard word for one. The point is
+    // that a reader recognises it at a glance, not that ten languages say the same syllable.
+    'ad.label': 'Sponsored',
+
     // --- Toasts -------------------------------------------------------------------------------
     'toast.dismiss': 'Dismiss',
 

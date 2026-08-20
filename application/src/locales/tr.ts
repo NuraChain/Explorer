@@ -278,6 +278,9 @@ export const tr: Dictionary = {
     'pagination.last': 'Son sayfa',
     'pagination.page': 'Sayfa {number}',
 
+    // --- Advertising --------------------------------------------------------------------------
+    'ad.label': 'Reklam',
+
     // --- Toasts -------------------------------------------------------------------------------
     'toast.dismiss': 'Kapat',
 

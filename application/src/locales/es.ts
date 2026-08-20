@@ -277,6 +277,9 @@ export const es: Dictionary = {
     'pagination.last': 'Última página',
     'pagination.page': 'Página {number}',
 
+    // --- Advertising --------------------------------------------------------------------------
+    'ad.label': 'Publicidad',
+
     // --- Toasts -------------------------------------------------------------------------------
     'toast.dismiss': 'Cerrar',
 
