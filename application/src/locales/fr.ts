@@ -217,7 +217,9 @@ export const fr: Dictionary = {
     'copy.blocked': 'Votre navigateur a bloqué l’accès au presse-papiers',
 
     'wallet.add': 'Ajouter {chain}',
-    'wallet.missing': 'Aucun portefeuille trouvé - installez MetaMask, puis réessayez',
+    'wallet.get': 'Obtenir',
+    'wallet.detected': 'Détecté',
+    'wallet.connected': 'Connecté',
     'wallet.added': '{chain} ajoutée à votre portefeuille',
     'wallet.dismissed': 'Demande rejetée',
     'wallet.refused': 'Votre portefeuille a refusé d’ajouter le réseau',

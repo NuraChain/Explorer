@@ -217,7 +217,9 @@ export const zh: Dictionary = {
     'copy.blocked': '浏览器阻止了剪贴板访问',
 
     'wallet.add': '添加 {chain}',
-    'wallet.missing': '未找到钱包 - 请安装 MetaMask 后重试',
+    'wallet.get': '获取',
+    'wallet.detected': '已检测到',
+    'wallet.connected': '已连接',
     'wallet.added': '{chain} 已添加到你的钱包',
     'wallet.dismissed': '请求已取消',
     'wallet.refused': '钱包拒绝添加该网络',

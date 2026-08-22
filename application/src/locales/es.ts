@@ -217,7 +217,9 @@ export const es: Dictionary = {
     'copy.blocked': 'Tu navegador bloqueó el acceso al portapapeles',
 
     'wallet.add': 'Añadir {chain}',
-    'wallet.missing': 'No se encontró ninguna cartera: instala MetaMask y vuelve a intentarlo',
+    'wallet.get': 'Obtener',
+    'wallet.detected': 'Detectada',
+    'wallet.connected': 'Conectada',
     'wallet.added': '{chain} añadida a tu cartera',
     'wallet.dismissed': 'Solicitud descartada',
     'wallet.refused': 'Tu cartera rechazó añadir la red',

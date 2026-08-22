@@ -233,7 +233,9 @@ export const en = {
     'copy.blocked': 'Your browser blocked clipboard access',
 
     'wallet.add': 'Add {chain}',
-    'wallet.missing': 'No wallet found - install MetaMask, then try again',
+    'wallet.get': 'Get it',
+    'wallet.detected': 'Detected',
+    'wallet.connected': 'Connected',
     'wallet.added': '{chain} added to your wallet',
     'wallet.dismissed': 'Request dismissed',
     'wallet.refused': 'Your wallet refused to add the network',

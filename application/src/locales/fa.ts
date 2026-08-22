@@ -222,7 +222,9 @@ export const fa: Dictionary = {
     'copy.blocked': 'مرورگر شما دسترسی به حافظه را مسدود کرد',
 
     'wallet.add': 'افزودن {chain}',
-    'wallet.missing': 'کیف پولی پیدا نشد - متامسک را نصب کنید و دوباره تلاش کنید',
+    'wallet.get': 'دریافت',
+    'wallet.detected': 'شناسایی شد',
+    'wallet.connected': 'متصل',
     'wallet.added': '{chain} به کیف پول شما افزوده شد',
     'wallet.dismissed': 'درخواست رد شد',
     'wallet.refused': 'کیف پول شما از افزودن شبکه خودداری کرد',

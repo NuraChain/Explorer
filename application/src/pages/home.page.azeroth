@@ -65,14 +65,17 @@ export default component Home()
             </h1>
             <p class="mt-2 max-w-xl text-[15px] leading-relaxed text-muted">{ locale.t('home.tagline') }</p>
             {/* Offered once, on the overview: the visitor who wants the chain in their wallet
-                wants it before they start reading, not on a transaction page. */}
-            <Show when={ stats.data() !== undefined }>
-            { () =>
-                <div class="mt-4">
-                    <AddChainButton chain={ stats.data()!.chain } />
-                </div>
-            }
-            </Show>
+                wants it before they start reading, not on a transaction page.
+
+                NOT inside a `<Show>` that reads `stats.data()`, which is what this used to be.
+                The poll above hands back a new payload every five seconds, and a Show whose
+                child reads it rebuilds that child every time - which is invisible for a plain
+                button and fatal for one that owns a dialog, because the reader's open dialog is
+                swept away mid-choice. The button is created ONCE here and takes what it needs
+                as props, deciding for itself what to render before the first payload lands. */}
+            <div class="mt-4 flex flex-wrap items-center gap-2.5">
+                <AddChainButton chain={ stats.data()?.chain ?? null } />
+            </div>
         </section>
 
         <Show when={ cadence.data() !== undefined }>

@@ -1,0 +1,195 @@
+import { onMount, Portal } from 'azerothjs';
+
+import { WALLET_BRANDS } from '../../lib/wallets.ts';
+import { lockBodyScroll, unlockBodyScroll } from '../../lib/body-lock.ts';
+import { useLocale } from '../../stores/locale.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+// Which wallet. The whole roster is shown whether or not it is installed, because the two states
+// answer different questions: an installed wallet is something to click, and a missing one tells
+// a reader who has none which wallets this explorer works with and where to get one. A dialog
+// listing only what happened to be detected leaves someone with nothing installed staring at an
+// empty box.
+//
+// Portaled and `fixed` like the language dialog, for the same reason: the header is sticky and
+// carries a backdrop-filter, which traps anything rendered under it in its own stacking context.
+//
+// Rows are plain buttons and links in a list rather than a listbox of options. The language
+// dialog is a listbox because every row there sets one value; here an installed wallet and a
+// missing one do different things, and native semantics say that without any ARIA at all.
+export default component WalletPicker(props: {
+    open: boolean;
+
+    /** The heading. Connecting and adding a network are different errands, and read differently. */
+    title: string;
+
+    onPick: (rdns: string) => void;
+    onClose: () => void;
+})
+{
+    const locale = useLocale();
+    const wallet = useWallet();
+
+    let panel: HTMLElement | null = null;
+
+    /**
+     * Whatever had focus when the dialog opened.
+     *
+     * Captured here rather than handed down as a ref: two different controls open this dialog,
+     * and focus has to return to whichever one it actually was.
+     */
+    let opener: HTMLElement | null = null;
+
+    const dismiss = (): void =>
+    {
+        props.onClose();
+        opener?.focus();
+    };
+
+    const choose = (rdns: string): void =>
+    {
+        props.onPick(rdns);
+        props.onClose();
+        opener?.focus();
+    };
+
+    /** The announced entry for a brand, or undefined when that wallet is not installed. */
+    const installed = (rdns: string): { icon: string | null } | undefined =>
+        wallet.options().find((option) => option.rdns === rdns);
+
+    onMount(() =>
+    {
+        const onKey = (event: KeyboardEvent): void =>
+        {
+            if (event.key === 'Escape' && props.open)
+            {
+                dismiss();
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    });
+
+    // Focus moves into the dialog on its first WALLET, so Tab from there walks the list in order
+    // and the reader is already on the thing they came to choose. Scoped to the list rather than
+    // the panel: the close button is earlier in the DOM, and landing on it offers the reader the
+    // exit before the choice. rAF because the portal has not painted when the effect runs.
+    effect (props.open)
+    {
+        if (props.open)
+        {
+            opener = document.activeElement as HTMLElement | null;
+            lockBodyScroll();
+            if (typeof requestAnimationFrame !== 'undefined')
+            {
+                requestAnimationFrame(() => panel?.querySelector<HTMLElement>('ul a, ul button')?.focus());
+            }
+        }
+        else
+        {
+            unlockBodyScroll();
+        }
+    }
+
+    <Show when={ props.open }>
+        <Portal>
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                {/* The scrim is the dismiss target, exactly as in the language dialog. */}
+                <button
+                    class="absolute inset-0 h-full w-full cursor-default border-0 bg-void/70 p-0 backdrop-blur-sm motion-safe:animate-fade"
+                    type="button"
+                    aria-label={ locale.t('nav.close') }
+                    onClick={ dismiss }
+                ></button>
+
+                <div
+                    class="relative flex max-h-[min(28rem,calc(100dvh-2rem))] w-full max-w-sm flex-col rounded-xl border border-line bg-field p-4 shadow-2xl motion-safe:animate-fade"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={ props.title }
+                    ref={ (element) => panel = element }
+                >
+                    <div class="mb-3 flex shrink-0 items-center justify-between gap-2">
+                        <h2 class="text-[15px] font-semibold text-text">{ props.title }</h2>
+                        <button
+                            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text"
+                            type="button"
+                            aria-label={ locale.t('nav.close') }
+                            onClick={ dismiss }
+                        >
+                            <Icon name="x" size={ 18 } />
+                        </button>
+                    </div>
+
+                    <ul class="flex flex-col gap-1 overflow-y-auto">
+                        <For each={ WALLET_BRANDS } key={ (brand) => brand.rdns } let={ brand }>
+                            <li>
+                                <Show
+                                    when={ installed(brand.rdns) !== undefined }
+                                    fallback={
+                                        // A link and not a disabled button: "you do not have this
+                                        // one" is only useful if it comes with somewhere to go.
+                                        <a
+                                            class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[14px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text"
+                                            href={ brand.install }
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            <span class="flex h-6 w-6 shrink-0 items-center justify-center text-faint">
+                                                <Icon name="wallet" size={ 17 } />
+                                            </span>
+                                            { brand.label }
+                                            <span class="ms-auto shrink-0 text-[13px] text-faint">{ locale.t('wallet.get') }</span>
+                                        </a>
+                                    }
+                                >
+                                { () =>
+                                    <button
+                                        class={ [
+                                            'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[14px] transition-colors duration-150',
+                                            wallet.connectedTo() === brand.rdns
+                                                ? 'cursor-default bg-raised text-nur'
+                                                : 'cursor-pointer text-text hover:bg-raised'
+                                        ].join(' ') }
+                                        type="button"
+                                        onClick={ () => choose(brand.rdns) }
+                                    >
+                                        {/* The wallet's OWN vector when it announced one, and a
+                                            neutral glyph when it did not. Lending one brand's
+                                            logo to another would be a misrepresentation, and this
+                                            explorer ships no wallet logos of its own. */}
+                                        <span class="flex h-6 w-6 shrink-0 items-center justify-center">
+                                            <Show
+                                                when={ installed(brand.rdns)?.icon !== null }
+                                                fallback={ <Icon name="wallet" size={ 17 } class="text-muted" /> }
+                                            >
+                                            { () => <img class="h-6 w-6 rounded" src={ installed(brand.rdns)!.icon! } alt="" /> }
+                                            </Show>
+                                        </span>
+                                        { brand.label }
+                                        {/* The tick, not colour alone, is what marks the wallet
+                                            already connected - the row is `text-nur` on
+                                            `bg-raised`, and a reader who cannot tell those from
+                                            the row above has nothing else to go on. */}
+                                        <Show
+                                            when={ wallet.connectedTo() === brand.rdns }
+                                            fallback={ <span class="ms-auto shrink-0 text-[13px] text-faint">{ locale.t('wallet.detected') }</span> }
+                                        >
+                                            <span class="ms-auto flex shrink-0 items-center gap-1.5 text-[13px]">
+                                                { locale.t('wallet.connected') }
+                                                <Icon name="check" size={ 15 } />
+                                            </span>
+                                        </Show>
+                                    </button>
+                                }
+                                </Show>
+                            </li>
+                        </For>
+                    </ul>
+                </div>
+            </div>
+        </Portal>
+    </Show>
+}

@@ -34,10 +34,10 @@ does fine-grained updates.
 application/src/
   components/ui/        primitives: badge button card empty-state input pagination skeleton toasts tooltip
   components/chain/     chain-aware: hash-link flow-ledger contract-panel contract-call cadence-strip
-                        wallet-connect add-chain-button
+                        wallet-connect wallet-picker add-chain-button
   components/layout/    brand-mark search-bar nav-drawer site-footer theme-switch language-switch
   pages/                one component per route
-  stores/               locale (10 languages) · theme · toasts · wallet (EIP-1193)
+  stores/               locale (10 languages) · theme · toasts · wallet (EIP-6963 + EIP-1193)
   lib/format.ts         all amount arithmetic — uint256 through bigint, never a double
   styles/tokens.css     every colour, font and motion value
   styles/base.css       element rules and the @utility layer

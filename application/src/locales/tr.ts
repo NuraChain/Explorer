@@ -218,7 +218,9 @@ export const tr: Dictionary = {
     'copy.blocked': 'Tarayıcınız pano erişimini engelledi',
 
     'wallet.add': '{chain} ekle',
-    'wallet.missing': 'Cüzdan bulunamadı - MetaMask kurup yeniden deneyin',
+    'wallet.get': 'Edin',
+    'wallet.detected': 'Bulundu',
+    'wallet.connected': 'Bağlı',
     'wallet.added': '{chain} cüzdanınıza eklendi',
     'wallet.dismissed': 'İstek kapatıldı',
     'wallet.refused': 'Cüzdanınız ağı eklemeyi reddetti',

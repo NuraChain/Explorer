@@ -218,7 +218,9 @@ export const hi: Dictionary = {
     'copy.blocked': 'आपके ब्राउज़र ने क्लिपबोर्ड की अनुमति नहीं दी',
 
     'wallet.add': '{chain} जोड़ें',
-    'wallet.missing': 'कोई वॉलेट नहीं मिला - MetaMask इंस्टॉल करें, फिर दोबारा कोशिश करें',
+    'wallet.get': 'पाएँ',
+    'wallet.detected': 'मिली',
+    'wallet.connected': 'जुड़ा',
     'wallet.added': '{chain} आपके वॉलेट में जुड़ गई',
     'wallet.dismissed': 'अनुरोध खारिज हुआ',
     'wallet.refused': 'आपके वॉलेट ने नेटवर्क जोड़ने से मना कर दिया',

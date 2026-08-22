@@ -88,7 +88,7 @@ A component must not hand-write a colour. If you need a new tone, add it here.
 **ui/** — `badge`, `button`, `card`, `empty-state`, `input`, `pagination`, `skeleton`, `toasts`,
 `tooltip`
 **chain/** — `add-chain-button`, `cadence-strip`, `contract-call`, `contract-panel`, `flow-ledger`,
-`hash-link`, `wallet-connect`
+`hash-link`, `series-chart`, `wallet-connect`, `wallet-picker`
 **layout/** — `brand-mark`, `language-switch`, `nav-drawer`, `search-bar`, `site-footer`,
 `theme-switch`
 

@@ -218,7 +218,9 @@ export const ar: Dictionary = {
     'copy.blocked': 'منع متصفحك الوصول إلى الحافظة',
 
     'wallet.add': 'إضافة {chain}',
-    'wallet.missing': 'لا محفظة موجودة - ثبّت MetaMask ثم حاول مجدداً',
+    'wallet.get': 'احصل عليها',
+    'wallet.detected': 'تم العثور عليها',
+    'wallet.connected': 'متصلة',
     'wallet.added': 'أُضيفت {chain} إلى محفظتك',
     'wallet.dismissed': 'رُفض الطلب',
     'wallet.refused': 'رفضت محفظتك إضافة الشبكة',

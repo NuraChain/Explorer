@@ -216,7 +216,9 @@ export const pt: Dictionary = {
     'copy.blocked': 'Seu navegador bloqueou o acesso à área de transferência',
 
     'wallet.add': 'Adicionar {chain}',
-    'wallet.missing': 'Nenhuma carteira encontrada - instale a MetaMask e tente novamente',
+    'wallet.get': 'Obter',
+    'wallet.detected': 'Detectada',
+    'wallet.connected': 'Conectada',
     'wallet.added': '{chain} adicionada à sua carteira',
     'wallet.dismissed': 'Solicitação dispensada',
     'wallet.refused': 'Sua carteira recusou adicionar a rede',

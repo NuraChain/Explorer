@@ -218,7 +218,9 @@ export const ru: Dictionary = {
     'copy.blocked': 'Браузер запретил доступ к буферу обмена',
 
     'wallet.add': 'Добавить {chain}',
-    'wallet.missing': 'Кошелёк не найден - установите MetaMask и попробуйте снова',
+    'wallet.get': 'Установить',
+    'wallet.detected': 'Обнаружен',
+    'wallet.connected': 'Подключён',
     'wallet.added': '{chain} добавлена в ваш кошелёк',
     'wallet.dismissed': 'Запрос отклонён',
     'wallet.refused': 'Кошелёк отказался добавить сеть',
