@@ -9,6 +9,7 @@ import Icon from '../icons/icon.component.azeroth';
 
 import AddChainButton from '../components/chain/add-chain-button.component.azeroth';
 import CadenceStrip from '../components/chain/cadence-strip.component.azeroth';
+import PriceTicker from '../components/chain/price-ticker.component.azeroth';
 import Badge from '../components/ui/badge.component.azeroth';
 import HashLink from '../components/chain/hash-link.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
@@ -71,10 +72,12 @@ export default component Home()
                 The poll above hands back a new payload every five seconds, and a Show whose
                 child reads it rebuilds that child every time - which is invisible for a plain
                 button and fatal for one that owns a dialog, because the reader's open dialog is
-                swept away mid-choice. The button is created ONCE here and takes what it needs
-                as props, deciding for itself what to render before the first payload lands. */}
+                swept away mid-choice. Both controls are created ONCE here and take what they
+                need as props; each decides for itself what to render before the first payload
+                lands. */}
             <div class="mt-4 flex flex-wrap items-center gap-2.5">
                 <AddChainButton chain={ stats.data()?.chain ?? null } />
+                <PriceTicker />
             </div>
         </section>
 

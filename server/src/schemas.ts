@@ -38,6 +38,26 @@ export const summary = object({
 });
 export type Summary = Infer<typeof summary>;
 
+/**
+ * What the native coin is worth in USD, and where that figure came from.
+ *
+ * `usd` is a NUMBER and not a wei string, alone among the amounts here. Every other figure on this
+ * wire is an exact integer of a smallest unit that a double would round; a price is a measurement
+ * with a handful of significant digits and no smallest unit to lose. It crosses as what it is.
+ *
+ * Null - never zero - when no exchange quotes the coin, or when the one that does cannot be
+ * reached. Zero is a price, and it says the coin is worthless.
+ */
+export const nativePrice = object({
+    symbol: string(),
+    usd: number().nullable(),
+    /** When the reading was taken upstream. Null exactly when `usd` is. */
+    at: string().nullable(),
+    /** The host the figure came from, so a page can say whose price it is printing. */
+    source: string()
+});
+export type NativePrice = Infer<typeof nativePrice>;
+
 export const block = object({
     number: number({ int: true, min: 0 }),
     hash: string(),

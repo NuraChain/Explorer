@@ -201,6 +201,9 @@ export const zh: Dictionary = {
     'cadence.bar': '区块 {number}，{count} 笔交易',
     'cadence.now': '现在',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': '价格来自 {host}，{ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': '合约创建',
     'chain.to': '至 {address}',

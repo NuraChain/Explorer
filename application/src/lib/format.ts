@@ -81,6 +81,45 @@ export function formatGwei(wei: string): string
     return `${ formatAmount(wei, 9, 2) } gwei`;
 }
 
+/** How many digits of a price actually carry information. Past this it is noise with a decimal point. */
+const PRICE_DIGITS = 4;
+
+/**
+ * A USD price, at a precision that survives a coin worth a fraction of a cent.
+ *
+ * Two decimal places is the wrong answer here. `$0.00027577` under the currency default formats
+ * to `$0.00`, which is not a rounding error but a different claim - it says the coin is
+ * worthless. So the fraction is chosen from the MAGNITUDE: enough places to carry four
+ * significant digits, and never more places than the price has.
+ *
+ * Latin digits and never the reader's own, like every other amount in this file: a price is a
+ * figure to be read exactly and pasted elsewhere, and it sits inside `.data`, where the direction
+ * is isolated.
+ *
+ * Empty for anything that is not a positive, finite price. There is no such thing as a coin worth
+ * nothing - a zero here means nobody is quoting it, and the caller renders nothing at all.
+ */
+export function formatUsd(value: number): string
+{
+    if (!Number.isFinite(value) || value <= 0)
+    {
+        return '';
+    }
+    // How many places sit between the point and the first digit that is not a zero. A price of
+    // 0.00027577 hides three, so four significant digits need seven places.
+    const hidden = value >= 1 ? 0 : Math.floor(-Math.log10(value));
+    // Capped well inside what Intl accepts: a price small enough to reach the cap has long since
+    // stopped being a number anybody reads.
+    const fraction = Math.min(18, value >= 1 ? 2 : hidden + PRICE_DIGITS);
+    return value.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        // The floor keeps whole-dollar prices in cents - `$1` reads as a placeholder, `$1.00`
+        // reads as a price - while the ceiling is what stops a sub-cent coin rounding to nothing.
+        minimumFractionDigits: Math.min(2, fraction),
+        maximumFractionDigits: fraction
+    });
+}
 /** `0x1234…abcd` - long enough to recognise, short enough to sit in a table. */
 export function shortHash(value: string, lead = 10, tail = 8): string
 {

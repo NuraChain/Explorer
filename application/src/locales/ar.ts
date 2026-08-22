@@ -202,6 +202,9 @@ export const ar: Dictionary = {
     'cadence.bar': 'الكتلة {number}، {count} معاملة',
     'cadence.now': 'الآن',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': 'السعر من {host}، {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'إنشاء عقد',
     'chain.to': 'إلى {address}',

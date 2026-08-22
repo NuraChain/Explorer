@@ -206,6 +206,9 @@ export const fa: Dictionary = {
     'cadence.bar': 'بلاک {number}، {count} تراکنش',
     'cadence.now': 'اکنون',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': 'قیمت از {host}، {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'ایجاد قرارداد',
     'chain.to': 'به {address}',

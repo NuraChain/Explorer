@@ -34,7 +34,7 @@ does fine-grained updates.
 application/src/
   components/ui/        primitives: badge button card empty-state input pagination skeleton toasts tooltip
   components/chain/     chain-aware: hash-link flow-ledger contract-panel contract-call cadence-strip
-                        wallet-connect wallet-picker add-chain-button
+                        wallet-connect wallet-picker add-chain-button price-ticker
   components/layout/    brand-mark search-bar nav-drawer site-footer theme-switch language-switch
   pages/                one component per route
   stores/               locale (10 languages) · theme · toasts · wallet (EIP-6963 + EIP-1193)

@@ -202,6 +202,9 @@ export const ru: Dictionary = {
     'cadence.bar': 'Блок {number}, транзакций: {count}',
     'cadence.now': 'сейчас',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': 'Цена с {host}, {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'создание контракта',
     'chain.to': 'к {address}',

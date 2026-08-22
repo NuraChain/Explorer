@@ -11,6 +11,7 @@ import { CachedChain, loadCacheOptions } from './chain/cache.ts';
 import { ChainReader, loadChainEnv } from './chain/client.ts';
 import { IndexStore } from './chain/store.ts';
 import { startIndexer } from './chain/indexer.ts';
+import { loadPriceEnv, SwapPriceFeed } from './price.ts';
 
 try
 {
@@ -46,6 +47,14 @@ const indexer = startIndexer(store, chain, log);
 // visitor at once. See chain/cache.ts for what is held and for how long.
 const reads = new CachedChain(chain, loadCacheOptions());
 
+// The only read in this process that is not the chain. It is held behind its own TTL, so the
+// exchange sees one request every half minute however many people are on the home page, and a
+// failure there is logged and then forgotten - the route answers `null` and the page prints
+// nothing rather than an error nobody can act on.
+const price = new SwapPriceFeed(loadPriceEnv(), chainEnv.symbol, {
+    onError: (error: unknown) => log.warn('price feed unreachable', { error: String(error) })
+});
+
 log.info('indexing', { rpc: chainEnv.rpcUrl, chainId: chainEnv.chainId, from: chainEnv.startBlock });
 
 // In dev, vite serves the client and proxies /api here; in production this server serves
@@ -60,6 +69,7 @@ const app = buildApp({
     observe: logRequests(log),
     store,
     chain: reads,
+    price,
     pages: ssr === undefined ? undefined : { routes: ssr.routes, clientDir: config.clientDir, renderer: ssr.renderPage }
 });
 

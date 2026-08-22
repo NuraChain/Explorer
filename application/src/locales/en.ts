@@ -217,6 +217,9 @@ export const en = {
     'cadence.bar': 'Block {number}, {count} transactions',
     'cadence.now': 'now',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': 'Price via {host}, {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'contract creation',
     'chain.to': 'to {address}',

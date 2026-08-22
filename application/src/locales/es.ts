@@ -201,6 +201,9 @@ export const es: Dictionary = {
     'cadence.bar': 'Bloque {number}, {count} transacciones',
     'cadence.now': 'ahora',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': 'Precio vía {host}, {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'creación de contrato',
     'chain.to': 'a {address}',

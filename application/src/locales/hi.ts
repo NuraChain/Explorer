@@ -202,6 +202,9 @@ export const hi: Dictionary = {
     'cadence.bar': 'ब्लॉक {number}, {count} लेनदेन',
     'cadence.now': 'अभी',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': '{host} से भाव, {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'कॉन्ट्रैक्ट निर्माण',
     'chain.to': '{address} को',

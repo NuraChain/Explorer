@@ -7,6 +7,7 @@ import { normalize, type DailyStats, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
 import { calldataFor, inspectContract, readContract } from './inspect.ts';
 import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
+import { noPrice, type PriceSource } from './price.ts';
 import {
     account,
     accountListQuery,
@@ -20,6 +21,7 @@ import {
     contractCallInput,
     contractCallResult,
     contractDetail,
+    nativePrice,
     pageQuery,
     searchQuery,
     searchResult,
@@ -48,6 +50,13 @@ export interface ApiDeps
 {
     store: IndexStore;
     chain: ChainGateway;
+
+    /**
+     * Where a USD price for the native coin comes from. Optional because it is the one dependency
+     * that is not this chain: a deployment with no exchange behind it quotes nothing, and every
+     * page still renders.
+     */
+    price?: PriceSource;
 }
 
 const DEFAULT_LIMIT = 25;
@@ -86,7 +95,7 @@ export function createApi(deps: ApiDeps): ReturnType<typeof build>
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- the route literal IS the type; naming it would erase per-route inference
-function build({ store, chain }: ApiDeps)
+function build({ store, chain, price }: ApiDeps)
 {
     /** Attaches the token metadata each transfer row needs, reading each token at most once. */
     const withTokens = (rows: ReturnType<IndexStore['transfersOfAddress']>['rows']): Transfer[] =>
@@ -108,6 +117,11 @@ function build({ store, chain }: ApiDeps)
         const page = query.page ?? 1;
         return { limit, offset: (page - 1) * limit, page };
     };
+
+    // Resolved once rather than per request: `noPrice` is what a deployment with no exchange
+    // configured answers with, and it must be the same object every time so the route below has
+    // no branch in it.
+    const quotes = price ?? noPrice(chain.env.symbol);
 
     // The rich list. Balances are live, and reading the node for every address on every request
     // would turn one page view into a balance storm, so the ranked list is cached for a few
@@ -232,6 +246,17 @@ function build({ store, chain }: ApiDeps)
                     gasPrice: recent[0]?.base_fee ?? '0'
                 };
             }),
+
+            /**
+             * What one coin is worth, in dollars.
+             *
+             * Proxied rather than fetched from the browser: the figure comes from another origin,
+             * and a page that reads it directly is one CORS header away from showing nothing, once
+             * per visitor per tick. Here it is one request every half minute no matter how many
+             * people are watching - and the wire shape stays this server's to declare, like every
+             * other field on it.
+             */
+            price: routes.get('/price', { output: nativePrice }, () => quotes.read()),
 
             /** The cadence strip's data: the most recent blocks, oldest-first for drawing. */
             cadence: routes.get('/cadence', { output: blockPage }, () =>

@@ -1,0 +1,60 @@
+import { client } from '../../api.ts';
+import { formatUsd } from '../../lib/format.ts';
+import { useLocale } from '../../stores/locale.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+import Tooltip from '../ui/tooltip.component.azeroth';
+
+// What the coin is worth, beside the chain it belongs to.
+//
+// It owns its own request and its own timer rather than joining the home page's five-second poll,
+// because it is not following the same thing. The page follows BLOCKS, which land every few
+// seconds; this follows a market, which the server holds for half a minute at a time. Refetching
+// it five times faster than it can change would be five requests for one answer.
+//
+// It renders NOTHING when there is no price - not a dash, not a zero, not a skeleton that never
+// resolves. A deployment with no exchange behind it, or an exchange that has gone quiet, has
+// nothing to say here, and a hero with one fewer element in it says that correctly.
+export default component PriceTicker()
+{
+    const locale = useLocale();
+
+    resource price = () => client.stats.price();
+
+    // Matches the server's own hold. See server/src/price.ts: PRICE_TTL_MS.
+    const REFRESH_MS = 30_000;
+
+    effect
+    {
+        const timer = setInterval(() => price.refetch(), REFRESH_MS);
+        return () => clearInterval(timer);
+    }
+
+    /** The quote as it will be shown, or null when there is nothing to show. */
+    derived shown = ((): { symbol: string; amount: string; source: string; at: string } | null =>
+    {
+        const quote = price.data();
+        if (quote === undefined || quote.usd === null || quote.at === null)
+        {
+            return null;
+        }
+        const amount = formatUsd(quote.usd);
+        return amount === '' ? null : { symbol: quote.symbol, amount, source: quote.source, at: quote.at };
+    })();
+
+    <Show when={ shown !== null }>
+    { () =>
+        // The source and the reading's age are in the tooltip rather than in the pill: a price
+        // that has to explain itself in the same breath is not a headline any more. The figure
+        // and its ticker are the content; where it came from is the footnote a reader goes
+        // looking for.
+        <Tooltip label={ locale.t('price.source', { host: shown!.source, ago: locale.ago(shown!.at) }) }>
+            <span class="panel inline-flex h-10 items-center gap-2 px-3.5 text-[14px]">
+                <Icon name="token" size={ 16 } class="text-nur" />
+                <span class="text-muted">{ shown!.symbol }</span>
+                <span class="data font-semibold">{ shown!.amount }</span>
+            </span>
+        </Tooltip>
+    }
+    </Show>
+}

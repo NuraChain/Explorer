@@ -202,6 +202,9 @@ export const tr: Dictionary = {
     'cadence.bar': 'Blok {number}, {count} işlem',
     'cadence.now': 'şimdi',
 
+    // --- Price --------------------------------------------------------------------------------
+    'price.source': 'Fiyat kaynağı {host}, {ago}',
+
     // --- Shared chain wording -----------------------------------------------------------------
     'chain.contractCreation': 'kontrat oluşturma',
     'chain.to': '{address} adresine',

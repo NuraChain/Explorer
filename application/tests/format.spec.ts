@@ -5,7 +5,7 @@
 // misreports a balance has failed at its only job, so the arithmetic is pinned here.
 import { describe, it, expect } from 'vitest';
 
-import { elapsed, formatAmount, formatCompact, formatCount, formatDate, formatDateTime, formatGwei, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
+import { elapsed, formatAmount, formatCompact, formatCount, formatDate, formatDateTime, formatGwei, formatUsd, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
 
 describe('parseAmount - what someone typed, into wei', () =>
 {
@@ -93,6 +93,42 @@ describe('formatValue / formatGwei', () =>
     {
         expect(formatGwei('1000000000')).toBe('1 gwei');
         expect(formatGwei('230923178')).toBe('0.2309 gwei');
+    });
+});
+
+describe('formatUsd - a price that may be worth a fraction of a cent', () =>
+{
+    it('keeps two places for anything priced like money', () =>
+    {
+        expect(formatUsd(689.99)).toBe('$689.99');
+        expect(formatUsd(1)).toBe('$1.00');
+        expect(formatUsd(3.14159)).toBe('$3.14');
+        expect(formatUsd(12345.678)).toBe('$12,345.68');
+    });
+
+    it('opens up the fraction rather than rounding a sub-cent coin to nothing', () =>
+    {
+        // The whole reason this function exists. Under the currency default this is "$0.00",
+        // which is not a rounded price but a different claim - that the coin is worthless.
+        expect(formatUsd(0.00027577)).toBe('$0.0002758');
+        expect(formatUsd(0.0123)).toBe('$0.0123');
+        expect(formatUsd(0.000000001234)).toBe('$0.000000001234');
+    });
+
+    it('never drops below cents, so a whole-dollar price still reads as a price', () =>
+    {
+        expect(formatUsd(0.5)).toBe('$0.50');
+        expect(formatUsd(0.1)).toBe('$0.10');
+    });
+
+    it('prints nothing at all for something that is not a price', () =>
+    {
+        // A zero is not a cheap coin, it is the absence of a quote - and the caller renders
+        // nothing rather than a figure nobody measured.
+        expect(formatUsd(0)).toBe('');
+        expect(formatUsd(-1)).toBe('');
+        expect(formatUsd(Number.NaN)).toBe('');
+        expect(formatUsd(Number.POSITIVE_INFINITY)).toBe('');
     });
 });
 
