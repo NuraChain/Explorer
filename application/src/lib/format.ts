@@ -155,7 +155,7 @@ export function formatChange(ratio: number, tag = 'en-US'): string
     return ratio.toLocaleString(tag, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 });
 }
 
-export type ElapsedUnit = 'justNow' | 'second' | 'minute' | 'hour' | 'day';
+type ElapsedUnit = 'justNow' | 'second' | 'minute' | 'hour' | 'day';
 
 const UNITS: ReadonlyArray<[limit: number, seconds: number, unit: ElapsedUnit]> = [
     [60, 1, 'second'],

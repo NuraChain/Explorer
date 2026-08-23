@@ -85,7 +85,7 @@ A component must not hand-write a colour. If you need a new tone, add it here.
 
 ## Component inventory
 
-**ui/** — `badge`, `button`, `card`, `empty-state`, `input`, `pagination`, `skeleton`, `toasts`,
+**ui/** — `badge`, `button`, `empty-state`, `input`, `pagination`, `skeleton`, `toasts`,
 `tooltip`
 **chain/** — `add-chain-button`, `cadence-strip`, `contract-call`, `contract-panel`, `flow-ledger`,
 `hash-link`, `price-ticker`, `series-chart`, `wallet-connect`, `wallet-picker`

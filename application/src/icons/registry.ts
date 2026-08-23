@@ -1,8 +1,6 @@
 import {
     Activity,
     ArrowDownLeft,
-    ArrowLeft,
-    ArrowRight,
     ArrowUpRight,
     Blocks,
     Check,
@@ -39,8 +37,6 @@ import { DISCORD, GITHUB, INSTAGRAM, TELEGRAM, X_COM } from './brands.ts';
 export const ICONS = {
     'activity': Activity,
     'alert': CircleAlert,
-    'arrow-left': ArrowLeft,
-    'arrow-right': ArrowRight,
     'block': Blocks,
     'check': Check,
     'chevron-down': ChevronDown,

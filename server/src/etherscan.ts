@@ -256,10 +256,11 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
             {
                 return fail('Error! Invalid address format');
             }
-            const balances = await Promise.all(raw.map(async (value) => ({
-                account: normalize(value),
-                balance: (await chain.balance(normalize(value))).toString()
-            })));
+            const balances = await Promise.all(raw.map(async (value) =>
+            {
+                const account = normalize(value);
+                return { account, balance: (await chain.balance(account)).toString() };
+            }));
             return ok(balances);
         }
 
