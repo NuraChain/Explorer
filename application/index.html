@@ -9,8 +9,11 @@
              below swaps it for the Persian name when that is the language being restored. -->
         <title>Nura Explorer</title>
         <meta name="description" content="An open block explorer for EVM chains. Every block, transaction and transfer is indexed locally, so you can follow where value actually moved."/>
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f8fa"/>
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1118"/>
+        <!-- The browser chrome around the page, matching --void in styles/tokens.css for each
+             theme (the manifest carries the dark one too). A value that disagreed with the page
+             behind it would draw a visible seam on every load. -->
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F8FA"/>
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#080B12"/>
         <!-- Three consumers, three formats: the .ico holds 16/32/48 for tabs, iOS reads only
              apple-touch-icon (it ignores .ico entirely), and Android takes the 192/512 pair
              through the manifest. All four are cut from brand/icon-source.png. -->
