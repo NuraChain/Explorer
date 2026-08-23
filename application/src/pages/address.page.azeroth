@@ -42,7 +42,12 @@ export default component AddressPage()
     state tab: 'flow' | 'transfers' | 'contract' = 'flow';
     state direction: AddressDirection = 'all';
 
-    derived address = params()['address'] ?? '';
+    // Lower-cased ONCE, here, because everything below compares it against wire values - and
+    // those arrive lower-cased. A wallet links out with a CHECKSUMMED address (EIP-55), and
+    // compared raw, `row.to === address` never matched: every transfer lost its direction and
+    // the ledger drew value that ARRIVED on the outflow rail. Same rule as the index itself -
+    // see normalize() in server/src/chain/store.ts.
+    derived address = (params()['address'] ?? '').toLowerCase();
 
     // Clicking a counterparty re-uses this component with a new param rather than mounting a
     // fresh one, so without this the reader lands on page 6 of an account that has two pages,
