@@ -56,16 +56,16 @@ export default component BlocksPage()
             <ul class="divide-y divide-line">
                 <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
                     <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
-                        <Link to={ `/block/${ block.number }` } class="data w-24 shrink-0 text-[15px] font-semibold text-nur no-underline hover:underline">
+                        <Link to={ `/block/${ block.number }` } class="data w-20 shrink-0 sm:w-24 text-[15px] font-semibold text-nur no-underline hover:underline">
                             #{ block.number }
                         </Link>
                         <div class="min-w-0 flex-1">
-                            <HashLink value={ block.hash } to={ `/block/${ block.number }` } tone="muted" lead={ 14 } tail={ 8 } />
+                            <HashLink value={ block.hash } to={ `/block/${ block.number }` } tone="muted" lead={ 12 } tail={ 6 } class="text-[13px]" />
                             <Tooltip label={ locale.dateTime(block.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(block.at) }</p></Tooltip>
                         </div>
-                        <div class="text-end">
-                            <p class="data text-[14px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
-                            <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
+                        <div class="text-end min-w-[80px]">
+                            <p class="data text-[13px] sm:text-[14px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
+                            <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[11px] sm:text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
                         </div>
                     </li>
                 </For>
