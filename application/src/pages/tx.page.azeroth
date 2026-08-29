@@ -74,67 +74,67 @@ export default component TransactionPage()
                 </Show>
 
                 <dl class="panel divide-y divide-line">
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.hash') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.hash') }</dt>
+                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy class="text-[13px]" /></dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.block') }</dt>
-                        <dd class="flex-1">
-                            <Link to={ `/block/${ detail.data()!.transaction.blockNumber }` } class="data text-[14px] text-beam no-underline hover:underline">
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.block') }</dt>
+                        <dd class="flex-1 min-w-0">
+                            <Link to={ `/block/${ detail.data()!.transaction.blockNumber }` } class="data text-[13px] sm:text-[14px] text-beam no-underline hover:underline">
                                 #{ detail.data()!.transaction.blockNumber }
                             </Link>
-                            <span class="ms-2 text-[13px] text-muted">{ locale.t('tx.position', { index: locale.n(detail.data()!.transaction.index) }) }</span>
+                            <span class="ms-2 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.position', { index: locale.n(detail.data()!.transaction.index) }) }</span>
                         </dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.from') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.from') }</dt>
+                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 14 } tail={ 8 } copy class="text-[13px]" /></dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.to') }</dt>
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.to') }</dt>
                         <dd class="min-w-0 flex-1">
                             <Show
                                 when={ detail.data()!.transaction.to }
                                 fallback={
-                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[14px] text-muted">{ locale.t('chain.contractCreation') }</span> } let={ created }>
+                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[13px] sm:text-[14px] text-muted">{ locale.t('chain.contractCreation') }</span> } let={ created }>
                                         <span class="flex flex-wrap items-center gap-2">
-                                            <span class="text-[13px] text-muted">{ locale.t('tx.created') }</span>
-                                            <HashLink value={ created } to={ `/address/${ created }` } lead={ 16 } tail={ 10 } copy />
+                                            <span class="text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.created') }</span>
+                                            <HashLink value={ created } to={ `/address/${ created }` } lead={ 14 } tail={ 8 } copy class="text-[13px]" />
                                         </span>
                                     </Show>
                                 }
                              let={ to }>
-                            <HashLink value={ to } to={ `/address/${ to }` } lead={ 16 } tail={ 10 } copy />
+                            <HashLink value={ to } to={ `/address/${ to }` } lead={ 14 } tail={ 8 } copy class="text-[13px]" />
                             </Show>
                         </dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.value') }</dt>
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.value') }</dt>
                         {/* `amount` on the value, not on the dd: the utility forces ltr, and on a
                             block element that also decides where the line starts, so the figure
                             stood against the far edge from its own label in a mirrored layout. */}
-                        <dd class="min-w-0 flex-1 text-[16px] font-bold"><span class="amount">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</span></dd>
+                        <dd class="min-w-0 flex-1 text-[15px] sm:text-[16px] font-bold"><span class="amount">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</span></dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.fee') }</dt>
-                        <dd class="flex-1">
-                            <span class="amount text-[14px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
-                            <span class="ms-2 text-[13px] text-muted">
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.fee') }</dt>
+                        <dd class="flex-1 min-w-0">
+                            <span class="amount text-[13px] sm:text-[14px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
+                            <span class="block sm:inline ms-2 mt-1.5 sm:mt-0 text-[12px] sm:text-[13px] text-muted">
                                 { locale.t('tx.feeDetail', { gas: locale.n(Number(detail.data()!.transaction.gasUsed)), price: formatGwei(detail.data()!.transaction.gasPrice) }) }
                             </span>
                         </dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
-                        <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.nonce') }</dt>
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 px-3 py-3 sm:gap-x-4 sm:px-4 sm:py-3">
+                        <dt class="w-20 shrink-0 sm:w-24 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.nonce') }</dt>
                         {/* The nonce is chain data and the calldata size beside it is a sentence in
                             the reader's language, so only the first goes inside the isolate - on
                             the dd it took the whole row to the wrong edge and dragged the words
                             with it. */}
-                        <dd class="flex-1 text-[14px]">
+                        <dd class="flex-1 min-w-0 text-[13px] sm:text-[14px]">
                             <span class="data">{ detail.data()!.transaction.nonce }</span>
                             <Show when={ detail.data()!.transaction.inputSize > 0 }>
-                                <span class="ms-3 text-[13px] text-muted">{ locale.t('tx.calldata', { size: locale.bytes(detail.data()!.transaction.inputSize) }) }</span>
+                                <span class="block sm:inline ms-3 mt-1.5 sm:mt-0 text-[12px] sm:text-[13px] text-muted">{ locale.t('tx.calldata', { size: locale.bytes(detail.data()!.transaction.inputSize) }) }</span>
                             </Show>
                         </dd>
                     </div>
