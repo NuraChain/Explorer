@@ -16,6 +16,14 @@ export default component Input(props: {
     prose?: boolean;
 
     size?: 'sm' | 'md';
+
+    /**
+     * Rows of a MULTI-LINE field, for the one thing this explorer takes that is not a line: a
+     * governance proposal, which is a JSON document somebody pastes. Same shell, same accessible
+     * name, same focus ring - a second field component would only have to be kept in step.
+     */
+    rows?: number;
+
     onInput?: (value: string) => void;
 
     /** The field element, for callers that must focus it (the global search shortcut). */
@@ -24,27 +32,48 @@ export default component Input(props: {
 {
     derived big = props.size !== 'sm';
 
-    <div class={ big
-        ? 'flex items-center gap-3 rounded-xl border border-line bg-field px-4 py-3 focus-within:border-nur'
-        : 'flex items-center gap-2 rounded-lg border border-line bg-field px-3 py-2 focus-within:border-nur' }
+    <div class={ [
+        big ? 'flex gap-3 rounded-xl border border-line bg-field px-4 py-3 focus-within:border-nur'
+            : 'flex gap-2 rounded-lg border border-line bg-field px-3 py-2 focus-within:border-nur',
+        props.rows === undefined ? 'items-center' : 'items-start'
+    ].join(' ') }
     >
         <Show when={ props.icon !== undefined }>
             <Icon name={ props.icon ?? 'help' } size={ big ? 18 : 15 } class="shrink-0 text-muted" />
         </Show>
-        <input
-            class={ [
-                'min-w-0 flex-1 bg-transparent text-text outline-none placeholder:font-sans placeholder:text-muted',
-                props.prose === true ? '' : 'hash-field',
-                big ? 'text-[16px]' : 'text-[14px]'
-            ].filter(Boolean).join(' ') }
-            type={ props.type ?? 'text' }
-            value={ props.value ?? '' }
-            placeholder={ props.placeholder }
-            aria-label={ props.label }
-            spellcheck={ false }
-            autocomplete="off"
-            onInput={ (event) => props.onInput?.((event.target as HTMLInputElement).value) }
-            ref={ props.ref }
-        />
+        <Show
+            when={ props.rows === undefined }
+            fallback={
+                <textarea
+                    class={ [
+                        'min-w-0 flex-1 resize-y bg-transparent leading-relaxed text-text outline-none placeholder:font-sans placeholder:text-muted',
+                        props.prose === true ? '' : 'hash-field',
+                        big ? 'text-[16px]' : 'text-[14px]'
+                    ].filter(Boolean).join(' ') }
+                    rows={ props.rows ?? 6 }
+                    value={ props.value ?? '' }
+                    placeholder={ props.placeholder }
+                    aria-label={ props.label }
+                    spellcheck={ false }
+                    onInput={ (event) => props.onInput?.((event.target as HTMLTextAreaElement).value) }
+                ></textarea>
+            }
+        >
+            <input
+                class={ [
+                    'min-w-0 flex-1 bg-transparent text-text outline-none placeholder:font-sans placeholder:text-muted',
+                    props.prose === true ? '' : 'hash-field',
+                    big ? 'text-[16px]' : 'text-[14px]'
+                ].filter(Boolean).join(' ') }
+                type={ props.type ?? 'text' }
+                value={ props.value ?? '' }
+                placeholder={ props.placeholder }
+                aria-label={ props.label }
+                spellcheck={ false }
+                autocomplete="off"
+                onInput={ (event) => props.onInput?.((event.target as HTMLInputElement).value) }
+                ref={ props.ref }
+            />
+        </Show>
     </div>
 }

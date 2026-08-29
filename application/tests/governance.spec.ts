@@ -1,21 +1,27 @@
-// The arithmetic behind a tally. A vote weight is a uint256, so every share below is worked out
-// in BigInt and only divided down to a percentage at the very end - the same rule format.ts
-// follows for amounts, and for the same reason: a double cannot hold what a governor counts.
+// The arithmetic behind a tally. Voting power is a uint256 and the module's shares are eighteen
+// places of fixed point, so everything below is worked out in BigInt and only divided down to a
+// percentage at the end - the same rule format.ts follows for amounts, and for the same reason.
 import { describe, it, expect } from 'vitest';
 
 import {
     isActionable,
+    majority,
     PROPOSAL_ICON,
     PROPOSAL_TONE,
-    quorumShare,
+    ratio,
     share,
-    SUPPORT,
-    supportOf,
-    totalCast
+    totalCast,
+    vetoShare,
+    VOTE_CODE,
+    VOTE_OPTIONS
 } from '../src/lib/governance.ts';
-import { PROPOSAL_STATES } from '../../server/src/schemas.ts';
+import { PROPOSAL_STATUSES } from '../../server/src/schemas.ts';
 
-const ONE = 10n ** 18n;
+const POWER = 10n ** 18n;
+
+const tally = (yes: bigint, abstain: bigint, no: bigint, veto: bigint): {
+    yes: string; abstain: string; no: string; noWithVeto: string;
+} => ({ yes: yes.toString(), abstain: abstain.toString(), no: no.toString(), noWithVeto: veto.toString() });
 
 describe('share', () =>
 {
@@ -23,7 +29,6 @@ describe('share', () =>
     {
         expect(share(1n, 4n)).toBe(25);
         expect(share(1n, 3n)).toBe(33.33);
-        expect(share(2n, 3n)).toBe(66.66);
     });
 
     it('answers zero rather than dividing by nothing', () =>
@@ -34,98 +39,88 @@ describe('share', () =>
 
     it('stays exact where a double has already run out of digits', () =>
     {
-        // Thirty digits and two hundred bits: the ratio is worked out before anything becomes a
-        // Number, so these are the same answers the small cases give.
         expect(share(10n ** 30n, 3n * 10n ** 30n)).toBe(33.33);
         expect(share(2n ** 200n, 2n ** 201n)).toBe(50);
     });
+});
 
-    it('is a reading and not a verdict - two places is all it claims', () =>
+describe('ratio', () =>
+{
+    it('reads the module\'s eighteen-place fixed point as a percentage', () =>
     {
-        // One wei over half of a 27-digit whole is still 50.00% on screen, and that is correct:
-        // the DECISION belongs to the governor's own counting, which compares whole uint256s
-        // (see proposalStatus on the server). A percentage is what a reader is shown.
+        expect(ratio('0.334000000000000000')).toBe(33.4);
+        expect(ratio('0.500000000000000000')).toBe(50);
+        expect(ratio('1.000000000000000000')).toBe(100);
+    });
+
+    it('cuts the string rather than parsing a float', () =>
+    {
+        // A weight of one, written the way the module writes it, is exactly 100% - not 99.99…
+        expect(ratio('1.000000000000000001')).toBe(100);
+        expect(ratio('0')).toBe(0);
+        expect(ratio('0.1')).toBe(10);
+    });
+});
+
+describe('a tally', () =>
+{
+    it('counts every option towards what was cast', () =>
+    {
+        expect(totalCast(tally(4n * POWER, 3n * POWER, 2n * POWER, POWER))).toBe(10n * POWER);
+    });
+
+    it('leaves abstentions OUT of the majority, as the module does', () =>
+    {
+        // 6 yes, 3 no, 1 veto: nine votes decided it, and six of them said yes.
+        const votes = tally(6n * POWER, 90n * POWER, 3n * POWER, POWER);
+        expect(majority(votes)).toBe(60);
+        // Turnout is another question entirely - the ninety abstentions count towards quorum.
+        expect(totalCast(votes)).toBe(100n * POWER);
+    });
+
+    it('measures a veto against everything cast, abstentions included', () =>
+    {
+        expect(vetoShare(tally(5n * POWER, 3n * POWER, POWER, POWER))).toBe(10);
+    });
+
+    it('holds a majority that no double could tell apart', () =>
+    {
         const half = 10n ** 27n;
-        expect(share(half + 1n, 2n * half)).toBe(50);
-        expect(share(51n, 100n)).toBe(51);
+        expect(majority(tally(half + 1n, 0n, half, 0n))).toBe(50);
+        expect(majority(tally(2n * half, 0n, half, 0n))).toBe(66.66);
     });
 });
 
-describe('totalCast', () =>
+describe('the vocabulary the module fixed', () =>
 {
-    it('adds the three sides without going through a double', () =>
+    it('numbers the vote options the way `vote()` takes them', () =>
     {
-        const tally = {
-            forVotes: (2n ** 200n).toString(),
-            againstVotes: '1',
-            abstainVotes: '2'
-        };
-        expect(totalCast(tally)).toBe(2n ** 200n + 3n);
-    });
-});
-
-describe('quorumShare', () =>
-{
-    const tally = (over: Partial<{ forVotes: string; abstainVotes: string; quorum: string | null }> = {}) =>
-        ({ forVotes: (3n * ONE).toString(), abstainVotes: ONE.toString(), quorum: (8n * ONE).toString(), ...over });
-
-    it('counts for AND abstain towards the quorum, the way GovernorCountingSimple does', () =>
-    {
-        // 3 for + 1 abstain against a quorum of 8 is half way there - the against side is not
-        // part of this reading at all.
-        expect(quorumShare(tally())).toBe(50);
+        // The precompile's third argument IS this number: yes is 1, and an explorer that sent 0
+        // would cast an unspecified vote in somebody's name.
+        expect(VOTE_CODE.yes).toBe(1);
+        expect(VOTE_CODE.abstain).toBe(2);
+        expect(VOTE_CODE.no).toBe(3);
+        expect(VOTE_CODE.noWithVeto).toBe(4);
     });
 
-    it('can pass 100, because a quorum is a floor and not a ceiling', () =>
+    it('offers the four a reader can actually cast', () =>
     {
-        expect(quorumShare(tally({ quorum: (2n * ONE).toString() }))).toBe(200);
+        expect(VOTE_OPTIONS).toEqual(['yes', 'abstain', 'no', 'noWithVeto']);
     });
 
-    it('is null when the governor would not say what the quorum was', () =>
-    {
-        // A progress bar against an unknown target is a picture of nothing.
-        expect(quorumShare(tally({ quorum: null }))).toBeNull();
-    });
-
-    it('treats a quorum of zero as reached rather than dividing by it', () =>
-    {
-        expect(quorumShare(tally({ quorum: '0' }))).toBe(100);
-    });
-});
-
-describe('the ballot vocabulary', () =>
-{
-    it('names support in the order the standard numbered it', () =>
-    {
-        expect(SUPPORT).toEqual(['against', 'for', 'abstain']);
-        expect(supportOf(0)).toBe('against');
-        expect(supportOf(1)).toBe('for');
-        expect(supportOf(2)).toBe('abstain');
-    });
-
-    it('answers null for a governor that counts some other way', () =>
-    {
-        // Fractional voting uses 255. It is a real ballot and it is not one of these three.
-        expect(supportOf(255)).toBeNull();
-        expect(supportOf(7)).toBeNull();
-    });
-});
-
-describe('the state vocabulary', () =>
-{
     it('dresses every state the wire can carry', () =>
     {
-        // A state with no tone renders an unstyled badge; one with no icon renders the fallback
-        // question mark. Both are silent failures, so the maps are checked against the source.
-        for (const state of PROPOSAL_STATES)
+        // A state with no tone renders an unstyled badge; one with no icon renders a question
+        // mark. Both are silent failures, so the maps are checked against the source.
+        for (const status of PROPOSAL_STATUSES)
         {
-            expect(PROPOSAL_TONE[state], `tone for ${ state }`).toBeDefined();
-            expect(PROPOSAL_ICON[state], `icon for ${ state }`).toBeDefined();
+            expect(PROPOSAL_TONE[status], `tone for ${ status }`).toBeDefined();
+            expect(PROPOSAL_ICON[status], `icon for ${ status }`).toBeDefined();
         }
     });
 
-    it('offers an action only where the chain has one left to take', () =>
+    it('offers an action only while a proposal can still take one', () =>
     {
-        expect(PROPOSAL_STATES.filter(isActionable)).toEqual(['active', 'succeeded', 'queued']);
+        expect(PROPOSAL_STATUSES.filter(isActionable)).toEqual(['deposit', 'voting']);
     });
 });

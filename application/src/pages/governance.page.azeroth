@@ -1,13 +1,13 @@
 import { Link } from 'azerothjs';
 
 import { client, type Proposal, type ProposalFilter } from '../api.ts';
-import { PROPOSAL_ICON, PROPOSAL_TONE } from '../lib/governance.ts';
+import { formatAmount } from '../lib/format.ts';
+import { PROPOSAL_ICON, PROPOSAL_TONE, ratio } from '../lib/governance.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
-import Icon from '../icons/icon.component.azeroth';
-
 import HashLink from '../components/chain/hash-link.component.azeroth';
+import NewProposal from '../components/chain/new-proposal.component.azeroth';
 import VoteTally from '../components/chain/vote-tally.component.azeroth';
 import Badge from '../components/ui/badge.component.azeroth';
 import EmptyState from '../components/ui/empty-state.component.azeroth';
@@ -16,67 +16,47 @@ import Pagination from '../components/ui/pagination.component.azeroth';
 import Skeleton from '../components/ui/skeleton.component.azeroth';
 import Tooltip from '../components/ui/tooltip.component.azeroth';
 
-// Governance: every proposal a governor on this chain has recorded.
+// Governance: what this chain is deciding about itself.
 //
-// The section exists exactly when the chain does govern itself. Nothing here is configured - a
-// governor is found by the events it emits (see the server's chain/governance.ts) - so a chain
-// with none reaches the empty state below and never sees a page pretending to have proposals.
+// The proposals are not in a contract somebody deployed - they are in the chain's own `x/gov`
+// module, and this page reads them over the EVM through the gov precompile. Where that precompile
+// is not among the chain's active ones the section says so rather than showing an empty list: the
+// module is still governing, the EVM simply cannot see it, and those are different facts.
 export default component GovernancePage()
 {
     const locale = useLocale();
 
     state page = 1;
     state status: ProposalFilter = 'all';
-    state governor = '';
 
+    resource stats = () => client.stats.summary();
     resource overview = () => client.governance.overview();
 
-    // All three in the source key: page 2 of the open proposals of one governor is a different
-    // list from page 2 of everything, and a resource keyed on the page alone would serve one
-    // while the controls said the other.
     resource proposals = (key: string) =>
     {
-        const [at = '1', narrowed = 'all', which = ''] = key.split('|');
-        return client.governance.list({
-            query: {
-                page: Number(at),
-                limit: 25,
-                status: narrowed as ProposalFilter,
-                ...(which === '' ? {} : { governor: which })
-            }
-        });
-    } with { source: `${ page }|${ status }|${ governor }` };
+        const [at = '1', narrowed = 'all'] = key.split('|');
+        return client.governance.list({ query: { page: Number(at), limit: 25, status: narrowed as ProposalFilter } });
+    } with { source: `${ page }|${ status }` };
 
-    derived governors = overview.data()?.governors ?? [];
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived params = overview.data()?.params ?? null;
 
-    /** Back to the first page whenever the list under the pager changes shape. */
     const narrow = (next: string): void =>
     {
         status = next as ProposalFilter;
         page = 1;
     };
 
-    const only = (next: string): void =>
-    {
-        governor = next;
-        page = 1;
-    };
-
-    /**
-     * When the vote closes, in the unit the governor counts in.
-     *
-     * A governor on a timestamp clock and one on a height clock both write a bare number, and
-     * printing the first as a block would say "block 1,700,000,000" - see ERC-6372.
-     */
+    /** The date that decides where a proposal stands - which one that is depends on its state. */
     const deadline = (row: Proposal): string =>
     {
-        const open = row.status === 'pending' || row.status === 'active';
-        if (row.clock === 'timestamp')
+        if (row.status === 'deposit')
         {
-            const date = locale.dateTime(new Date(Number(row.voteEnd) * 1000).toISOString());
-            return locale.t(open ? 'governance.ends.date' : 'governance.ended.date', { date });
+            return locale.t('governance.deposit.ends', { date: locale.dateTime(row.depositEndTime) });
         }
-        return locale.t(open ? 'governance.ends.block' : 'governance.ended.block', { block: locale.n(Number(row.voteEnd)) });
+        return locale.t(row.status === 'voting' ? 'governance.voting.ends' : 'governance.voting.ended',
+            { date: locale.dateTime(row.votingEndTime) });
     };
 
     useTitle(() => locale.t('governance.title'));
@@ -87,39 +67,57 @@ export default component GovernancePage()
             <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('governance.hint') }</p>
         </div>
 
-        <Show when={ overview.data() !== undefined && governors.length === 0 }>
-            <section class="panel">
+        <Show when={ overview.data()?.enabled === false }>
+        { () =>
+            <section class="panel overflow-hidden">
                 <EmptyState icon="vote" title={ locale.t('governance.empty.chain.title') } hint={ locale.t('governance.empty.chain.hint') } />
+                <p class="hash border-t border-line px-4 py-3 text-center text-[12px] text-faint">
+                    { overview.data()!.precompile }
+                </p>
             </section>
+        }
         </Show>
 
-        <Show when={ governors.length > 0 }>
+        <Show when={ overview.data()?.enabled === true }>
         { () =>
             <div class="flex flex-col gap-4">
-                {/* Who governs. One governor is a line; several are a list, and the chain that
-                    has two is exactly the chain where "which one is this" matters. */}
+                {/* What passing takes on this chain, as the module itself states it. */}
                 <section class="panel overflow-hidden">
                     <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
-                        { locale.t('governance.governors') }
+                        { locale.t('governance.module') }
                     </h2>
-                    <ul class="divide-y divide-line">
-                        <For each={ governors } key={ (row) => row.address } let={ row }>
-                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-nur">
-                                    <Icon name="vote" size={ 15 } />
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-[14px] font-semibold">
-                                        { row.name === '' ? locale.t('governance.governor.unnamed') : row.name }
-                                    </p>
-                                    <HashLink value={ row.address } to={ `/address/${ row.address }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
-                                </div>
-                                <p class="w-full text-end text-[13px] text-muted sm:w-auto">
-                                    { locale.t('governance.governor.proposals', { count: locale.n(row.proposals) }) }
-                                </p>
-                            </li>
-                        </For>
-                    </ul>
+                    <dl class="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:flex-wrap sm:gap-x-10">
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('governance.quorum') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">
+                                { locale.t('governance.share', { percent: locale.n(ratio(params?.quorum ?? '0'), 1) }) }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('governance.threshold') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">
+                                { locale.t('governance.share', { percent: locale.n(ratio(params?.threshold ?? '0'), 1) }) }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('governance.veto') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">
+                                { locale.t('governance.share', { percent: locale.n(ratio(params?.vetoThreshold ?? '0'), 1) }) }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('governance.minDeposit') }</dt>
+                            <dd class="text-[14px] font-semibold">
+                                <span class="amount">{ formatAmount(params?.minDeposit[0]?.amount ?? '0', decimals) }</span> { symbol }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('governance.votingPeriod') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">
+                                { locale.t('governance.days', { count: locale.n((params?.votingPeriod ?? 0) / 86_400, 1) }) }
+                            </dd>
+                        </div>
+                    </dl>
                 </section>
 
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -136,42 +134,37 @@ export default component GovernancePage()
                         onChange={ narrow }
                     />
 
-                    {/* Only where there is a choice to make. */}
-                    <Show when={ governors.length > 1 }>
-                        <FilterGroup
-                            label={ locale.t('governance.filter.governor') }
-                            name="proposal-governor"
-                            value={ governor }
-                            options={ [
-                                { value: '', label: locale.t('filter.all') },
-                                ...governors.map((row) => ({
-                                    value: row.address,
-                                    label: row.name === '' ? row.address.slice(0, 10) : row.name
-                                }))
-                            ] }
-                            onChange={ only }
+                    {/* Making one is offered from here, where the reader can see what it will cost
+                        and what it has to clear. */}
+                    <Show when={ stats.data() !== undefined && params !== null }>
+                    { () =>
+                        <NewProposal
+                            precompile={ overview.data()!.precompile }
+                            calls={ overview.data()!.calls }
+                            params={ params! }
+                            chain={ stats.data()!.chain }
+                            onSent={ () => { overview.refetch(); proposals.refetch(); } }
                         />
+                    }
                     </Show>
                 </div>
 
                 <section class="panel overflow-hidden">
-                    <ul class="divide-y divide-line">
-                        <For each={ proposals.data()?.rows ?? [] } key={ (row) => `${ row.governor }-${ row.id }` } let={ row }>
-                            <li class="flex flex-col gap-2 px-4 py-3">
+                    <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
+                        <For each={ proposals.data()?.rows ?? [] } key={ (row) => row.id } let={ row }>
+                            <li class="flex flex-col gap-2 rounded-lg border border-line bg-raised px-3 py-2.5 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4 sm:py-3">
                                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                                     <Badge tone={ PROPOSAL_TONE[row.status] } icon={ PROPOSAL_ICON[row.status] }>
                                         { locale.t(`governance.state.${ row.status }`) }
                                     </Badge>
+                                    <span class="data text-[13px] text-muted">#{ row.id }</span>
                                     <Link
-                                        to={ `/governance/${ row.governor }/${ row.id }` }
+                                        to={ `/governance/${ row.id }` }
                                         class="min-w-0 flex-1 text-[15px] font-semibold text-text no-underline hover:text-nur"
                                     >
-                                        {/* `dir="auto"` because a title is whatever the proposer
-                                            wrote, in whatever script they wrote it: an English
-                                            sentence inside a mirrored page takes its full stop to
-                                            the wrong end, and a Persian one inside an LTR page
-                                            does the same. The browser reads the first strong
-                                            character and gets both right. */}
+                                        {/* `dir="auto"`: a title is whatever the proposer wrote, in
+                                            whatever script they wrote it, and inheriting the page's
+                                            direction puts its punctuation at the wrong end. */}
                                         <span dir="auto">{ row.title === '' ? locale.t('governance.untitled') : row.title }</span>
                                     </Link>
                                 </div>
@@ -181,11 +174,10 @@ export default component GovernancePage()
                                         { locale.t('governance.proposedBy') }
                                         <HashLink value={ row.proposer } to={ `/address/${ row.proposer }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
                                     </span>
-                                    <Tooltip label={ locale.dateTime(row.at) }><span>{ locale.ago(row.at) }</span></Tooltip>
-                                    <span>{ locale.t('governance.voters', { count: locale.n(row.voters) }) }</span>
+                                    <Tooltip label={ locale.dateTime(row.submitTime) }><span>{ locale.ago(row.submitTime) }</span></Tooltip>
                                 </div>
 
-                                <VoteTally tally={ row } compact />
+                                <VoteTally tally={ row.tally } decimals={ decimals } symbol={ symbol } compact />
                                 <p class="text-[12px] text-faint">{ deadline(row) }</p>
                             </li>
                         </For>
@@ -195,15 +187,12 @@ export default component GovernancePage()
                         <div class="flex flex-col gap-2 px-4 py-4">
                             <Skeleton class="h-16 w-full" />
                             <Skeleton class="h-16 w-full" />
-                            <Skeleton class="h-16 w-full" />
                         </div>
                     </Show>
 
-                    {/* Two empty states, because they are two different facts: a governor with no
-                        proposals at all, and a filter that matched none of the ones it has. */}
                     <Show when={ proposals.data()?.rows.length === 0 }>
                         <Show
-                            when={ status === 'all' && governor === '' }
+                            when={ status === 'all' }
                             fallback={ <EmptyState icon="filter" title={ locale.t('governance.empty.filtered.title') } hint={ locale.t('governance.empty.filtered.hint') } /> }
                         >
                             <EmptyState icon="vote" title={ locale.t('governance.empty.title') } hint={ locale.t('governance.empty.hint') } />

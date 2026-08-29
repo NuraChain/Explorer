@@ -1,37 +1,36 @@
+import type { GovParams, Tally } from '../../api.ts';
 import { formatAmount } from '../../lib/format.ts';
-import { quorumShare, share, totalCast } from '../../lib/governance.ts';
+import { majority, ratio, share, totalCast, vetoShare } from '../../lib/governance.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 
 import Tooltip from '../ui/tooltip.component.azeroth';
 
-// The three sides of a vote, drawn as shares of what was cast.
+// The four ways this chain's governance counts a vote, drawn as shares of what was cast.
 //
-// Deliberately NOT in inflow/outflow. Those two colours answer where value went, and a vote is
-// not a movement of value - spending them here would make the one functional pair in this palette
-// mean two different things on two different pages. For takes the accent, against and abstain the
-// two neutral steps below it, and every row carries its own label and figure, so the colour is
-// never what the reading depends on.
+// Deliberately NOT in inflow/outflow. Those two colours answer where value went, and a vote is not
+// a movement of value - spending them here would make the one functional pair in this palette mean
+// two different things on two different pages. Yes takes the accent and the other three take the
+// neutral steps below it, with every row carrying its own label and figure, so the colour is never
+// what the reading depends on.
 
-/** The sides, in the order `GovernorCountingSimple` numbers them, each with the bar it draws. */
+/** The options in the module's own order, each with the bar it draws. */
 const SIDES = [
-    { key: 'for', bar: 'bg-nur' },
-    { key: 'against', bar: 'bg-faint' },
-    { key: 'abstain', bar: 'bg-line' }
+    { key: 'yes', bar: 'bg-nur' },
+    { key: 'abstain', bar: 'bg-faint' },
+    { key: 'no', bar: 'bg-muted' },
+    { key: 'noWithVeto', bar: 'bg-line' }
 ] as const;
 
 export default component VoteTally(props: {
-    tally: { forVotes: string; againstVotes: string; abstainVotes: string; quorum: string | null };
+    tally: Tally;
 
-    /**
-     * The votes token's decimals, where the index knows them.
-     *
-     * Null is not 18. A weight is a uint256 of the token's smallest unit, so assuming eighteen
-     * places for a token that has none prints a figure a billion billion times too small - and
-     * where this is null the bars carry shares only, which is the reading a vote is about anyway.
-     */
-    decimals?: number | null;
+    /** The staking denom's decimals - the chain's own, since governance is counted in it. */
+    decimals?: number;
     symbol?: string;
+
+    /** What passing turns on. Given, the panel says how the vote stands against it. */
+    params?: GovParams;
 
     /** One slim track, no labels: the shape a list row has room for. */
     compact?: boolean;
@@ -44,19 +43,14 @@ export default component VoteTally(props: {
     derived rows = SIDES.map((side) => ({
         key: side.key,
         bar: side.bar,
-        value: side.key === 'for'
-            ? props.tally.forVotes
-            : side.key === 'against' ? props.tally.againstVotes : props.tally.abstainVotes
+        value: props.tally[side.key]
     })).map((side) => ({ ...side, percent: share(BigInt(side.value), cast) }));
-
-    derived quorum = quorumShare(props.tally);
 
     /** The sentence a screen reader is given, and the bubble a pointer gets. The same one. */
     derived summary = rows
-        .map((row) => `${ locale.t(`governance.support.${ row.key }`) } ${ locale.t('governance.share', { percent: locale.n(row.percent, 1) }) }`)
+        .map((row) => `${ locale.t(`governance.option.${ row.key }`) } ${ locale.t('governance.share', { percent: locale.n(row.percent, 1) }) }`)
         .join(' · ');
 
-    /** An absolute weight, only where the token's decimals are known. */
     const weight = (value: string): string =>
         `${ formatAmount(value, props.decimals ?? 18) }${ props.symbol === undefined || props.symbol === '' ? '' : ` ${ props.symbol }` }`;
 
@@ -69,14 +63,10 @@ export default component VoteTally(props: {
                         <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                             <span class="flex items-center gap-2 text-[13px]">
                                 <span class={ `h-2 w-2 shrink-0 rounded-full ${ row.bar }` } aria-hidden="true"></span>
-                                { locale.t(`governance.support.${ row.key }`) }
+                                { locale.t(`governance.option.${ row.key }`) }
                             </span>
                             <span class="text-[13px] text-muted">
-                                {/* The absolute figure only where it MEANS something - see the
-                                    note on `decimals` above. */}
-                                <Show when={ props.decimals !== null && props.decimals !== undefined }>
-                                    <span class="amount me-2 text-text">{ weight(row.value) }</span>
-                                </Show>
+                                <span class="amount me-2 text-text">{ weight(row.value) }</span>
                                 <span class="tabular-nums">{ locale.t('governance.share', { percent: locale.n(row.percent, 1) }) }</span>
                             </span>
                         </div>
@@ -86,36 +76,45 @@ export default component VoteTally(props: {
                     </div>
                 </For>
 
-                {/* Quorum is a separate reading from the tally: it asks whether enough turned up
-                    at all, and a proposal can lead on every bar above and still fail here. */}
-                <Show
-                    when={ quorum !== null }
-                    fallback={ <p class="text-[12px] text-faint">{ locale.t('governance.quorum.unknown') }</p> }
-                >
-                    <div class="flex flex-col gap-1.5 border-t border-line pt-2.5">
-                        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                            <span class="text-[13px] text-muted">{ locale.t('governance.quorum') }</span>
-                            <span class="text-[13px] text-muted">
-                                <Show when={ props.decimals !== null && props.decimals !== undefined && props.tally.quorum !== null }>
-                                    <span class="amount me-2 text-text">{ weight(props.tally.quorum ?? '0') }</span>
-                                </Show>
-                                <span class="tabular-nums">{ locale.t('governance.share', { percent: locale.n(Math.min(quorum ?? 0, 999), 1) }) }</span>
+                {/* What passing turns on, where the module has told us.
+
+                    Turnout is missing on purpose: quorum is measured against the whole bonded
+                    supply, which `x/gov` does not report through this precompile, and a bar drawn
+                    against a number nobody gave us would be an invented reading. The two the tally
+                    CAN answer are here - the majority among the votes that decided, and the veto
+                    share of everything cast. */}
+                <Show when={ props.params !== undefined }>
+                { () =>
+                    <div class="flex flex-col gap-1.5 border-t border-line pt-2.5 text-[12px] text-muted">
+                        <p class="flex flex-wrap items-baseline justify-between gap-x-3">
+                            <span>{ locale.t('governance.majority') }</span>
+                            <span class="tabular-nums">
+                                { locale.t('governance.against.threshold', {
+                                    share: locale.n(majority(props.tally), 1),
+                                    needed: locale.n(ratio(props.params!.threshold), 1)
+                                }) }
                             </span>
-                        </div>
-                        <span class="flex h-1.5 w-full overflow-hidden rounded-full bg-raised">
-                            <span
-                                class={ (quorum ?? 0) >= 100 ? 'h-full bg-nur' : 'h-full bg-faint' }
-                                style={ `width: ${ Math.min(quorum ?? 0, 100) }%` }
-                            ></span>
-                        </span>
+                        </p>
+                        <p class="flex flex-wrap items-baseline justify-between gap-x-3">
+                            <span>{ locale.t('governance.veto') }</span>
+                            <span class="tabular-nums">
+                                { locale.t('governance.against.threshold', {
+                                    share: locale.n(vetoShare(props.tally), 1),
+                                    needed: locale.n(ratio(props.params!.vetoThreshold), 1)
+                                }) }
+                            </span>
+                        </p>
+                        <p class="text-faint">
+                            { locale.t('governance.quorum.note', { percent: locale.n(ratio(props.params!.quorum), 1) }) }
+                        </p>
                     </div>
+                }
                 </Show>
             </div>
         }
     >
-        {/* Compact: one track, three segments. `role="img"` with the same sentence the bubble
-            carries, because the bubble is a visual affordance and says nothing to a reader who
-            is not pointing at it. */}
+        {/* Compact: one track, four segments. `role="img"` with the same sentence the bubble
+            carries, because the bubble says nothing to a reader who is not pointing at it. */}
         <Tooltip label={ summary } class="flex w-full">
             <span class="flex h-1.5 w-full overflow-hidden rounded-full bg-raised" role="img" aria-label={ summary }>
                 <For each={ rows } key={ (row) => row.key } let={ row }>

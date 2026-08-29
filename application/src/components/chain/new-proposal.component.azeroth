@@ -1,0 +1,166 @@
+import { client, type ChainInfo, type GovCalls, type GovParams } from '../../api.ts';
+import { formatAmount, parseAmount } from '../../lib/format.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+import WalletConnect from './wallet-connect.component.azeroth';
+import Button from '../ui/button.component.azeroth';
+import Input from '../ui/input.component.azeroth';
+
+// Making a proposal, from a browser.
+//
+// A proposal on this chain is a JSON document - the same one `evmd tx gov submit-proposal` takes -
+// and the gov precompile accepts it as bytes beside an opening deposit. So the field below is a
+// textarea and not a form of twenty inputs: the document's shape belongs to whichever module the
+// proposal addresses, and an explorer that invented a form for it would only be able to write the
+// proposals it had been taught, badly.
+//
+// The JSON is parsed HERE before anything is signed. Not to judge it - the module does that - but
+// because a missing brace is a mistake worth catching before a wallet asks somebody to pay for it.
+
+export default component NewProposal(props: {
+    precompile: string;
+    calls: GovCalls;
+    params: GovParams;
+    chain: ChainInfo;
+
+    /** Called once the transaction is in the wallet's hands. */
+    onSent?: () => void;
+})
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+    const wallet = useWallet();
+
+    state open = false;
+    state document = '';
+    state amount = '';
+    state busy = false;
+    state failure = '';
+
+    derived ready = wallet.account() !== '' && wallet.chainId() === props.chain.chainId;
+    derived denom = props.params.minDeposit[0]?.denom ?? '';
+    derived minimum = props.params.minDeposit[0]?.amount ?? '0';
+
+    /** UTF-8 as the `bytes` argument wants it: the document travels as the bytes somebody typed. */
+    const hexOf = (text: string): string =>
+        `0x${ [...new TextEncoder().encode(text)].map((byte) => byte.toString(16).padStart(2, '0')).join('') }`;
+
+    const submit = async (): Promise<void> =>
+    {
+        failure = '';
+
+        try
+        {
+            JSON.parse(document);
+        }
+        catch
+        {
+            failure = locale.t('governance.new.badJson');
+            return;
+        }
+
+        const base = parseAmount(amount, props.chain.decimals);
+        if (base === null || base === '0')
+        {
+            failure = locale.t('governance.act.badAmount');
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            const { data } = await client.address.calldata({
+                params: { address: props.precompile },
+                input: {
+                    selector: props.calls.submitProposal,
+                    args: [wallet.account(), hexOf(document), JSON.stringify([[denom, base]])]
+                }
+            });
+            await wallet.send({ to: props.precompile, data, value: '0' });
+            toasts.push('success', locale.t('governance.act.sent'), 'send');
+            open = false;
+            props.onSent?.();
+        }
+        catch (error)
+        {
+            const message = error instanceof Error ? error.message : String(error);
+            failure = message.includes('4001') || message.toLowerCase().includes('rejected')
+                ? locale.t('wallet.dismissed')
+                : message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    <Show
+        when={ open }
+        fallback={
+            <Button variant="primary" icon="vote" onClick={ () => open = true }>
+                { locale.t('governance.new') }
+            </Button>
+        }
+    >
+        <section class="panel flex w-full flex-col gap-4 px-4 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    { locale.t('governance.new') }
+                </h2>
+                <span class="flex items-center gap-2">
+                    <WalletConnect chain={ props.chain } compact />
+                    <Button variant="ghost" icon="x" onClick={ () => open = false }>
+                        { locale.t('governance.new.close') }
+                    </Button>
+                </span>
+            </div>
+
+            <p class="text-[13px] leading-relaxed text-muted">
+                { locale.t('governance.new.hint', {
+                    amount: `${ formatAmount(minimum, props.chain.decimals) } ${ props.chain.symbol }`
+                }) }
+            </p>
+
+            <Input
+                label={ locale.t('governance.new.document') }
+                placeholder={ '{\n  "messages": [],\n  "title": "",\n  "summary": "",\n  "metadata": "ipfs://"\n}' }
+                rows={ 12 }
+                size="sm"
+                value={ document }
+                onInput={ (value) => document = value }
+            />
+
+            <div class="flex flex-wrap items-end gap-2">
+                <div class="min-w-[12rem] flex-1">
+                    <Input
+                        label={ locale.t('governance.new.deposit') }
+                        placeholder={ props.chain.symbol }
+                        size="sm"
+                        value={ amount }
+                        onInput={ (value) => amount = value }
+                    />
+                </div>
+                <Show
+                    when={ ready }
+                    fallback={ <p class="text-[13px] text-muted">{ locale.t('governance.act.connect') }</p> }
+                >
+                    <Button variant="primary" icon="send" busy={ busy } onClick={ () => void submit() }>
+                        { locale.t('governance.new.submit') }
+                    </Button>
+                </Show>
+            </div>
+
+            <Show when={ failure !== '' }>
+                <p class="flex items-start gap-2 rounded-lg border border-outflow bg-raised px-3 py-2 text-[13px] text-outflow">
+                    <Icon name="alert" size={ 15 } class="mt-0.5 shrink-0" />
+                    { failure }
+                </p>
+            </Show>
+        </section>
+    </Show>
+}

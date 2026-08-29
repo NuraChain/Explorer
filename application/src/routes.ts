@@ -24,9 +24,8 @@ export const routes: PageRoute[] = [
     { path: '/blocks', component: BlocksPage, render: 'server' },
     { path: '/block/:number', component: BlockPage, render: 'server' },
     { path: '/governance', component: GovernancePage, render: 'server' },
-    // The governor is in the path, not only the id: nothing says a chain has one governor, and a
-    // proposal id is unique to the contract that hashed it.
-    { path: '/governance/:governor/:id', component: ProposalPage, render: 'server' },
+    // One module, one numbering: a proposal id is the chain's own, so the path carries nothing else.
+    { path: '/governance/:id', component: ProposalPage, render: 'server' },
     { path: '/txs', component: TransactionsPage, render: 'server' },
     { path: '/tx/:hash', component: TransactionPage, render: 'server' },
     { path: '/address/:address', component: AddressPage, render: 'server' }

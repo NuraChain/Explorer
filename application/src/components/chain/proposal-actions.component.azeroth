@@ -1,5 +1,6 @@
-import { client, type ChainInfo, type ProposalDetail } from '../../api.ts';
-import { formatAmount } from '../../lib/format.ts';
+import { client, type ChainInfo, type ProposalDetail, type VoteOption } from '../../api.ts';
+import { formatAmount, parseAmount } from '../../lib/format.ts';
+import { VOTE_CODE, VOTE_OPTIONS } from '../../lib/governance.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 import { useToasts } from '../../stores/toasts.store.ts';
@@ -7,32 +8,28 @@ import { useWallet } from '../../stores/wallet.store.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
 
-import HashLink from './hash-link.component.azeroth';
 import WalletConnect from './wallet-connect.component.azeroth';
 import Button from '../ui/button.component.azeroth';
 import FilterGroup from '../ui/filter-group.component.azeroth';
 import Input from '../ui/input.component.azeroth';
 
-// Everything on this page that needs a KEY: casting a ballot, queueing a passed proposal,
-// executing a queued one, and handing voting power to somebody.
+// Taking part in a vote, from a browser.
 //
-// The explorer's part of all four ends at the calldata. The bytes are encoded by the server from
-// its own signature table (see the `calls` field on the detail), handed to the wallet, and the
-// wallet asks its owner - this page never signs, never sends, and never holds a key. It is the
-// same split contract-call.component makes between reading a getter and writing to a contract,
-// and it is why the reads below (voting power, "have I voted") happen here without ceremony while
-// every write goes out through the wallet.
+// The chain's governance is a Cosmos module, and none of it is reachable from an EVM wallet by
+// itself - what makes this page more than a viewer is the gov PRECOMPILE: a fixed address that
+// turns `MsgVote` and `MsgDeposit` into ordinary EVM transactions. So a reader votes with the same
+// wallet they send NURA with, and this explorer's part ends where it always does: it encodes the
+// calldata, hands it over, and the wallet asks its owner.
 //
-// The panel renders only where there is something to do: an executed proposal has no action left
-// on it, and a row of disabled buttons under it would be furniture.
-
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+// The three controls map one to one onto the module's own messages. Nothing is offered that the
+// proposal's state cannot take: a deposit while it is still collecting one, a vote while the vote
+// is open, and a withdrawal only to the account that made the proposal.
 
 export default component ProposalActions(props: {
     detail: ProposalDetail;
     chain: ChainInfo;
 
-    /** Called after a transaction goes out, so the page can start watching for its effect. */
+    /** Called once a transaction is in the wallet's hands, so the page can watch for its effect. */
     onSent?: () => void;
 })
 {
@@ -40,73 +37,30 @@ export default component ProposalActions(props: {
     const toasts = useToasts();
     const wallet = useWallet();
 
-    state choice = '1';
+    state choice: VoteOption = 'yes';
     state reason = '';
-    state delegateTo = '';
+    state amount = '';
     state busy = '';
     state failure = '';
 
-    /** What the governor says about this reader: their weight at the snapshot, and whether they voted. */
-    state power: string | null = null;
-    state voted = false;
-
     derived proposal = props.detail.proposal;
     derived ready = wallet.account() !== '' && wallet.chainId() === props.chain.chainId;
-    derived votable = proposal.status === 'active';
-    derived queueable = proposal.status === 'succeeded';
-    derived executable = proposal.status === 'queued';
+    derived votable = proposal.status === 'voting';
+    derived depositable = proposal.status === 'deposit';
+    derived mine = wallet.account().toLowerCase() === proposal.proposer.toLowerCase();
 
-    /** The three arrays a queue or an execute names the proposal by, as the server stored them. */
-    derived targets = props.detail.actions.map((action) => action.target).join(',');
-    derived values = props.detail.actions.map((action) => action.value).join(',');
-    derived calldatas = props.detail.actions.map((action) => action.calldata).join(',');
+    /** The denom governance is counted in - the chain's own, as the module's minimum deposit names it. */
+    derived denom = props.detail.params.minDeposit[0]?.denom ?? '';
 
-    // Both reads are about the CONNECTED reader, so they run again whenever that changes - a
-    // wallet switched to another account is a different question with a different answer.
-    effect
-    {
-        const account = wallet.account();
-        const token = props.detail.token;
-        if (account === '' || !votable)
-        {
-            power = null;
-            voted = false;
-            return;
-        }
-
-        void (async (): Promise<void> =>
-        {
-            const [weight, already] = await Promise.all([
-                token === null
-                    ? Promise.resolve(null)
-                    : read(token, props.detail.calls.getPastVotes, [account, proposal.voteStart]),
-                read(proposal.governor, props.detail.calls.hasVoted, [proposal.id, account])
-            ]);
-            power = weight;
-            voted = already === 'true';
-        })();
-    }
-
-    /** One view call through the explorer's own node. Null when the contract refuses to answer. */
-    const read = async (address: string, selector: string, args: string[]): Promise<string | null> =>
-    {
-        try
-        {
-            const result = await client.address.call({ params: { address }, input: { selector, args } });
-            return result.error === '' ? result.values[0]?.value ?? null : null;
-        }
-        catch
-        {
-            return null;
-        }
-    };
+    /** A coin list, in the positional JSON the encoder reads a `(string,uint256)[]` from. */
+    const coins = (base: string): string => JSON.stringify([[denom, base]]);
 
     /**
      * Encode, hand to the wallet, and say what happened.
      *
-     * `value` stays '0' on every one of these, execute included. A proposal spends the
-     * treasury's money, not the executor's - and a page that quietly attached currency to
-     * somebody's transaction would be the worst kind of helpful.
+     * Every one of these carries no value: a deposit is an argument to the message, not currency
+     * attached to the transaction, and a page that quietly sent NURA alongside would be the worst
+     * kind of helpful.
      */
     const send = async (kind: string, selector: string, args: string[]): Promise<void> =>
     {
@@ -115,14 +69,10 @@ export default component ProposalActions(props: {
         try
         {
             const { data } = await client.address.calldata({
-                params: { address: kind === 'delegate' ? props.detail.token ?? '' : proposal.governor },
+                params: { address: props.detail.precompile },
                 input: { selector, args }
             });
-            await wallet.send({
-                to: kind === 'delegate' ? props.detail.token ?? '' : proposal.governor,
-                data,
-                value: '0'
-            });
+            await wallet.send({ to: props.detail.precompile, data, value: '0' });
             toasts.push('success', locale.t('governance.act.sent'), 'send');
             props.onSent?.();
         }
@@ -142,22 +92,23 @@ export default component ProposalActions(props: {
 
     const castVote = (): void =>
     {
-        // Two functions, because a reason is a string somebody wrote and an empty one is not a
-        // reason - `castVote` is the cheaper call and the honest one when nothing was said.
-        void (reason.trim() === ''
-            ? send('vote', props.detail.calls.castVote, [proposal.id, choice])
-            : send('vote', props.detail.calls.castVoteWithReason, [proposal.id, choice, reason]));
+        void send('vote', props.detail.calls.vote, [
+            wallet.account(),
+            proposal.id,
+            String(VOTE_CODE[choice]),
+            reason
+        ]);
     };
 
-    const delegate = (): void =>
+    const deposit = (): void =>
     {
-        const to = delegateTo.trim() === '' ? wallet.account() : delegateTo.trim();
-        if (!ADDRESS.test(to))
+        const base = parseAmount(amount, props.chain.decimals);
+        if (base === null || base === '0')
         {
-            failure = locale.t('governance.act.badAddress');
+            failure = locale.t('governance.act.badAmount');
             return;
         }
-        void send('delegate', props.detail.calls.delegate, [to]);
+        void send('deposit', props.detail.calls.deposit, [wallet.account(), proposal.id, coins(base)]);
     };
 
     <section class="panel flex flex-col gap-4 px-4 py-4">
@@ -172,37 +123,17 @@ export default component ProposalActions(props: {
             when={ ready }
             fallback={ <p class="text-[13px] text-muted">{ locale.t('governance.act.connect') }</p> }
         >
-            {/* Voting */}
             <Show when={ votable }>
                 <div class="flex flex-col gap-3">
-                    <Show when={ props.detail.tokenDecimals !== null && power !== null }>
-                        <p class="text-[13px] text-muted">
-                            { locale.t('governance.act.power', {
-                                weight: `${ formatAmount(power ?? '0', props.detail.tokenDecimals ?? 18) } ${ props.detail.tokenSymbol }`.trim()
-                            }) }
-                        </p>
-                    </Show>
-
-                    {/* Said in words, not by a disabled button: a reader who has voted and cannot
-                        see why the control is dead assumes the page is broken. The control stays
-                        live - a governor refuses a second ballot, and that refusal is its own. */}
-                    <Show when={ voted }>
-                        <p class="flex items-center gap-2 text-[13px] text-inflow">
-                            <Icon name="check" size={ 14 } />
-                            { locale.t('governance.act.voted') }
-                        </p>
-                    </Show>
-
                     <FilterGroup
                         label={ locale.t('governance.act.vote') }
-                        name="vote-support"
+                        name="vote-option"
                         value={ choice }
-                        options={ [
-                            { value: '1', label: locale.t('governance.support.for') },
-                            { value: '0', label: locale.t('governance.support.against') },
-                            { value: '2', label: locale.t('governance.support.abstain') }
-                        ] }
-                        onChange={ (next) => choice = next }
+                        options={ VOTE_OPTIONS.map((option) => ({
+                            value: option,
+                            label: locale.t(`governance.option.${ option }`)
+                        })) }
+                        onChange={ (next) => choice = next as VoteOption }
                     />
 
                     <Input
@@ -213,7 +144,7 @@ export default component ProposalActions(props: {
                         onInput={ (value) => reason = value }
                     />
 
-                    <div class="flex flex-wrap gap-2">
+                    <div>
                         <Button variant="primary" icon="vote" busy={ busy === 'vote' } onClick={ castVote }>
                             { locale.t('governance.act.submit') }
                         </Button>
@@ -221,70 +152,48 @@ export default component ProposalActions(props: {
                 </div>
             </Show>
 
-            {/* The two lifecycle actions. Both are open to anybody - a governor checks the
-                proposal's state, not the sender - so neither is hidden behind a role this page
-                cannot verify. */}
-            <Show when={ queueable }>
+            {/* A proposal in its deposit period is not being voted on yet - it is waiting for the
+                stake that puts it to a vote, and anybody may add it. */}
+            <Show when={ depositable }>
                 <div class="flex flex-col gap-2">
-                    <p class="text-[13px] text-muted">{ locale.t('governance.act.queue.hint') }</p>
-                    <div>
-                        <Button
-                            variant="primary"
-                            icon="run"
-                            busy={ busy === 'queue' }
-                            onClick={ () => void send('queue', props.detail.calls.queue,
-                                [targets, values, calldatas, props.detail.descriptionHash]) }
-                        >
-                            { locale.t('governance.act.queue') }
-                        </Button>
-                    </div>
-                </div>
-            </Show>
-
-            <Show when={ executable }>
-                <div class="flex flex-col gap-2">
-                    <p class="text-[13px] text-muted">{ locale.t('governance.act.execute.hint') }</p>
-                    <div>
-                        <Button
-                            variant="primary"
-                            icon="run"
-                            busy={ busy === 'execute' }
-                            onClick={ () => void send('execute', props.detail.calls.execute,
-                                [targets, values, calldatas, props.detail.descriptionHash]) }
-                        >
-                            { locale.t('governance.act.execute') }
-                        </Button>
-                    </div>
-                </div>
-            </Show>
-
-            {/* Delegation is the votes TOKEN's, not the governor's, and it is offered wherever the
-                token is known: voting power that was never delegated does not count, and the
-                proposal a reader is looking at is where they find that out. */}
-            <Show when={ props.detail.token !== null }>
-                <div class="flex flex-col gap-2 border-t border-line pt-4">
-                    <h3 class="text-[13px] font-semibold">{ locale.t('governance.act.delegate') }</h3>
-                    <p class="text-[13px] text-muted">{ locale.t('governance.act.delegate.hint') }</p>
+                    <p class="text-[13px] text-muted">
+                        { locale.t('governance.act.deposit.hint', {
+                            amount: `${ formatAmount(props.detail.params.minDeposit[0]?.amount ?? '0', props.chain.decimals) } ${ props.chain.symbol }`
+                        }) }
+                    </p>
                     <div class="flex flex-wrap items-end gap-2">
-                        <div class="min-w-[16rem] flex-1">
+                        <div class="min-w-[12rem] flex-1">
                             <Input
-                                label={ locale.t('governance.act.delegate') }
-                                placeholder={ locale.t('governance.act.delegate.placeholder') }
+                                label={ locale.t('governance.act.deposit') }
+                                placeholder={ props.chain.symbol }
                                 size="sm"
-                                value={ delegateTo }
-                                onInput={ (value) => delegateTo = value }
+                                value={ amount }
+                                onInput={ (value) => amount = value }
                             />
                         </div>
-                        <Button variant="outline" busy={ busy === 'delegate' } onClick={ delegate }>
-                            { delegateTo.trim() === ''
-                                ? locale.t('governance.act.delegate.self')
-                                : locale.t('governance.act.delegate.submit') }
+                        <Button variant="primary" icon="wallet" busy={ busy === 'deposit' } onClick={ deposit }>
+                            { locale.t('governance.act.deposit.submit') }
                         </Button>
                     </div>
-                    <p class="flex flex-wrap items-center gap-1.5 text-[12px] text-faint">
-                        { locale.t('governance.act.delegate.token') }
-                        <HashLink value={ props.detail.token ?? '' } to={ `/address/${ props.detail.token ?? '' }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
-                    </p>
+                </div>
+            </Show>
+
+            {/* Only to the account that made it, and only while it can still be withdrawn. The
+                module refuses anybody else, and offering a button that will be refused is worse
+                than not offering it. */}
+            <Show when={ mine && (votable || depositable) }>
+                <div class="flex flex-col gap-2 border-t border-line pt-4">
+                    <p class="text-[13px] text-muted">{ locale.t('governance.act.cancel.hint') }</p>
+                    <div>
+                        <Button
+                            variant="outline"
+                            icon="x"
+                            busy={ busy === 'cancel' }
+                            onClick={ () => void send('cancel', props.detail.calls.cancelProposal, [wallet.account(), proposal.id]) }
+                        >
+                            { locale.t('governance.act.cancel') }
+                        </Button>
+                    </div>
                 </div>
             </Show>
         </Show>
