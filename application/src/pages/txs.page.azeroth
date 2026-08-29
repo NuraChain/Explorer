@@ -58,16 +58,27 @@ export default component TransactionsPage()
         </div>
 
         <section class="panel overflow-hidden">
-            <ul class="divide-y divide-line">
+            {/* A row on a screen, a card on a phone - the same pair the blocks list carries. */}
+            <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                 <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash } let={ row }>
-                    <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
-                        <Badge
-                            tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
-                            icon={ row.status === 'reverted' ? 'alert' : 'success' }
-                        >
-                            { locale.t(`chain.status.${ row.status }`) }
-                        </Badge>
-                        <div class="min-w-0 flex-1">
+                    <li class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4 sm:py-3">
+                        {/* The card's header: what happened, and how much moved - the two things a
+                            reader scans a list of transactions for. `sm:contents` hands both back
+                            to the row above the breakpoint, so one markup draws both shapes. */}
+                        <div class="flex items-center justify-between gap-3 sm:contents">
+                            <Badge
+                                tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
+                                icon={ row.status === 'reverted' ? 'alert' : 'success' }
+                            >
+                                { locale.t(`chain.status.${ row.status }`) }
+                            </Badge>
+                            <div class="flex items-baseline gap-x-3 text-end sm:order-last sm:block sm:max-w-[45%]">
+                                <p class="text-[14px]"><span class="amount">{ formatValue(row.value, symbol, decimals) }</span></p>
+                                <Tooltip label={ locale.dateTime(row.at) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
+                            </div>
+                        </div>
+
+                        <div class="min-w-0 sm:flex-1">
                             <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
                             {/* The pair the same way the address ledger draws it: a HashLink
                                 each, so the whole value is one hover away and the counterparty is
@@ -91,10 +102,6 @@ export default component TransactionsPage()
                                     </Show>
                                 </span>
                             </p>
-                        </div>
-                        <div class="min-w-0 max-w-[45%] text-end">
-                            <p class="amount text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>
-                            <Tooltip label={ locale.dateTime(row.at) } class="flex justify-center"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                         </div>
                     </li>
                 </For>

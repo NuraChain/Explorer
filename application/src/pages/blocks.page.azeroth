@@ -53,19 +53,39 @@ export default component BlocksPage()
         </div>
 
         <section class="panel overflow-hidden">
-            <ul class="divide-y divide-line">
+            {/* A row on a screen, a CARD on a phone: below `sm:` each block gets its own raised
+                surface and the dividers give way to the space between them. A block is four facts
+                that belong together, and at 390px a divided row reads as four separate lines of
+                the same page. Above `sm:` nothing changes - see the same pair on every list. */}
+            <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                 <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
-                    <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
-                        <Link to={ `/block/${ block.number }` } class="data w-24 shrink-0 text-[15px] font-semibold text-nur no-underline hover:underline">
-                            #{ block.number }
-                        </Link>
-                        <div class="min-w-0 flex-1">
+                    <li class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4 sm:py-3">
+                        {/* The card's header: the height, and what the block carried. `sm:contents`
+                            hands both children straight back to the row above the breakpoint, so
+                            one markup draws the card and the row - and on a phone the hash gets a
+                            line to itself instead of splitting around a column beside it. */}
+                        <div class="flex items-baseline justify-between gap-3 sm:contents">
+                            {/* `data` on the number, NOT on the link that boxes it. The utility
+                                pins the direction to ltr, and on a fixed-width box that also
+                                decides where the line starts - so in a mirrored layout the height
+                                sat against the far edge of its own column with the reader's side
+                                left empty. */}
+                            <Link to={ `/block/${ block.number }` } class="w-24 shrink-0 text-[15px] font-semibold text-nur no-underline hover:underline">
+                                <span class="data">#{ block.number }</span>
+                            </Link>
+                            {/* A sentence in the reader's language with a count in it, so NOT in
+                                the `data` isolate: the mono stack has no Persian letters to set
+                                "تراکنش" in, and pinning it to ltr puts the number on the wrong
+                                side of its own word. Tabular figures keep the column even. */}
+                            <div class="flex items-baseline gap-x-3 text-end sm:order-last sm:block">
+                                <p class="text-[14px] tabular-nums">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
+                                <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: locale.n(gasShare(block.gasUsed, block.gasLimit) * 100, 1) }) }</p></Tooltip>
+                            </div>
+                        </div>
+
+                        <div class="min-w-0 sm:flex-1">
                             <HashLink value={ block.hash } to={ `/block/${ block.number }` } tone="muted" lead={ 14 } tail={ 8 } />
                             <Tooltip label={ locale.dateTime(block.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(block.at) }</p></Tooltip>
-                        </div>
-                        <div class="text-end">
-                            <p class="data text-[14px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
-                            <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
                         </div>
                     </li>
                 </For>

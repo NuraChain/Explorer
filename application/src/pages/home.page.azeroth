@@ -125,10 +125,11 @@ export default component Home()
                     <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('home.latestBlocks') }</h2>
                     <Link to="/blocks" class="text-[13px] text-beam no-underline hover:underline">{ locale.t('home.all') }</Link>
                 </div>
-                <ul class="divide-y divide-line">
+                {/* A row on a screen, a card on a phone - the same pair the blocks list carries. */}
+                <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                     <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
-                        <li class="flex items-center gap-3 px-4 py-2.5">
-                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-nur">
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-raised px-3 py-2.5 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-field text-nur sm:bg-raised">
                                 <Icon name="block" size={ 15 } />
                             </span>
                             <div class="min-w-0 flex-1">
@@ -138,11 +139,13 @@ export default component Home()
                                 <Tooltip label={ locale.dateTime(block.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(block.at) }</p></Tooltip>
                             </div>
                             <div class="text-end">
-                                <p class="data text-[13px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
+                                {/* A sentence with a count in it, not chain data - see the note
+                                    on the same line of the blocks list. */}
+                                <p class="text-[13px] tabular-nums">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
                                 {/* The percentage is a rounding of two numbers the reader cannot
                                     see, exactly as on the blocks list - so it carries the same
                                     bubble rather than being the one place they are hidden. */}
-                                <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
+                                <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: locale.n(gasShare(block.gasUsed, block.gasLimit) * 100, 1) }) }</p></Tooltip>
                             </div>
                         </li>
                     </For>
@@ -157,16 +160,28 @@ export default component Home()
                     <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('home.latestTransactions') }</h2>
                     <Link to="/txs" class="text-[13px] text-beam no-underline hover:underline">{ locale.t('home.all') }</Link>
                 </div>
-                <ul class="divide-y divide-line">
+                {/* A row on a screen, a card on a phone - the same pair the blocks list carries. */}
+                <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                     <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash } let={ row }>
-                        <li class="flex items-center gap-3 px-4 py-2.5">
-                            <Badge
-                                tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
-                                icon={ row.status === 'reverted' ? 'alert' : 'success' }
-                            >
-                                { locale.t(`chain.status.${ row.status }`) }
-                            </Badge>
-                            <div class="min-w-0 flex-1">
+                        <li class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4">
+                            {/* The card's header: what happened and how much moved, the same pair
+                                the transactions list leads with. `sm:contents` hands both back to
+                                the row above the breakpoint, and on a phone it leaves the hash a
+                                line of its own rather than a column between two others. */}
+                            <div class="flex items-center justify-between gap-3 sm:contents">
+                                <Badge
+                                    tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
+                                    icon={ row.status === 'reverted' ? 'alert' : 'success' }
+                                >
+                                    { locale.t(`chain.status.${ row.status }`) }
+                                </Badge>
+                                {/* Capped rather than shrink-0 above `sm:`: an unbounded value
+                                    column pushed the hash beside it down to nothing and then ran
+                                    off the card anyway. */}
+                                <p class="text-end text-[13px] sm:order-last sm:max-w-[45%] sm:shrink-0"><span class="amount">{ formatValue(row.value, symbol, decimals) }</span></p>
+                            </div>
+
+                            <div class="min-w-0 sm:flex-1">
                                 <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 12 } tail={ 6 } />
                                 {/* The counterparty is shortened INSIDE a sentence, so it stays a
                                     sentence and the bubble carries the whole address. A HashLink
@@ -182,9 +197,6 @@ export default component Home()
                                     </Tooltip>
                                 </Show>
                             </div>
-                            {/* Capped rather than shrink-0: an unbounded value column pushed the
-                                hash beside it down to nothing and then ran off the card anyway. */}
-                            <p class="amount max-w-[45%] shrink-0 text-end text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
                         </li>
                     </For>
                 </ul>

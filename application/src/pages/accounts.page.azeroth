@@ -79,18 +79,35 @@ export default component AccountsPage()
         </div>
 
         <section class="panel overflow-hidden">
-            <ul class="divide-y divide-line">
+            {/* A row on a screen, a card on a phone - the same pair the blocks list carries. */}
+            <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                 <For each={ accounts.data()?.rows ?? [] } key={ (row) => row.address } let={ row }>
-                    <li class="flex items-center gap-3 px-4 py-2.5">
-                        {/* A rank is a number the READER counts, not a chain value, so it is
-                            printed in their own digits and NOT in the `amount` isolate - the mono
-                            stack has no Persian digits to set it in. Same reasoning as the page
-                            numbers in Pagination. */}
-                        <span class="w-8 shrink-0 text-end text-[13px] tabular-nums text-muted">{ locale.n(row.rank) }</span>
-                        <div class="min-w-0 flex-1">
+                    <li class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1.5 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4">
+                        {/* The card's header: the place in the ranking, and the balance that
+                            earned it. `sm:contents` hands both back to the row above the
+                            breakpoint - and on a phone it leaves the address a whole line, which
+                            is the only way twenty-seven characters of it fit on one. */}
+                        <div class="flex items-baseline justify-between gap-3 sm:contents">
+                            {/* A rank is a number the READER counts, not a chain value, so it is
+                                printed in their own digits and NOT in the `amount` isolate - the
+                                mono stack has no Persian digits to set it in. Same reasoning as
+                                the page numbers in Pagination.
+
+                                Aligned to the row's START, not to the end of its own box: ranks
+                                are one or two digits in a column three wide, and ending them left
+                                a hole between the edge of the row and the first thing written in
+                                it - thirty pixels of nothing at the corner of every card. */}
+                            <span class="w-8 shrink-0 text-start text-[13px] tabular-nums text-muted">{ locale.n(row.rank) }</span>
+                            {/* `amount` on the figure, not on the line that places it: the utility
+                                pins the direction to ltr, and on a block that also decides which
+                                edge `text-end` means - so the balance stood at the reader's start
+                                in a mirrored layout, with the end of its own line left empty. */}
+                            <p class="text-end text-[14px] sm:order-last sm:shrink-0"><span class="amount">{ formatValue(row.balance, symbol, decimals) }</span></p>
+                        </div>
+
+                        <div class="min-w-0 sm:flex-1">
                             <HashLink value={ row.address } to={ `/address/${ row.address }` } lead={ 16 } tail={ 10 } />
                         </div>
-                        <p class="amount shrink-0 text-end text-[14px]">{ formatValue(row.balance, symbol, decimals) }</p>
                     </li>
                 </For>
             </ul>
