@@ -72,14 +72,18 @@ application/src/
 `server/` owns the wire shape. A new chain field starts in `server/src/schemas.ts`; the browser's
 client type is inferred from that declaration, so it is decided in exactly one place.
 
-**Governance is discovered, not configured.** A governor is any contract that emits
-`ProposalCreated`, so the indexer decodes those events into `governors` / `proposals` / `votes`
-(`server/src/chain/governance.ts`) and `/governance` + `/governance/:governor/:id` light up on a
-chain that has one and stay an empty state on a chain that does not. A proposal's state is derived
-from indexed facts against the governor's own clock (ERC-6372); the detail page also asks the
-governor for `state()` and `proposalVotes()`, and where the two disagree the governor wins. Voting,
-delegation, queue and execute are wallet transactions encoded from the server's signature table -
-this explorer never signs and never sends.
+**Governance is the chain's own, and it is never indexed.** Nura is a Cosmos chain with an EVM
+module, so proposals live in `x/gov` and never touch the EVM - there is not one `ProposalCreated`
+log on the chain. What reaches the EVM is the gov PRECOMPILE at `0x…0805`: `server/src/chain/gov.ts`
+reads proposals, tallies, votes and params from it over `eth_call`, and the routes hold the answer
+for five seconds. A chain has tens of proposals where it has millions of transactions, so a copy in
+sqlite would only be a copy that can be wrong.
+
+Voting, depositing, withdrawing and SUBMITTING a proposal are ordinary EVM transactions to that
+address, encoded from the server's signature table and signed by the reader's wallet - the same
+split every write in this explorer makes. Where the precompile is not among the chain's
+`active_static_precompiles`, every read answers empty and the page says governance is not reachable
+from the EVM rather than showing a chain nobody proposes anything on.
 
 ## Design system
 
