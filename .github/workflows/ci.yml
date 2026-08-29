@@ -24,7 +24,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx azeroth check
+      - run: npm run check
 
   build:
     name: Build

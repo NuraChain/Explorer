@@ -12,7 +12,7 @@
     ],
     "scripts": {
         "dev": "azeroth dev",
-        "check": "azeroth check",
+        "check": "azeroth check && oxlint",
         "build": "azeroth build",
         "test": "azeroth test",
         "test:coverage": "npm run test:coverage --workspace server",
@@ -26,9 +26,15 @@
         "service:restart": "bash scripts/service-restart.sh",
         "service:install": "bash scripts/service-install.sh",
         "service:uninstall": "bash scripts/service-uninstall.sh",
-        "service:deploy": "npm run build && npm run service:restart"
+        "service:deploy": "npm run build && npm run service:restart",
+        "lint": "oxlint",
+        "lint:fix": "oxlint --fix",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
     },
     "devDependencies": {
-        "@azerothjs/cli": "2.0.0-beta.2"
+        "@azerothjs/cli": "2.0.0-beta.2",
+        "oxfmt": "^0.65.0",
+        "oxlint": "^1.80.0"
     }
 }

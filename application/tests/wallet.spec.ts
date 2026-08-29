@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 
 import { METAMASK_RDNS, NURA_RDNS, TRUST_RDNS, brandFor, usableIcon, WALLET_BRANDS } from '../src/lib/wallets.ts';
 import type { ChainInfo } from '../src/api.ts';
+import type { WalletApi } from '../src/stores/wallet.store.ts';
 
 interface Call
 {
@@ -116,7 +117,7 @@ function fakeWallet(rdns: string, answers: Record<string, unknown | (() => unkno
  * `options()` is populated by the time the constructor returns. A silent session restore behind
  * one is not: it is two provider reads and the setters behind them, all microtasks.
  */
-async function freshWallet(): Promise<import('../src/stores/wallet.store.ts').WalletApi>
+async function freshWallet(): Promise<WalletApi>
 {
     vi.resetModules();
     const module = await import('../src/stores/wallet.store.ts');
@@ -444,8 +445,9 @@ describe('adding the network', () =>
         const wallet = await freshWallet();
 
         await wallet.addChain(METAMASK_RDNS, { ...CHAIN, explorerUrl: '' });
-        const sent = metamask.calls.find((call) => call.method === 'wallet_addEthereumChain');
-        expect((sent?.params?.[0] as { blockExplorerUrls: string[] }).blockExplorerUrls).toEqual([window.location.origin]);
+        const sent = metamask.calls.find((call) => call.method === 'wallet_addEthereumChain')?.params?.[0] as
+            { blockExplorerUrls: string[] } | undefined;
+        expect(sent?.blockExplorerUrls).toEqual([window.location.origin]);
     });
 
     it('tells a dismissal apart from a refusal, and both from a ticker clash', async () =>
@@ -487,7 +489,7 @@ describe('sending', () =>
 {
     /** A connected store over one wallet that will accept a transaction. */
     async function connected(answers: Record<string, unknown | (() => unknown)> = {}): Promise<{
-        wallet: import('../src/stores/wallet.store.ts').WalletApi;
+        wallet: WalletApi;
         metamask: Fake;
     }>
     {
@@ -525,8 +527,9 @@ describe('sending', () =>
     {
         const { wallet, metamask } = await connected();
         await wallet.send({ to: TO, data: '0x', value: (10n ** 18n).toString() });
-        const sent = metamask.calls.find((call) => call.method === 'eth_sendTransaction');
-        expect((sent?.params?.[0] as { value: string }).value).toBe(`0x${ (10n ** 18n).toString(16) }`);
+        const sent = metamask.calls.find((call) => call.method === 'eth_sendTransaction')?.params?.[0] as
+            { value: string } | undefined;
+        expect(sent?.value).toBe(`0x${ (10n ** 18n).toString(16) }`);
     });
 
     it('carries a value no double could hold, without rounding it', async () =>
@@ -534,8 +537,9 @@ describe('sending', () =>
         const { wallet, metamask } = await connected();
         const huge = (2n ** 200n + 12345n).toString();
         await wallet.send({ to: TO, data: '0x', value: huge });
-        const sent = metamask.calls.find((call) => call.method === 'eth_sendTransaction');
-        expect(BigInt((sent?.params?.[0] as { value: string }).value)).toBe(BigInt(huge));
+        const sent = metamask.calls.find((call) => call.method === 'eth_sendTransaction')?.params?.[0] as
+            { value: string } | undefined;
+        expect(BigInt(sent?.value ?? '0')).toBe(BigInt(huge));
     });
 
     it('refuses to send with no wallet, and with no connected account', async () =>

@@ -121,6 +121,9 @@ describe('the toasts store', () =>
         // self-dismissal that would otherwise clear it - so each case starts from empty
         // explicitly rather than inheriting the previous one's stack.
         const toasts = useToasts();
+        // The copy IS the point: dismiss() mutates the very list being walked, and iterating it
+        // live drops every second entry.
+        // oxlint-disable-next-line unicorn/no-useless-spread
         for (const entry of [...toasts.items()])
         {
             toasts.dismiss(entry.id);

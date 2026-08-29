@@ -394,6 +394,9 @@ export class ChainReader implements ChainGateway
 /** `Promise.all` with a ceiling on how many run at once; results keep the input's order. */
 async function mapWithLimit<T, R>(items: readonly T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]>
 {
+    // The argument is the length, and the type argument says so too: this is a result buffer
+    // filled by index, not a one-element array.
+    // oxlint-disable-next-line unicorn/no-new-array
     const results = new Array<R>(items.length);
     let next = 0;
     const worker = async (): Promise<void> =>

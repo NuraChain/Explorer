@@ -1,0 +1,83 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": [
+        "typescript",
+        "unicorn",
+        "oxc",
+        "import"
+    ],
+    "categories": {
+        "correctness": "error"
+    },
+    "ignorePatterns": [
+        "**/dist/**",
+        "**/dist-server/**",
+        "**/coverage/**",
+        "**/node_modules/**",
+        "**/.playwright-mcp/**",
+        "**/.data/**"
+    ],
+    "rules": {
+        "typescript/no-explicit-any": "error",
+        "typescript/consistent-type-imports": [
+            "error",
+            {
+                "prefer": "type-imports",
+                "fixStyle": "separate-type-imports"
+            }
+        ],
+        "typescript/consistent-type-definitions": [
+            "error",
+            "interface"
+        ],
+        "typescript/explicit-function-return-type": [
+            "warn",
+            {
+                "allowExpressions": true,
+                "allowTypedFunctionExpressions": true
+            }
+        ],
+        "typescript/no-namespace": "error",
+        "typescript/no-non-null-asserted-optional-chain": "error",
+        "typescript/no-unused-vars": [
+            "error",
+            {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_",
+                "destructuredArrayIgnorePattern": "^_"
+            }
+        ],
+        "eqeqeq": [
+            "error",
+            "always"
+        ],
+        "curly": [
+            "error",
+            "all"
+        ],
+        "no-console": "warn",
+        "no-var": "error",
+        "prefer-const": "error"
+    },
+    "overrides": [
+        {
+            "files": [
+                "**/*.spec.ts",
+                "**/tests/**/*.ts"
+            ],
+            "rules": {
+                "typescript/explicit-function-return-type": "off"
+            }
+        },
+        {
+            "files": [
+                "**/*.js",
+                "**/*.mjs",
+                "**/*.cjs"
+            ],
+            "rules": {
+                "typescript/explicit-function-return-type": "off"
+            }
+        }
+    ]
+}

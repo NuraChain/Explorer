@@ -10,13 +10,38 @@ disagrees with the code, the code is right and this file needs fixing.
 npm run dev            # both halves: client on 3001, server on 3000
 npm run build          # client bundle, SSR bundle, prerender
 npm start              # run the built app (NODE_ENV=production, honours PORT)
-npx azeroth check      # typecheck + lint, both workspaces — the gate
+npm run check          # typecheck both workspaces + oxlint — the gate
+npm run lint           # oxlint on its own (`lint:fix` applies what it can fix)
+npm run format         # oxfmt — READ the note below before running this
+npx azeroth check      # the typecheck half alone; the CLI's lint step knew eslint, which is gone
 npm test               # every suite
 npm run test:shuffle   # every suite in random order — the isolation gate
 npm run test:coverage  # server suite + coverage report
 ```
 
-`npx azeroth check`, `npm test` and `npm run test:shuffle` must all pass before a change is done.
+`npm run check`, `npm test` and `npm run test:shuffle` must all pass before a change is done.
+
+## Linting and formatting
+
+**oxlint replaced ESLint** (`.oxlintrc.json`): the `correctness` category plus the house rules that
+survive the move - no `any`, type-only imports, interfaces over type aliases, explicit return types,
+no namespaces, unused names must start with `_`. Suppress a rule where the code is deliberately the
+thing it flags, with the reason written above it:
+
+```ts
+// oxlint-disable-next-line unicorn/no-new-array
+```
+
+Two things went with ESLint, and neither has a replacement yet:
+
+- **`.azeroth` files are no longer linted.** oxlint cannot parse the single-file component format,
+  so the 44 components are typechecked and nothing more - the reactivity rules that came with
+  `@azerothjs/eslint-plugin` are gone. Review UI code by reading it.
+- **The house STYLE is unenforced.** oxlint deliberately implements no formatting rules, and oxfmt
+  is Prettier-shaped: it has no brace-style option, so `npm run format` would pull all 78 source
+  files off Allman braces onto K&R. It is installed and configured (`.oxfmtrc.json` carries the
+  4-space indent, single quotes, no trailing comma, 110 columns) but it has never been run against
+  this repository. Do not run it without deciding to change the house style first.
 
 ---
 
