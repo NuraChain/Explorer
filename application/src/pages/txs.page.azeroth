@@ -68,7 +68,7 @@ export default component TransactionsPage()
                             { locale.t(`chain.status.${ row.status }`) }
                         </Badge>
                         <div class="min-w-0 flex-1">
-                            <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 14 } tail={ 8 } />
+                            <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 12 } tail={ 6 } class="text-[13px]" />
                             {/* The pair the same way the address ledger draws it: a HashLink
                                 each, so the whole value is one hover away and the counterparty is
                                 one click away. Copy is off on both - the row already carries one
@@ -79,22 +79,22 @@ export default component TransactionsPage()
                                 "reverted" is a third of a phone's width there is not room for two
                                 fifteen-character values. The whole address is still one hover and
                                 one click away. */}
-                            <p class="flex flex-wrap items-center gap-x-1.5 text-[12px] text-muted">
-                                <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
+                            <p class="flex flex-wrap items-center gap-x-1.5 text-[11px] sm:text-[12px] text-muted">
+                                <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 5 } tail={ 3 } copy={ false } class="text-[11px] sm:text-[12px]" />
                                 {/* The arrow travels WITH the address it points at. On a phone the
                                     pair is wider than the column holding it, and left loose the
                                     arrow wrapped onto a line of its own pointing at nothing. */}
                                 <span class="inline-flex items-center gap-1.5">
                                     <span class="icon-flip inline-block">&rarr;</span>
                                     <Show when={ row.to } fallback={ <span>{ locale.t('chain.contractCreation') }</span> } let={ to }>
-                                        <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
+                                        <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 5 } tail={ 3 } copy={ false } class="text-[11px] sm:text-[12px]" />
                                     </Show>
                                 </span>
                             </p>
                         </div>
-                        <div class="min-w-0 max-w-[45%] text-end">
-                            <p class="amount text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>
-                            <Tooltip label={ locale.dateTime(row.at) } class="flex justify-center"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
+                        <div class="min-w-0 max-w-[50%] text-end">
+                            <p class="amount text-[13px] sm:text-[14px]">{ formatValue(row.value, symbol, decimals) }</p>
+                            <Tooltip label={ locale.dateTime(row.at) } class="flex justify-center"><p class="text-[11px] sm:text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                         </div>
                     </li>
                 </For>
