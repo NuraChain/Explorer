@@ -72,10 +72,9 @@ export default component TransactionsPage()
                             >
                                 { locale.t(`chain.status.${ row.status }`) }
                             </Badge>
-                            <div class="flex items-baseline gap-x-3 text-end sm:order-last sm:block sm:max-w-[45%]">
-                                <p class="text-[14px]"><span class="amount">{ formatValue(row.value, symbol, decimals) }</span></p>
-                                <Tooltip label={ locale.dateTime(row.at) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
-                            </div>
+                            <p class="text-end text-[14px] sm:order-last sm:max-w-[45%] sm:shrink-0">
+                                <span class="amount">{ formatValue(row.value, symbol, decimals) }</span>
+                            </p>
                         </div>
 
                         <div class="min-w-0 sm:flex-1">
@@ -90,7 +89,7 @@ export default component TransactionsPage()
                                 "reverted" is a third of a phone's width there is not room for two
                                 fifteen-character values. The whole address is still one hover and
                                 one click away. */}
-                            <p class="flex flex-wrap items-center gap-x-1.5 text-[12px] text-muted">
+                            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-muted">
                                 <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
                                 {/* The arrow travels WITH the address it points at. On a phone the
                                     pair is wider than the column holding it, and left loose the
@@ -101,6 +100,13 @@ export default component TransactionsPage()
                                         <HashLink value={ to } to={ `/address/${ to }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
                                     </Show>
                                 </span>
+                                {/* Last, under the addresses it dates. `w-full` is what puts it on
+                                    its own line inside this wrapping one: on a card the age closes
+                                    the row, and above `sm:` it rides after the pair rather than
+                                    costing every row a third line. */}
+                                <Tooltip label={ locale.dateTime(row.at) } class="flex w-full sm:w-auto">
+                                    <span>{ locale.ago(row.at) }</span>
+                                </Tooltip>
                             </p>
                         </div>
                     </li>
