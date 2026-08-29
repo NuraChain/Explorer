@@ -127,22 +127,22 @@ export default component Home()
                 </div>
                 <ul class="divide-y divide-line">
                     <For each={ blocks.data()?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
-                        <li class="flex items-center gap-3 px-4 py-2.5">
+                        <li class="flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4">
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-nur">
                                 <Icon name="block" size={ 15 } />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <Link to={ `/block/${ block.number }` } class="data text-[14px] font-semibold text-text no-underline hover:text-nur">
+                                <Link to={ `/block/${ block.number }` } class="data text-[13px] sm:text-[14px] font-semibold text-text no-underline hover:text-nur">
                                     #{ block.number }
                                 </Link>
-                                <Tooltip label={ locale.dateTime(block.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(block.at) }</p></Tooltip>
+                                <Tooltip label={ locale.dateTime(block.at) } class="flex"><p class="text-[11px] sm:text-[12px] text-muted">{ locale.ago(block.at) }</p></Tooltip>
                             </div>
-                            <div class="text-end">
-                                <p class="data text-[13px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
+                            <div class="text-end min-w-[70px]">
+                                <p class="data text-[12px] sm:text-[13px]">{ locale.t('chain.txCount', { count: locale.n(block.txCount) }) }</p>
                                 {/* The percentage is a rounding of two numbers the reader cannot
                                     see, exactly as on the blocks list - so it carries the same
                                     bubble rather than being the one place they are hidden. */}
-                                <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
+                                <Tooltip label={ locale.t('blocks.gasTooltip', { used: locale.n(Number(block.gasUsed)), limit: locale.n(Number(block.gasLimit)) }) } class="flex justify-end"><p class="text-[11px] sm:text-[12px] text-muted">{ locale.t('chain.gasShare', { percent: (gasShare(block.gasUsed, block.gasLimit) * 100).toFixed(1) }) }</p></Tooltip>
                             </div>
                         </li>
                     </For>
@@ -159,7 +159,7 @@ export default component Home()
                 </div>
                 <ul class="divide-y divide-line">
                     <For each={ txs.data()?.rows ?? [] } key={ (row) => row.hash } let={ row }>
-                        <li class="flex items-center gap-3 px-4 py-2.5">
+                        <li class="flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4">
                             <Badge
                                 tone={ row.status === 'reverted' ? 'danger' : row.status === 'unknown' ? 'neutral' : 'success' }
                                 icon={ row.status === 'reverted' ? 'alert' : 'success' }
@@ -167,24 +167,24 @@ export default component Home()
                                 { locale.t(`chain.status.${ row.status }`) }
                             </Badge>
                             <div class="min-w-0 flex-1">
-                                <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 12 } tail={ 6 } />
+                                <HashLink value={ row.hash } to={ `/tx/${ row.hash }` } lead={ 10 } tail={ 5 } class="text-[13px]" />
                                 {/* The counterparty is shortened INSIDE a sentence, so it stays a
                                     sentence and the bubble carries the whole address. A HashLink
                                     here would put a second link in a row whose hash is already
                                     one, and split the phrase around it. */}
                                 <Show
                                     when={ row.to }
-                                    fallback={ <p class="text-[12px] text-muted">{ locale.t('chain.contractCreation') }</p> }
+                                    fallback={ <p class="text-[11px] sm:text-[12px] text-muted">{ locale.t('chain.contractCreation') }</p> }
                                     let={ to }
                                 >
                                     <Tooltip label={ to } class="flex">
-                                        <p class="text-[12px] text-muted">{ locale.t('chain.to', { address: shortHash(to, 8, 6) }) }</p>
+                                        <p class="text-[11px] sm:text-[12px] text-muted">{ locale.t('chain.to', { address: shortHash(to, 6, 4) }) }</p>
                                     </Tooltip>
                                 </Show>
                             </div>
                             {/* Capped rather than shrink-0: an unbounded value column pushed the
                                 hash beside it down to nothing and then ran off the card anyway. */}
-                            <p class="amount max-w-[45%] shrink-0 text-end text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
+                            <p class="amount max-w-[50%] shrink-0 text-end text-[12px] sm:text-[13px]">{ formatValue(row.value, symbol, decimals) }</p>
                         </li>
                     </For>
                 </ul>
