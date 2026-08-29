@@ -416,6 +416,25 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // `token()` is ERC-4626's as well, and one entry serves both: a selector has one signature,
     // and what it MEANS is the contract's business, not this table's.
 
+    // --- The Cosmos gov precompile (cosmos/evm, 0x…0805) --------------------------------------
+    // A chain whose governance lives in its own `x/gov` module rather than in a deployed contract
+    // still reaches the EVM through this fixed address: queries answer `eth_call`, and the five
+    // transactions are ordinary EVM transactions a wallet signs. The signatures are here for the
+    // same reason every other one is - so this server can ENCODE the call and name it back.
+    ['submitProposal(address,bytes,(string,uint256)[])', 'nonpayable', 'uint64'],
+    ['cancelProposal(address,uint64)', 'nonpayable', 'bool'],
+    ['deposit(address,uint64,(string,uint256)[])', 'nonpayable', 'bool'],
+    ['vote(address,uint64,uint8,string)', 'nonpayable', 'bool'],
+    ['voteWeighted(address,uint64,(uint8,string)[],string)', 'nonpayable', 'bool'],
+    ['getProposal(uint64)', 'view', '(uint64,string[],uint32,(string,string,string,string),uint64,uint64,(string,uint256)[],uint64,uint64,string,string,string,address)'],
+    ['getProposals(uint32,address,address,(bytes,uint64,uint64,bool,bool))', 'view', '(uint64,string[],uint32,(string,string,string,string),uint64,uint64,(string,uint256)[],uint64,uint64,string,string,string,address)[],(bytes,uint64)'],
+    ['getTallyResult(uint64)', 'view', '(string,string,string,string)'],
+    ['getVote(uint64,address)', 'view', '(uint64,address,(uint8,string)[],string)'],
+    ['getVotes(uint64,(bytes,uint64,uint64,bool,bool))', 'view', '(uint64,address,(uint8,string)[],string)[],(bytes,uint64)'],
+    ['getDeposit(uint64,address)', 'view', '(uint64,address,(string,uint256)[])'],
+    ['getDeposits(uint64,(bytes,uint64,uint64,bool,bool))', 'view', '(uint64,address,(string,uint256)[])[],(bytes,uint64)'],
+    ['getConstitution()', 'view', 'string'],
+
     // --- Odds and ends every toolchain emits --------------------------------------------------
     ['multicall(bytes[])', 'nonpayable', 'bytes[]'],
     ['version()', 'view', 'string'],

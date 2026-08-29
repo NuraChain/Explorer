@@ -12,7 +12,15 @@ import type { AddressDirection, BlockFilter, TxStatusFilter } from '../schemas.t
 // address" - that is the question an explorer exists to answer, and it is answerable only
 // because these rows were written down as the chain was read.
 
-/** Bumped whenever a column changes; the index rebuilds itself from the chain. */
+/**
+ * Bumped whenever a column changes; the index rebuilds itself from the chain.
+ *
+ * It reads 2 for a shape that is the same as 1. Version 2 also held three governance tables, and
+ * they went again when governance turned out to live in the chain's own `x/gov` module rather
+ * than in a contract (see chain/gov.ts) - nothing here indexes it. The number stays where it is
+ * so that an index built under 2 is not dropped and replayed for a change that removed tables it
+ * can simply stop reading.
+ */
 const SCHEMA_VERSION = '2';
 
 /** The ERC-20 / ERC-721 `Transfer(address,address,uint256)` topic. */
@@ -86,72 +94,6 @@ CREATE TABLE IF NOT EXISTS tokens (
     decimals INTEGER NOT NULL,
     kind TEXT NOT NULL
 );
--- Governance. Nothing here is configured: a governor is an address that emitted a governor's
--- event, and it is written down the first time one is seen.
-CREATE TABLE IF NOT EXISTS governors (
-    address TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    token TEXT,
-    counting_mode TEXT NOT NULL,
-    -- 'blocknumber' or 'timestamp': what vote_start and vote_end are measured in. See ERC-6372.
-    clock TEXT NOT NULL,
-    first_block INTEGER NOT NULL
-);
--- The one table in this file that is not append-only. A proposal is created once and then
--- MARKED - queued, executed, withdrawn - by transactions that arrive later, so the row carries
--- the marks and a reorg has to take them off again (see rollbackFrom).
-CREATE TABLE IF NOT EXISTS proposals (
-    governor TEXT NOT NULL,
-    proposal_id TEXT NOT NULL,
-    proposer TEXT NOT NULL,
-    description TEXT NOT NULL,
-    -- The calls the proposal makes if it passes, as JSON arrays, index-aligned. JSON and not
-    -- four tables: they are read as one list, always together, and never queried across.
-    targets TEXT NOT NULL,
-    call_values TEXT NOT NULL,
-    signatures TEXT NOT NULL,
-    calldatas TEXT NOT NULL,
-    vote_start TEXT NOT NULL,
-    vote_end TEXT NOT NULL,
-    -- What the governor answered for quorum(vote_start) when the proposal was first seen. Null
-    -- when it refused: quorum can be a function of a timepoint the node no longer has state for.
-    quorum TEXT,
-    created_block INTEGER NOT NULL,
-    created_tx TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,
-    canceled_block INTEGER,
-    canceled_tx TEXT,
-    queued_block INTEGER,
-    queued_tx TEXT,
-    queued_eta TEXT,
-    executed_block INTEGER,
-    executed_tx TEXT,
-    -- Summed from the votes below rather than read from the governor: the tally is derived, and
-    -- rederiving it after every write is what keeps it true across a reorg.
-    for_votes TEXT NOT NULL DEFAULT '0',
-    against_votes TEXT NOT NULL DEFAULT '0',
-    abstain_votes TEXT NOT NULL DEFAULT '0',
-    voters INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (governor, proposal_id)
-);
-CREATE INDEX IF NOT EXISTS idx_proposals_created ON proposals (created_block DESC);
-CREATE TABLE IF NOT EXISTS votes (
-    tx_hash TEXT NOT NULL,
-    log_index INTEGER NOT NULL,
-    governor TEXT NOT NULL,
-    proposal_id TEXT NOT NULL,
-    voter TEXT NOT NULL,
-    -- 0 against, 1 for, 2 abstain - the order GovernorCountingSimple fixed. A governor that
-    -- counts some other way emits its own numbers here, and they are stored as they came.
-    support INTEGER NOT NULL,
-    weight TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    block_number INTEGER NOT NULL,
-    timestamp INTEGER NOT NULL,
-    PRIMARY KEY (tx_hash, log_index)
-);
-CREATE INDEX IF NOT EXISTS idx_votes_proposal ON votes (governor, proposal_id, block_number DESC);
-CREATE INDEX IF NOT EXISTS idx_votes_voter ON votes (voter, block_number DESC);
 `;
 
 export interface BlockRow
@@ -206,74 +148,6 @@ export interface TokenRow
     symbol: string;
     decimals: number;
     kind: string;
-}
-
-export interface GovernorRow
-{
-    address: string;
-    /** `name()`, or '' from a governor that does not answer it. */
-    name: string;
-    /** The votes token the governor counts, or null where `token()` said nothing. */
-    token: string | null;
-    counting_mode: string;
-    clock: string;
-    first_block: number;
-}
-
-export interface ProposalRow
-{
-    governor: string;
-    /** A uint256 as a decimal string: proposal ids are hashes of the proposal, not counters. */
-    proposal_id: string;
-    proposer: string;
-    description: string;
-    targets: string;
-    call_values: string;
-    signatures: string;
-    calldatas: string;
-    vote_start: string;
-    vote_end: string;
-    quorum: string | null;
-    created_block: number;
-    created_tx: string;
-    timestamp: number;
-    canceled_block: number | null;
-    canceled_tx: string | null;
-    queued_block: number | null;
-    queued_tx: string | null;
-    queued_eta: string | null;
-    executed_block: number | null;
-    executed_tx: string | null;
-    for_votes: string;
-    against_votes: string;
-    abstain_votes: string;
-    voters: number;
-}
-
-export interface VoteRow
-{
-    tx_hash: string;
-    log_index: number;
-    governor: string;
-    proposal_id: string;
-    voter: string;
-    support: number;
-    weight: string;
-    reason: string;
-    block_number: number;
-    timestamp: number;
-}
-
-/** A proposal reaching a state a later transaction put it in. */
-export interface ProposalMark
-{
-    governor: string;
-    proposal_id: string;
-    kind: 'queued' | 'executed' | 'canceled';
-    block: number;
-    tx_hash: string;
-    /** Only a queue carries one. */
-    eta: string | null;
 }
 
 /** Seconds in a UTC day - the bucket every series here is grouped into. */
@@ -366,9 +240,6 @@ export class IndexStore
     /** Addresses already in `tokens`, so ingest does not query per transfer to ask. */
     readonly #knownTokens = new Set<string>();
 
-    /** The same, for governors: one governor emits an event per vote, and each one would ask. */
-    readonly #knownGovernors = new Set<string>();
-
     #inTransaction = false;
 
     constructor(path: string)
@@ -458,9 +329,6 @@ export class IndexStore
             + 'DROP TABLE IF EXISTS transactions;'
             + 'DROP TABLE IF EXISTS token_transfers;'
             + 'DROP TABLE IF EXISTS tokens;'
-            + 'DROP TABLE IF EXISTS governors;'
-            + 'DROP TABLE IF EXISTS proposals;'
-            + 'DROP TABLE IF EXISTS votes;'
             + 'DROP TABLE IF EXISTS meta;');
         this.#db.exec(DDL);
         this.setMeta('schema', SCHEMA_VERSION);
@@ -508,11 +376,9 @@ export class IndexStore
         }
         if (known !== null)
         {
-            this.#db.exec('DELETE FROM blocks; DELETE FROM transactions; DELETE FROM token_transfers; DELETE FROM tokens;'
-                + 'DELETE FROM governors; DELETE FROM proposals; DELETE FROM votes;');
+            this.#db.exec('DELETE FROM blocks; DELETE FROM transactions; DELETE FROM token_transfers; DELETE FROM tokens;');
             this.#stmt('DELETE FROM meta WHERE key = ?').run('cursor');
             this.#knownTokens.clear();
-            this.#knownGovernors.clear();
         }
         this.setMeta('genesis', genesisHash);
         return known !== null;
@@ -533,26 +399,6 @@ export class IndexStore
     {
         this.#stmt('DELETE FROM token_transfers WHERE block_number >= ?').run(number);
         this.#stmt('DELETE FROM transactions WHERE block_number >= ?').run(number);
-
-        // Governance before blocks, and the tally last. A vote that is being rolled back was
-        // counted into a proposal that is NOT - the proposal is older than the fork - so the
-        // proposals it touched have to be summed again once its rows are gone.
-        const touched = this.#stmt('SELECT DISTINCT governor, proposal_id FROM votes WHERE block_number >= ?')
-            .all(number) as unknown as Array<{ governor: string; proposal_id: string }>;
-        this.#stmt('DELETE FROM votes WHERE block_number >= ?').run(number);
-        this.#stmt('UPDATE proposals SET canceled_block = NULL, canceled_tx = NULL WHERE canceled_block >= ?').run(number);
-        this.#stmt('UPDATE proposals SET queued_block = NULL, queued_tx = NULL, queued_eta = NULL WHERE queued_block >= ?').run(number);
-        this.#stmt('UPDATE proposals SET executed_block = NULL, executed_tx = NULL WHERE executed_block >= ?').run(number);
-        this.#stmt('DELETE FROM proposals WHERE created_block >= ?').run(number);
-        this.#stmt('DELETE FROM governors WHERE first_block >= ?').run(number);
-        // Cleared rather than pruned: the set is a cache of what the table holds, and the table
-        // just lost rows this process cannot name without asking it again.
-        this.#knownGovernors.clear();
-        for (const row of touched)
-        {
-            this.retally(row.governor, row.proposal_id);
-        }
-
         this.#stmt('DELETE FROM blocks WHERE number >= ?').run(number);
     }
 
@@ -1135,168 +981,5 @@ export class IndexStore
     public tokens(): TokenRow[]
     {
         return this.#stmt('SELECT * FROM tokens ORDER BY symbol ASC').all() as unknown as TokenRow[];
-    }
-
-    // ----------------------------------------------------------------------------------
-    // Governance
-    // ----------------------------------------------------------------------------------
-
-    /** Whether this governor has been described already. Answered from memory after the first miss. */
-    public knownGovernor(address: string): boolean
-    {
-        const account = normalize(address);
-        if (this.#knownGovernors.has(account))
-        {
-            return true;
-        }
-        if (this.#stmt('SELECT 1 FROM governors WHERE address = ?').get(account) === undefined)
-        {
-            return false;
-        }
-        this.#knownGovernors.add(account);
-        return true;
-    }
-
-    public upsertGovernor(row: GovernorRow): void
-    {
-        this.#stmt(`
-            INSERT INTO governors (address, name, token, counting_mode, clock, first_block)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT (address) DO UPDATE SET name = excluded.name, token = excluded.token,
-                counting_mode = excluded.counting_mode, clock = excluded.clock`)
-            .run(row.address, row.name, row.token, row.counting_mode, row.clock, row.first_block);
-        this.#knownGovernors.add(normalize(row.address));
-    }
-
-    /** A proposal, written once. A replay of the same block must not overwrite its later marks. */
-    public insertProposal(row: ProposalRow): void
-    {
-        this.#stmt(`
-            INSERT INTO proposals (governor, proposal_id, proposer, description, targets, call_values,
-                signatures, calldatas, vote_start, vote_end, quorum, created_block, created_tx, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (governor, proposal_id) DO NOTHING`)
-            .run(row.governor, row.proposal_id, row.proposer, row.description, row.targets, row.call_values,
-                row.signatures, row.calldatas, row.vote_start, row.vote_end, row.quorum, row.created_block,
-                row.created_tx, row.timestamp);
-    }
-
-    /**
-     * A later state, written onto the proposal it belongs to.
-     *
-     * Nothing is inserted when the proposal is not there: an execution whose creation is below
-     * START_BLOCK has no row to mark, and inventing a proposal from its execution would print one
-     * with no proposer, no description and no votes.
-     */
-    public markProposal(mark: ProposalMark): void
-    {
-        const column = mark.kind;
-        const eta = mark.kind === 'queued' ? ', queued_eta = ?' : '';
-        const parameters: Array<string | number | null> = [mark.block, mark.tx_hash];
-        if (mark.kind === 'queued')
-        {
-            parameters.push(mark.eta);
-        }
-        this.#stmt(`
-            UPDATE proposals SET ${ column }_block = ?, ${ column }_tx = ?${ eta }
-            WHERE governor = ? AND proposal_id = ?`)
-            .run(...parameters, mark.governor, mark.proposal_id);
-    }
-
-    public insertVote(row: VoteRow): void
-    {
-        this.#stmt(`
-            INSERT INTO votes (tx_hash, log_index, governor, proposal_id, voter, support, weight, reason, block_number, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (tx_hash, log_index) DO NOTHING`)
-            .run(row.tx_hash, row.log_index, row.governor, row.proposal_id, row.voter, row.support,
-                row.weight, row.reason, row.block_number, row.timestamp);
-    }
-
-    /**
-     * One proposal's tally, summed again from its votes.
-     *
-     * In JS and not in SQL: a vote's weight is a uint256, and `SUM` over a TEXT column is a
-     * double - which is exactly the rounding this whole file exists to avoid. A proposal's votes
-     * are counted in tens, so the scan costs nothing and the answer is exact.
-     */
-    public retally(governor: string, proposalId: string): void
-    {
-        const rows = this.#stmt('SELECT voter, support, weight FROM votes WHERE governor = ? AND proposal_id = ?')
-            .all(normalize(governor), proposalId) as unknown as Array<{ voter: string; support: number; weight: string }>;
-
-        const total = [0n, 0n, 0n];
-        const voters = new Set<string>();
-        for (const row of rows)
-        {
-            voters.add(row.voter);
-            const at = row.support;
-            if (at === 0 || at === 1 || at === 2)
-            {
-                total[at] += BigInt(row.weight);
-            }
-        }
-
-        this.#stmt(`
-            UPDATE proposals SET against_votes = ?, for_votes = ?, abstain_votes = ?, voters = ?
-            WHERE governor = ? AND proposal_id = ?`)
-            .run(total[0]!.toString(), total[1]!.toString(), total[2]!.toString(), voters.size,
-                normalize(governor), proposalId);
-    }
-
-    public governors(): GovernorRow[]
-    {
-        return this.#stmt('SELECT * FROM governors ORDER BY first_block ASC').all() as unknown as GovernorRow[];
-    }
-
-    public governor(address: string): GovernorRow | null
-    {
-        return (this.#stmt('SELECT * FROM governors WHERE address = ?')
-            .get(normalize(address)) as GovernorRow | undefined) ?? null;
-    }
-
-    /**
-     * Every proposal, newest first - the whole list, not a page of it.
-     *
-     * The one list in this file that is NOT paged in sqlite, because the thing a reader narrows
-     * it by is the one column it does not have: a proposal's state is decided by the governor's
-     * clock against the head, and by a tally against a quorum. Both are derived. Governance is
-     * also the lowest-volume thing on a chain - hundreds of rows where transactions are millions
-     * - so the whole table is cheaper to hand up than a second, wrong, stored status column.
-     */
-    public proposals(governor?: string): ProposalRow[]
-    {
-        return governor === undefined
-            ? this.#stmt('SELECT * FROM proposals ORDER BY created_block DESC, proposal_id DESC').all() as unknown as ProposalRow[]
-            : this.#stmt('SELECT * FROM proposals WHERE governor = ? ORDER BY created_block DESC, proposal_id DESC')
-                .all(normalize(governor)) as unknown as ProposalRow[];
-    }
-
-    public proposal(governor: string, proposalId: string): ProposalRow | null
-    {
-        return (this.#stmt('SELECT * FROM proposals WHERE governor = ? AND proposal_id = ?')
-            .get(normalize(governor), proposalId) as ProposalRow | undefined) ?? null;
-    }
-
-    public votesOfProposal(governor: string, proposalId: string, limit: number, offset: number): { rows: VoteRow[]; total: number }
-    {
-        const key = normalize(governor);
-        const total = (this.#stmt('SELECT COUNT(*) AS n FROM votes WHERE governor = ? AND proposal_id = ?')
-            .get(key, proposalId) as { n: number }).n;
-        const rows = this.#stmt(`
-            SELECT * FROM votes WHERE governor = ? AND proposal_id = ?
-            ORDER BY block_number DESC, log_index DESC LIMIT ? OFFSET ?`)
-            .all(key, proposalId, limit, offset) as unknown as VoteRow[];
-        return { rows, total };
-    }
-
-    /** Every vote an address has cast, newest first - the governance half of an address page. */
-    public votesOfAddress(address: string, limit: number, offset: number): { rows: VoteRow[]; total: number }
-    {
-        const account = normalize(address);
-        const total = (this.#stmt('SELECT COUNT(*) AS n FROM votes WHERE voter = ?').get(account) as { n: number }).n;
-        const rows = this.#stmt('SELECT * FROM votes WHERE voter = ? ORDER BY block_number DESC, log_index DESC LIMIT ? OFFSET ?')
-            .all(account, limit, offset) as unknown as VoteRow[];
-        return { rows, total };
     }
 }
