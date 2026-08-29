@@ -66,7 +66,7 @@ export default component AccountsPage()
             <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('accounts.hint') }</p>
         </div>
 
-        <div class="max-w-md">
+        <div class="w-full max-w-md">
             <Input
                 icon="search"
                 size="sm"
@@ -81,16 +81,16 @@ export default component AccountsPage()
         <section class="panel overflow-hidden">
             <ul class="divide-y divide-line">
                 <For each={ accounts.data()?.rows ?? [] } key={ (row) => row.address } let={ row }>
-                    <li class="flex items-center gap-3 px-4 py-2.5">
+                    <li class="flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4">
                         {/* A rank is a number the READER counts, not a chain value, so it is
                             printed in their own digits and NOT in the `amount` isolate - the mono
                             stack has no Persian digits to set it in. Same reasoning as the page
                             numbers in Pagination. */}
-                        <span class="w-8 shrink-0 text-end text-[13px] tabular-nums text-muted">{ locale.n(row.rank) }</span>
+                        <span class="w-8 shrink-0 sm:w-10 text-end text-[13px] tabular-nums text-muted">{ locale.n(row.rank) }</span>
                         <div class="min-w-0 flex-1">
-                            <HashLink value={ row.address } to={ `/address/${ row.address }` } lead={ 16 } tail={ 10 } />
+                            <HashLink value={ row.address } to={ `/address/${ row.address }` } lead={ 14 } tail={ 8 } class="text-[13px]" />
                         </div>
-                        <p class="amount shrink-0 text-end text-[14px]">{ formatValue(row.balance, symbol, decimals) }</p>
+                        <p class="amount shrink-0 text-end text-[13px] sm:text-[14px]">{ formatValue(row.balance, symbol, decimals) }</p>
                     </li>
                 </For>
             </ul>
