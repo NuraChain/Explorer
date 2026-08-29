@@ -34,7 +34,8 @@ does fine-grained updates.
 application/src/
   components/ui/        primitives: badge button empty-state input pagination skeleton toasts tooltip
   components/chain/     chain-aware: hash-link flow-ledger contract-panel contract-call cadence-strip
-                        wallet-connect wallet-picker add-chain-button price-ticker
+                        wallet-connect wallet-picker add-chain-button price-ticker vote-tally
+                        proposal-actions
   components/layout/    brand-mark search-bar nav-drawer site-footer theme-switch language-switch
   pages/                one component per route
   stores/               locale (10 languages) · theme · toasts · wallet (EIP-6963 + EIP-1193)
@@ -45,6 +46,15 @@ application/src/
 
 `server/` owns the wire shape. A new chain field starts in `server/src/schemas.ts`; the browser's
 client type is inferred from that declaration, so it is decided in exactly one place.
+
+**Governance is discovered, not configured.** A governor is any contract that emits
+`ProposalCreated`, so the indexer decodes those events into `governors` / `proposals` / `votes`
+(`server/src/chain/governance.ts`) and `/governance` + `/governance/:governor/:id` light up on a
+chain that has one and stay an empty state on a chain that does not. A proposal's state is derived
+from indexed facts against the governor's own clock (ERC-6372); the detail page also asks the
+governor for `state()` and `proposalVotes()`, and where the two disagree the governor wins. Voting,
+delegation, queue and execute are wallet transactions encoded from the server's signature table -
+this explorer never signs and never sends.
 
 ## Design system
 
