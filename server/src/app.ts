@@ -1,12 +1,31 @@
+import { keccak256, toHex } from 'viem';
+
 import { App, json, NotFoundError, type RequestObserver } from '@azerothjs/http';
 import { feature, manifestOf, register } from '@azerothjs/http/api';
 import { mountPages, type KitOptions } from '@azerothjs/kit';
 
 import type { ChainGateway } from './chain/client.ts';
+import { PROPOSAL_STATE_BY_CODE } from './chain/governance.ts';
+import { FUNCTION_BY_SELECTOR, selectorOf } from './chain/signatures.ts';
 import { normalize, type DailyStats, type IndexStore } from './chain/store.ts';
+import { decodeReturn, encodeCall } from './chain/values.ts';
 import { createEtherscanApi } from './etherscan.ts';
 import { calldataFor, inspectContract, readContract } from './inspect.ts';
-import { classify, iso, meanBlockTime, pageCount, presentBlock, presentTransaction, presentTransfer } from './present.ts';
+import {
+    classify,
+    iso,
+    meanBlockTime,
+    pageCount,
+    presentActions,
+    presentBlock,
+    presentGovernor,
+    presentProposal,
+    presentTransaction,
+    presentTransfer,
+    presentVote,
+    proposalGroup,
+    proposalStatus
+} from './present.ts';
 import { noPrice, type PriceSource } from './price.ts';
 import {
     account,
@@ -21,8 +40,12 @@ import {
     contractCallInput,
     contractCallResult,
     contractDetail,
+    governanceOverview,
     nativePrice,
     pageQuery,
+    proposalDetail,
+    proposalListQuery,
+    proposalPage,
     searchQuery,
     searchResult,
     summary,
@@ -46,6 +69,37 @@ import {
 // this address". Balances are the exception and come from the NODE: a stale balance is a wrong
 // answer, and it is one cheap call.
 
+/**
+ * One getter on a contract, decoded, or null when it refuses.
+ *
+ * The signature has to be one the table knows, which is what keeps this from being an open relay
+ * for the node: the only calls this server makes on its own are the handful named below.
+ */
+async function readGetter(
+    chain: ChainGateway,
+    address: string,
+    signature: string,
+    args: readonly string[],
+    outputs: readonly string[]
+): Promise<string[] | null>
+{
+    const entry = FUNCTION_BY_SELECTOR.get(selectorOf(signature));
+    if (entry === undefined)
+    {
+        return null;
+    }
+    try
+    {
+        const data = await chain.call(address, encodeCall(entry, args));
+        const decoded = decodeReturn([...outputs], data);
+        return decoded.length === 0 ? null : decoded.map((value) => value.value);
+    }
+    catch
+    {
+        return null;
+    }
+}
+
 export interface ApiDeps
 {
     store: IndexStore;
@@ -60,6 +114,23 @@ export interface ApiDeps
 }
 
 const DEFAULT_LIMIT = 25;
+
+/**
+ * The selectors the governance page's controls encode against, hashed once at import.
+ *
+ * `delegate`, `getPastVotes` and `hasVoted` are here beside the four writes because the page
+ * asks all seven of the same question - "which four bytes name this function" - and the answer
+ * belongs to the signature table rather than to a component.
+ */
+const GOVERNOR_CALLS = {
+    castVote: selectorOf('castVote(uint256,uint8)'),
+    castVoteWithReason: selectorOf('castVoteWithReason(uint256,uint8,string)'),
+    queue: selectorOf('queue(address[],uint256[],bytes[],bytes32)'),
+    execute: selectorOf('execute(address[],uint256[],bytes[],bytes32)'),
+    delegate: selectorOf('delegate(address)'),
+    getPastVotes: selectorOf('getPastVotes(address,uint256)'),
+    hasVoted: selectorOf('hasVoted(uint256,address)')
+};
 
 /** How far the charts look back when nobody says. A month reads as a trend; a week reads as noise. */
 const DEFAULT_CHART_DAYS = 30;
@@ -94,7 +165,9 @@ export function createApi(deps: ApiDeps): ReturnType<typeof build>
     return build(deps);
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- the route literal IS the type; naming it would erase per-route inference
+// No return type on purpose: the route literal IS the type, and naming it would erase the
+// per-route inference every `client.blocks.list` call downstream depends on.
+// oxlint-disable-next-line typescript/explicit-function-return-type
 function build({ store, chain, price }: ApiDeps)
 {
     /** Attaches the token metadata each transfer row needs, reading each token at most once. */
@@ -116,6 +189,22 @@ function build({ store, chain, price }: ApiDeps)
         const limit = query.limit ?? DEFAULT_LIMIT;
         const page = query.page ?? 1;
         return { limit, offset: (page - 1) * limit, page };
+    };
+
+    /**
+     * Now, as each governor measures it.
+     *
+     * A governor's deadlines are on its own clock (ERC-6372): heights for most, seconds for the
+     * ones built on a timestamp clock, and the same number means either. The head of the INDEX
+     * rather than of the node, like every other figure this API derives - the detail page asks
+     * the governor itself, which is the answer that settles a disagreement.
+     */
+    const governorNow = (): ((governor: string) => bigint) =>
+    {
+        const indexed = store.stats();
+        const clocks = new Map(store.governors().map((row) => [row.address, row.clock]));
+        return (governor) =>
+            (clocks.get(governor) === 'timestamp' ? BigInt(indexed.headTime) : BigInt(indexed.head));
     };
 
     // Resolved once rather than per request: `noPrice` is what a deployment with no exchange
@@ -480,6 +569,115 @@ function build({ store, chain, price }: ApiDeps)
                     total: matched.length,
                     page,
                     pages: pageCount(matched.length, limit)
+                };
+            })
+        })),
+
+        // Governance: the proposals a governor on this chain has recorded, and how they went.
+        //
+        // Every figure here is read from the index, so the section exists exactly when the chain
+        // has one - a chain with no governor deployed has no governors table row, and the client
+        // hides the whole section rather than showing an empty page of it.
+        governance: feature('/governance', (routes) => ({
+            overview: routes.get('/', { output: governanceOverview }, () =>
+            {
+                const now = governorNow();
+                const rows = store.proposals();
+                const counts = rows.map((row) => proposalGroup(proposalStatus(row, now(row.governor))));
+                return {
+                    governors: store.governors().map((row) =>
+                        presentGovernor(row, rows.filter((entry) => entry.governor === row.address).length)),
+                    total: rows.length,
+                    open: counts.filter((group) => group === 'open').length,
+                    passed: counts.filter((group) => group === 'passed').length,
+                    failed: counts.filter((group) => group === 'failed').length
+                };
+            }),
+
+            /**
+             * A page of proposals, newest first.
+             *
+             * Narrowed and paged HERE rather than in sqlite, because the column it is narrowed by
+             * does not exist: a proposal's state is its marks, then its deadline against the
+             * governor's clock, then its tally against a quorum. Governance is also the
+             * lowest-volume thing on a chain - see IndexStore.proposals.
+             */
+            list: routes.get('/proposals', { query: proposalListQuery, output: proposalPage }, ({ query }) =>
+            {
+                const { limit, offset, page } = paging(query);
+                const now = governorNow();
+                const governors = new Map(store.governors().map((row) => [row.address, row]));
+                const wanted = query.status ?? 'all';
+                const rows = store.proposals(query.governor)
+                    .map((row) => presentProposal(row, governors.get(row.governor) ?? null, now(row.governor)))
+                    .filter((row) => wanted === 'all' || proposalGroup(row.status) === wanted);
+
+                return {
+                    rows: rows.slice(offset, offset + limit),
+                    total: rows.length,
+                    page,
+                    pages: pageCount(rows.length, limit)
+                };
+            }),
+
+            /**
+             * One proposal, with a page of the ballots cast on it.
+             *
+             * Two facts here come from the NODE and not from the index, and both for the same
+             * reason: a governor may count votes in a way this explorer does not implement.
+             * `state()` is its own verdict, and `proposalVotes()` is its own tally - where either
+             * answers, it wins over the derivation, because the governor is the authority on its
+             * own proposal. Where neither answers, the indexed reading stands on its own.
+             */
+            one: routes.get('/proposals/:governor/:id', { query: pageQuery, output: proposalDetail }, async ({ params, query }) =>
+            {
+                const row = store.proposal(params.governor, params.id);
+                if (row === null)
+                {
+                    throw new NotFoundError('No such proposal');
+                }
+                const governor = store.governor(params.governor);
+                // The votes token as the INDEX knows it: a token nobody has ever transferred has
+                // no row here, and that is what `tokenDecimals: null` on the wire means.
+                const votesToken = governor?.token === undefined || governor.token === null
+                    ? null
+                    : store.token(governor.token);
+                const { limit, offset, page } = paging(query);
+                const votes = store.votesOfProposal(row.governor, row.proposal_id, limit, offset);
+
+                const [state, tally] = await Promise.all([
+                    readGetter(chain, row.governor, 'state(uint256)', [row.proposal_id], ['uint8']),
+                    readGetter(chain, row.governor, 'proposalVotes(uint256)', [row.proposal_id], ['uint256', 'uint256', 'uint256'])
+                ]);
+                const live = state === null ? null : PROPOSAL_STATE_BY_CODE[Number(state[0])] ?? null;
+                const presented = presentProposal(row, governor, governorNow()(row.governor));
+
+                return {
+                    proposal: tally === null
+                        ? presented
+                        : { ...presented, againstVotes: tally[0]!, forVotes: tally[1]!, abstainVotes: tally[2]! },
+                    description: row.description,
+                    // Hashed here, where the description is stored whole. A proposal is named to
+                    // queue() and execute() by the hash of its text, and re-deriving that in a
+                    // browser from a string that crossed a wire is a re-encoding bug waiting to
+                    // send somebody's transaction at a proposal that does not exist.
+                    descriptionHash: keccak256(toHex(row.description)),
+                    calls: GOVERNOR_CALLS,
+                    actions: presentActions(row),
+                    liveState: live,
+                    countingMode: governor?.counting_mode ?? '',
+                    token: governor?.token ?? null,
+                    tokenSymbol: votesToken?.symbol ?? '',
+                    tokenDecimals: votesToken === null ? null : votesToken.decimals,
+                    createdTx: row.created_tx,
+                    canceledTx: row.canceled_tx,
+                    queuedTx: row.queued_tx,
+                    queuedEta: row.queued_eta,
+                    executedTx: row.executed_tx,
+                    votes: votes.rows.map(presentVote),
+                    total: votes.total,
+                    page,
+                    pages: pageCount(votes.total, limit)
                 };
             })
         }))

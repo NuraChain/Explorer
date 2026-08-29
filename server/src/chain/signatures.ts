@@ -383,6 +383,39 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['rescueERC20(address,address,uint256)', 'nonpayable', ''],
     ['mintBatch(address[],uint256[])', 'nonpayable', ''],
 
+    // --- Governor (OpenZeppelin, and the Bravo shape it kept) ---------------------------------
+    // The write half is here for the same reason the read half is: this table is what lets the
+    // explorer ENCODE a call. Nothing is signed or sent from this process - the bytes go to the
+    // browser and the wallet's owner decides - but a vote that cannot be encoded is a governance
+    // page a reader can only watch.
+    ['propose(address[],uint256[],bytes[],string)', 'nonpayable', 'uint256'],
+    ['queue(address[],uint256[],bytes[],bytes32)', 'nonpayable', 'uint256'],
+    ['execute(address[],uint256[],bytes[],bytes32)', 'payable', 'uint256'],
+    ['cancel(address[],uint256[],bytes[],bytes32)', 'nonpayable', 'uint256'],
+    ['castVote(uint256,uint8)', 'nonpayable', 'uint256'],
+    ['castVoteWithReason(uint256,uint8,string)', 'nonpayable', 'uint256'],
+    ['castVoteWithReasonAndParams(uint256,uint8,string,bytes)', 'nonpayable', 'uint256'],
+    ['castVoteBySig(uint256,uint8,address,bytes)', 'nonpayable', 'uint256'],
+    ['state(uint256)', 'view', 'uint8'],
+    ['proposalVotes(uint256)', 'view', 'uint256,uint256,uint256'],
+    ['proposalSnapshot(uint256)', 'view', 'uint256'],
+    ['proposalDeadline(uint256)', 'view', 'uint256'],
+    ['proposalProposer(uint256)', 'view', 'address'],
+    ['proposalEta(uint256)', 'view', 'uint256'],
+    ['proposalNeedsQueuing(uint256)', 'view', 'bool'],
+    ['hasVoted(uint256,address)', 'view', 'bool'],
+    ['quorum(uint256)', 'view', 'uint256'],
+    ['quorumNumerator()', 'view', 'uint256'],
+    ['quorumDenominator()', 'view', 'uint256'],
+    ['votingDelay()', 'view', 'uint256'],
+    ['votingPeriod()', 'view', 'uint256'],
+    ['proposalThreshold()', 'view', 'uint256'],
+    ['hashProposal(address[],uint256[],bytes[],bytes32)', 'pure', 'uint256'],
+    ['COUNTING_MODE()', 'view', 'string'],
+    ['timelock()', 'view', 'address'],
+    // `token()` is ERC-4626's as well, and one entry serves both: a selector has one signature,
+    // and what it MEANS is the contract's business, not this table's.
+
     // --- Odds and ends every toolchain emits --------------------------------------------------
     ['multicall(bytes[])', 'nonpayable', 'bytes[]'],
     ['version()', 'view', 'string'],
@@ -421,6 +454,15 @@ const EVENTS: readonly string[] = [
     'Burn(address,uint256,uint256,address)',
     'Swap(address,uint256,uint256,uint256,uint256,address)',
     'Sync(uint112,uint112)',
+    // Governor, and the votes token underneath it.
+    'ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)',
+    'ProposalQueued(uint256,uint256)',
+    'ProposalExecuted(uint256)',
+    'ProposalCanceled(uint256)',
+    'VoteCast(address,uint256,uint8,uint256,string)',
+    'VoteCastWithParams(address,uint256,uint8,uint256,string,bytes)',
+    'DelegateChanged(address,address,address)',
+    'DelegateVotesChanged(address,uint256,uint256)',
     // Uniswap V3 factory and position manager.
     'FeeAmountEnabled(uint24,int24)',
     'OwnerChanged(address,address)',

@@ -1,16 +1,20 @@
 import type { Logger } from '@azerothjs/logger';
 
 import type { BlockWithReceipts, ChainGateway, IndexedLog } from './client.ts';
+import { decodeGovernance, readClock, type GovernanceEvent } from './governance.ts';
+import { FUNCTION_BY_SELECTOR, selectorOf } from './signatures.ts';
 import {
     normalize,
     TRANSFER_SINGLE_TOPIC,
     TRANSFER_TOPIC,
     type BlockRow,
+    type GovernorRow,
     type IndexStore,
     type TokenRow,
     type TransactionRow,
     type TransferRow
 } from './store.ts';
+import { decodeReturn, encodeCall } from './values.ts';
 
 // The sync loop: catch up from the cursor to the head in batches, then follow. Blocks are the
 // unit of work rather than logs, because native value moves leave no log - and native value is
@@ -109,15 +113,27 @@ export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logg
             const unknown = new Set(prepared.flatMap(entry => [...entry.tokens]).filter(token => !store.knownToken(token)));
             const described = await describeTokens(chain, unknown, log);
 
+            // Governance asks the node two questions, so both are asked out here, beside the
+            // token descriptions and outside the write: who this governor is, the first time one
+            // is seen, and what quorum a new proposal was created under. The second cannot be
+            // asked later - quorum is a function of a timepoint, and a pruned node forgets.
+            const governors = await describeGovernors(chain, newGovernors(store, prepared), log);
+            const quorums = await readQuorums(chain, prepared);
+
             store.transaction(() =>
             {
                 for (const token of described)
                 {
                     store.upsertToken(token);
                 }
+                for (const row of governors)
+                {
+                    store.upsertGovernor(row);
+                }
                 for (const entry of prepared)
                 {
                     store.insertBlock(entry.block, entry.transactions, entry.transfers);
+                    writeGovernance(store, entry, quorums);
                 }
                 store.setCursor(to);
             });
@@ -198,6 +214,14 @@ async function rewindIfReorged(store: IndexStore, chain: ChainGateway, log: Logg
     store.setCursor(chain.env.startBlock - 1);
 }
 
+/** One governance event, with the transaction and log position that place it in the chain. */
+interface PreparedGovernance
+{
+    event: GovernanceEvent;
+    txHash: string;
+    logIndex: number;
+}
+
 /** One block turned into rows, ready to write. Pure: no database, no network. */
 interface PreparedBlock
 {
@@ -205,6 +229,7 @@ interface PreparedBlock
     transactions: TransactionRow[];
     transfers: TransferRow[];
     tokens: Set<string>;
+    governance: PreparedGovernance[];
 }
 
 /** Decodes one block - its header, transactions and token transfers - into the rows it becomes. */
@@ -212,6 +237,7 @@ function prepare(block: BlockWithReceipts): PreparedBlock
 {
     const transfers: TransferRow[] = [];
     const tokens = new Set<string>();
+    const governance: PreparedGovernance[] = [];
 
     for (const transaction of block.transactions)
     {
@@ -222,6 +248,12 @@ function prepare(block: BlockWithReceipts): PreparedBlock
             {
                 transfers.push(decoded);
                 tokens.add(decoded.token);
+                continue;
+            }
+            const governed = decodeGovernance(entry);
+            if (governed !== null)
+            {
+                governance.push({ event: governed, txHash: transaction.hash.toLowerCase(), logIndex: entry.index });
             }
         }
     }
@@ -255,8 +287,190 @@ function prepare(block: BlockWithReceipts): PreparedBlock
             timestamp: block.timestamp
         })),
         transfers,
-        tokens
+        tokens,
+        governance
     };
+}
+
+/** The governors in this batch that the index has never described. Address -> where it was met. */
+function newGovernors(store: IndexStore, prepared: readonly PreparedBlock[]): Map<string, number>
+{
+    const found = new Map<string, number>();
+    for (const entry of prepared)
+    {
+        for (const { event } of entry.governance)
+        {
+            if (!found.has(event.governor) && !store.knownGovernor(event.governor))
+            {
+                found.set(event.governor, entry.block.number);
+            }
+        }
+    }
+    return found;
+}
+
+/**
+ * Who each new governor is: its name, the token it counts, how it counts, and which clock its
+ * deadlines are on.
+ *
+ * Every one of them is optional. `IGovernor` requires none of these getters, and a governor that
+ * answers none is still a governor - it emitted the event that says so - so a contract that
+ * refuses every question is recorded under its address with the answers left empty.
+ */
+async function describeGovernors(chain: ChainGateway, found: ReadonlyMap<string, number>, log: Logger): Promise<GovernorRow[]>
+{
+    if (found.size === 0)
+    {
+        return [];
+    }
+    return Promise.all([...found].map(async ([address, firstBlock]): Promise<GovernorRow> =>
+    {
+        const [name, token, counting, clock] = await Promise.all([
+            getter(chain, address, 'name()', 'string'),
+            getter(chain, address, 'token()', 'address'),
+            getter(chain, address, 'COUNTING_MODE()', 'string'),
+            getter(chain, address, 'CLOCK_MODE()', 'string')
+        ]);
+        log.info('governor found', { address, name: name ?? '', block: firstBlock });
+        return {
+            address,
+            name: name ?? '',
+            token: token === null ? null : normalize(token),
+            counting_mode: counting ?? '',
+            clock: readClock(clock ?? ''),
+            first_block: firstBlock
+        };
+    }));
+}
+
+/**
+ * The quorum each new proposal was created under, keyed `governor:id`.
+ *
+ * Read at index time and stored, because `quorum(timepoint)` is a historical question: it reads
+ * the votes token's supply at the snapshot, and a node that has pruned that state answers
+ * nothing. Asked once, while the block is current, the figure is kept for good.
+ */
+async function readQuorums(chain: ChainGateway, prepared: readonly PreparedBlock[]): Promise<Map<string, string | null>>
+{
+    const created = prepared.flatMap(entry => entry.governance)
+        .map(entry => entry.event)
+        .filter(event => event.kind === 'created');
+
+    const answers = await Promise.all(created.map(async (event) =>
+    {
+        const entry = FUNCTION_BY_SELECTOR.get(selectorOf('quorum(uint256)'));
+        if (entry === undefined)
+        {
+            return [`${ event.governor }:${ event.proposalId }`, null] as const;
+        }
+        try
+        {
+            const data = await chain.call(event.governor, encodeCall(entry, [event.voteStart]));
+            const [value] = decodeReturn(['uint256'], data);
+            return [`${ event.governor }:${ event.proposalId }`, value?.value ?? null] as const;
+        }
+        catch
+        {
+            return [`${ event.governor }:${ event.proposalId }`, null] as const;
+        }
+    }));
+    return new Map(answers);
+}
+
+/** One no-argument getter, decoded, or null when the contract does not answer it. */
+async function getter(chain: ChainGateway, address: string, signature: string, output: string): Promise<string | null>
+{
+    try
+    {
+        const data = await chain.call(address, selectorOf(signature));
+        const [value] = decodeReturn([output], data);
+        return value?.value ?? null;
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+/**
+ * One block's governance, written.
+ *
+ * A mark - queued, executed, canceled - updates the proposal it names and inserts nothing: a
+ * proposal created below START_BLOCK has no row here, and writing one from its execution would
+ * print a proposal with no proposer, no description and no votes.
+ */
+function writeGovernance(store: IndexStore, entry: PreparedBlock, quorums: ReadonlyMap<string, string | null>): void
+{
+    const touched = new Set<string>();
+
+    for (const { event, txHash, logIndex } of entry.governance)
+    {
+        const key = `${ event.governor }:${ event.proposalId }`;
+        if (event.kind === 'created')
+        {
+            store.insertProposal({
+                governor: event.governor,
+                proposal_id: event.proposalId,
+                proposer: event.proposer,
+                description: event.description,
+                targets: JSON.stringify(event.targets),
+                call_values: JSON.stringify(event.values),
+                signatures: JSON.stringify(event.signatures),
+                calldatas: JSON.stringify(event.calldatas),
+                vote_start: event.voteStart,
+                vote_end: event.voteEnd,
+                quorum: quorums.get(key) ?? null,
+                created_block: entry.block.number,
+                created_tx: txHash,
+                timestamp: entry.block.timestamp,
+                canceled_block: null,
+                canceled_tx: null,
+                queued_block: null,
+                queued_tx: null,
+                queued_eta: null,
+                executed_block: null,
+                executed_tx: null,
+                for_votes: '0',
+                against_votes: '0',
+                abstain_votes: '0',
+                voters: 0
+            });
+            continue;
+        }
+
+        if (event.kind === 'vote')
+        {
+            store.insertVote({
+                tx_hash: txHash,
+                log_index: logIndex,
+                governor: event.governor,
+                proposal_id: event.proposalId,
+                voter: event.voter,
+                support: event.support,
+                weight: event.weight,
+                reason: event.reason,
+                block_number: entry.block.number,
+                timestamp: entry.block.timestamp
+            });
+            touched.add(key);
+            continue;
+        }
+
+        store.markProposal({
+            governor: event.governor,
+            proposal_id: event.proposalId,
+            kind: event.kind,
+            block: entry.block.number,
+            tx_hash: txHash,
+            eta: event.eta
+        });
+    }
+
+    for (const key of touched)
+    {
+        const at = key.indexOf(':');
+        store.retally(key.slice(0, at), key.slice(at + 1));
+    }
 }
 
 /** A `Transfer` log turned into a row, or null when the log is something else. */

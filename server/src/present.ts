@@ -1,5 +1,17 @@
-import type { BlockRow, TokenRow, TransactionRow, TransferRow } from './chain/store.ts';
-import type { Block, Transaction, Transfer } from './schemas.ts';
+import { proposalTitle } from './chain/governance.ts';
+import { FUNCTION_BY_SELECTOR } from './chain/signatures.ts';
+import type { BlockRow, GovernorRow, ProposalRow, TokenRow, TransactionRow, TransferRow, VoteRow } from './chain/store.ts';
+import type {
+    Block,
+    Governor,
+    GovernorClock,
+    Proposal,
+    ProposalAction,
+    ProposalState,
+    Transaction,
+    Transfer,
+    Vote
+} from './schemas.ts';
 
 // Row -> wire. The index stores what the chain said; these functions decide what a reader is
 // told. Amounts stay decimal strings the whole way across (see schemas.ts).
@@ -67,6 +79,149 @@ export function presentTransfer(row: TransferRow, token: TokenRow | null): Trans
         kind: row.kind === 'erc721' ? 'erc721' : row.kind === 'erc1155' ? 'erc1155' : 'erc20',
         at: iso(row.timestamp)
     };
+}
+
+/** A stored clock as the two the wire declares; anything else is a height, which is the default. */
+export function clockOf(governor: GovernorRow | null): GovernorClock
+{
+    return governor?.clock === 'timestamp' ? 'timestamp' : 'blocknumber';
+}
+
+/**
+ * Where a proposal stands, from indexed facts alone.
+ *
+ * The marks come first because they are decisions somebody made: a canceled proposal is canceled
+ * whatever its deadline says, and an executed one is over. Only when none of them applies does
+ * the clock decide - and after the deadline, the tally does, counted the way
+ * `GovernorCountingSimple` counts it: for + abstain must reach the quorum, and for must beat
+ * against. A governor that counts otherwise is read from the governor itself on the detail page.
+ */
+export function proposalStatus(row: ProposalRow, now: bigint): ProposalState
+{
+    if (row.canceled_block !== null)
+    {
+        return 'canceled';
+    }
+    if (row.executed_block !== null)
+    {
+        return 'executed';
+    }
+    if (row.queued_block !== null)
+    {
+        return 'queued';
+    }
+    if (now < BigInt(row.vote_start))
+    {
+        return 'pending';
+    }
+    if (now <= BigInt(row.vote_end))
+    {
+        return 'active';
+    }
+    if (row.quorum === null)
+    {
+        return 'closed';
+    }
+    const reached = BigInt(row.for_votes) + BigInt(row.abstain_votes) >= BigInt(row.quorum);
+    return reached && BigInt(row.for_votes) > BigInt(row.against_votes) ? 'succeeded' : 'defeated';
+}
+
+/** The three groups a list of proposals is narrowed by. See PROPOSAL_FILTER in schemas.ts. */
+export function proposalGroup(state: ProposalState): 'open' | 'passed' | 'failed'
+{
+    if (state === 'pending' || state === 'active')
+    {
+        return 'open';
+    }
+    return state === 'succeeded' || state === 'queued' || state === 'executed' ? 'passed' : 'failed';
+}
+
+export function presentGovernor(row: GovernorRow, proposals: number): Governor
+{
+    return {
+        address: row.address,
+        name: row.name,
+        token: row.token,
+        countingMode: row.counting_mode,
+        clock: clockOf(row),
+        firstBlock: row.first_block,
+        proposals
+    };
+}
+
+export function presentProposal(row: ProposalRow, governor: GovernorRow | null, now: bigint): Proposal
+{
+    return {
+        governor: row.governor,
+        governorName: governor?.name ?? '',
+        id: row.proposal_id,
+        proposer: row.proposer,
+        title: proposalTitle(row.description),
+        status: proposalStatus(row, now),
+        voteStart: row.vote_start,
+        voteEnd: row.vote_end,
+        clock: clockOf(governor),
+        forVotes: row.for_votes,
+        againstVotes: row.against_votes,
+        abstainVotes: row.abstain_votes,
+        quorum: row.quorum,
+        voters: row.voters,
+        at: iso(row.timestamp),
+        txHash: row.created_tx
+    };
+}
+
+export function presentVote(row: VoteRow): Vote
+{
+    return {
+        voter: row.voter,
+        support: row.support,
+        weight: row.weight,
+        reason: row.reason,
+        at: iso(row.timestamp),
+        txHash: row.tx_hash
+    };
+}
+
+/**
+ * The calls a proposal makes, as the creation event listed them.
+ *
+ * The three arrays are index-aligned by the standard, but they arrive from a log rather than from
+ * a type, so a short one is read as empty rather than trusted: a target with somebody else's
+ * calldata beside it is the worst thing this page could print.
+ */
+export function presentActions(row: ProposalRow): ProposalAction[]
+{
+    const list = (json: string): string[] =>
+    {
+        try
+        {
+            const parsed: unknown = JSON.parse(json);
+            return Array.isArray(parsed) ? parsed.map((entry) => String(entry)) : [];
+        }
+        catch
+        {
+            return [];
+        }
+    };
+
+    const targets = list(row.targets);
+    const values = list(row.call_values);
+    const calldatas = list(row.calldatas);
+
+    return targets.map((target, at) =>
+    {
+        const calldata = calldatas[at] ?? '0x';
+        return {
+            target,
+            value: values[at] ?? '0',
+            calldata,
+            // Four bytes is a selector; anything shorter is a plain transfer with no call in it.
+            signature: calldata.length >= 10
+                ? FUNCTION_BY_SELECTOR.get(calldata.slice(0, 10).toLowerCase())?.signature ?? null
+                : null
+        };
+    });
 }
 
 /** Mean seconds between consecutive blocks in a newest-first run; 0 with fewer than two. */

@@ -415,6 +415,12 @@ const STANDARDS: ReadonlyArray<readonly [string, readonly string[]]> = [
     ['ERC-165', ['supportsInterface(bytes4)']],
     ['ERC-2612', ['permit(address,address,uint256,uint256,uint8,bytes32,bytes32)', 'nonces(address)', 'DOMAIN_SEPARATOR()']],
     ['ERC-4626', ['asset()', 'totalAssets()', 'convertToShares(uint256)', 'deposit(uint256,address)']],
+    // Governance. `state` and `castVote` together are the fingerprint: a timelock has neither,
+    // and a votes TOKEN carries the delegation half without the proposal half - which is why the
+    // two are listed separately. A chain's governor is also found by the events it emits, so
+    // nothing here has to be configured (see chain/governance.ts).
+    ['Governor', ['propose(address[],uint256[],bytes[],string)', 'castVote(uint256,uint8)', 'state(uint256)', 'COUNTING_MODE()']],
+    ['ERC-5805', ['delegate(address)', 'delegates(address)', 'getVotes(address)', 'getPastVotes(address,uint256)']],
     ['Ownable', ['owner()', 'transferOwnership(address)']],
     ['AccessControl', ['hasRole(bytes32,address)', 'getRoleAdmin(bytes32)', 'grantRole(bytes32,address)']],
     ['Pausable', ['paused()']],

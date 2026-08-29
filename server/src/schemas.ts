@@ -308,6 +308,193 @@ export type BlockDetail = Infer<typeof blockDetail>;
 export const transactionDetail = object({ transaction, transfers: array(transfer), total: number(), page: number(), pages: number() });
 export type TransactionDetail = Infer<typeof transactionDetail>;
 
+// --- Governance ------------------------------------------------------------------------------
+// Read from the logs a Governor writes, and from nothing else: there is no proposal in this
+// explorer that the chain did not record. Weights are votes, which are a uint256 like every other
+// amount here, so they cross as decimal strings.
+
+/**
+ * What a governor measures its deadlines in.
+ *
+ * ERC-6372 lets a governor run on block heights or on wall-clock seconds, and `voteStart` is a
+ * bare number either way. The client needs this to know whether to print a height or a date -
+ * and a timestamp shown as a block number is off by a factor of a hundred million.
+ */
+export const GOVERNOR_CLOCKS = ['blocknumber', 'timestamp'] as const;
+export type GovernorClock = (typeof GOVERNOR_CLOCKS)[number];
+
+export const governor = object({
+    address: string(),
+    /** `name()`, or '' from a governor that does not answer it. Never invented. */
+    name: string(),
+    /** The votes token whose balances this governor counts, where it names one. */
+    token: string().nullable(),
+    /** `COUNTING_MODE()` - eg `support=bravo&quorum=for,abstain`. '' when it answers nothing. */
+    countingMode: string(),
+    clock: enumOf(GOVERNOR_CLOCKS),
+    firstBlock: number({ int: true, min: 0 }),
+    proposals: number({ int: true, min: 0 })
+});
+export type Governor = Infer<typeof governor>;
+
+/**
+ * A proposal's state, in the eight names `IGovernor` gives them - plus one this explorer needs.
+ *
+ * `closed` is "voting is over and this index cannot say what it decided": the outcome turns on a
+ * quorum, and a governor whose `quorum()` refused the snapshot leaves nothing to compare the
+ * tally against. Calling that `defeated` would report a passed proposal as a failed one.
+ */
+export const PROPOSAL_STATES = [
+    'pending', 'active', 'canceled', 'defeated', 'succeeded', 'queued', 'expired', 'executed', 'closed'
+] as const;
+export type ProposalState = (typeof PROPOSAL_STATES)[number];
+export const proposalState = enumOf(PROPOSAL_STATES);
+
+export const proposal = object({
+    governor: string(),
+    governorName: string(),
+    /** A uint256 as a decimal string. Proposal ids are hashes of the proposal, not counters. */
+    id: string(),
+    proposer: string(),
+    /** The first line of the description, which is the line a proposal is known by. */
+    title: string(),
+    status: proposalState,
+    /** Timepoints on the governor's clock - heights or seconds, per `clock`. */
+    voteStart: string(),
+    voteEnd: string(),
+    clock: enumOf(GOVERNOR_CLOCKS),
+    forVotes: string(),
+    againstVotes: string(),
+    abstainVotes: string(),
+    /** What had to be reached at the snapshot. Null when the governor would not say. */
+    quorum: string().nullable(),
+    voters: number({ int: true, min: 0 }),
+    at: string(),
+    txHash: string()
+});
+export type Proposal = Infer<typeof proposal>;
+
+/** One call a proposal makes if it passes. Index-aligned with the others, as the event listed them. */
+export const proposalAction = object({
+    target: string(),
+    /** Native currency sent with the call, in wei. */
+    value: string(),
+    calldata: string(),
+    /** The signature the calldata's selector belongs to, when this explorer knows it. */
+    signature: string().nullable()
+});
+export type ProposalAction = Infer<typeof proposalAction>;
+
+export const vote = object({
+    voter: string(),
+    /** 0 against, 1 for, 2 abstain. A governor counting some other way emits its own numbers. */
+    support: number({ int: true, min: 0 }),
+    weight: string(),
+    reason: string(),
+    at: string(),
+    txHash: string()
+});
+export type Vote = Infer<typeof vote>;
+
+export const proposalPage = object({
+    rows: array(proposal),
+    total: number({ int: true, min: 0 }),
+    page: number({ int: true, min: 1 }),
+    pages: number({ int: true, min: 1 })
+});
+export type ProposalPage = Infer<typeof proposalPage>;
+
+export const votePage = object({
+    rows: array(vote),
+    total: number({ int: true, min: 0 }),
+    page: number({ int: true, min: 1 }),
+    pages: number({ int: true, min: 1 })
+});
+export type VotePage = Infer<typeof votePage>;
+
+/**
+ * One proposal, whole: what the index recorded, and what the governor says right now.
+ *
+ * `liveState` and `proposal.status` are two different claims on purpose. The first is the
+ * governor's own answer, which is authoritative and costs a call; the second is derived from
+ * indexed facts and is what every row in the list carries. They agree except where a governor
+ * counts votes in a way `GovernorCountingSimple` does not - and where they disagree, the page
+ * shows the governor's.
+ */
+/**
+ * The selectors a governance control encodes against.
+ *
+ * Sent rather than written into the client, because a selector is a hash of a signature and the
+ * table that hashes them lives on this side (see chain/signatures.ts). A four-byte constant typed
+ * into a component is a call to whatever function that hash belongs to - and nobody reviewing the
+ * component can see which.
+ */
+export const governorCalls = object({
+    castVote: string(),
+    castVoteWithReason: string(),
+    queue: string(),
+    execute: string(),
+    /** On the votes TOKEN, not on the governor: delegation is the token's. */
+    delegate: string(),
+    getPastVotes: string(),
+    hasVoted: string()
+});
+export type GovernorCalls = Infer<typeof governorCalls>;
+
+export const proposalDetail = object({
+    proposal,
+    description: string(),
+    /** keccak256 of the description, which is how queue() and execute() name this proposal. */
+    descriptionHash: string(),
+    calls: governorCalls,
+    actions: array(proposalAction),
+    liveState: proposalState.nullable(),
+    countingMode: string(),
+    token: string().nullable(),
+    /** The votes token's ticker, where the index has seen it. '' when it has not. */
+    tokenSymbol: string(),
+    /**
+     * The votes token's decimals, or null when the index has never described it.
+     *
+     * Null and 18 are different facts. A weight is a uint256 of the token's smallest unit, and an
+     * explorer that assumes eighteen places prints a whole-token figure a billion times too small
+     * for a token that has none - so where this is null the page shows shares and no absolutes.
+     */
+    tokenDecimals: number({ int: true, min: 0 }).nullable(),
+    /** The lifecycle, each transaction null until the chain records that stage. */
+    createdTx: string(),
+    canceledTx: string().nullable(),
+    queuedTx: string().nullable(),
+    /** Seconds since the epoch, as the timelock reports them. Null unless queued. */
+    queuedEta: string().nullable(),
+    executedTx: string().nullable(),
+    votes: array(vote),
+    total: number({ int: true, min: 0 }),
+    page: number({ int: true, min: 1 }),
+    pages: number({ int: true, min: 1 })
+});
+export type ProposalDetail = Infer<typeof proposalDetail>;
+
+/** Who governs this chain, and how its proposals have gone. The governance page's header. */
+export const governanceOverview = object({
+    governors: array(governor),
+    total: number({ int: true, min: 0 }),
+    open: number({ int: true, min: 0 }),
+    passed: number({ int: true, min: 0 }),
+    failed: number({ int: true, min: 0 })
+});
+export type GovernanceOverview = Infer<typeof governanceOverview>;
+
+/**
+ * What a list of proposals can be narrowed to.
+ *
+ * Three groups rather than nine states: a reader asks "what can I still vote on", "what went
+ * through" and "what did not", and offering nine chips would put `expired` and `closed` in front
+ * of somebody who has never met a timelock.
+ */
+export const PROPOSAL_FILTER = ['all', 'open', 'passed', 'failed'] as const;
+export type ProposalFilter = (typeof PROPOSAL_FILTER)[number];
+
 export const SEARCH_KINDS = ['block', 'transaction', 'address', 'none'] as const;
 
 /** What a search term turned out to be, and where to send the reader. Resolved against the index. */
@@ -367,6 +554,13 @@ export const addressListQuery = object({ ...pageShape, direction: enumOf(ADDRESS
 export const accountListQuery = object({ ...pageShape, q: string().optional() });
 
 export const searchQuery = object({ q: string() });
+
+/** A page of proposals, optionally narrowed to one governor and one group of states. */
+export const proposalListQuery = object({
+    ...pageShape,
+    governor: string().optional(),
+    status: enumOf(PROPOSAL_FILTER).optional()
+});
 
 // --- Charts and statistics --------------------------------------------------------------------
 // Everything below is DERIVED from the index and from nothing else. There is no price feed, no
