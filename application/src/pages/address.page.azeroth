@@ -159,38 +159,38 @@ export default component AddressPage()
         <Show when={ account.data() !== undefined }>
         { () =>
             <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-                <div class="panel px-4 py-3">
-                    <dt class="text-[13px] text-muted">{ locale.t('address.balance') }</dt>
-                    <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatValue(account.data()!.balance, symbol, decimals) }</span></dd>
+                <div class="panel px-3 py-3 sm:px-4">
+                    <dt class="text-[12px] sm:text-[13px] text-muted">{ locale.t('address.balance') }</dt>
+                    <dd class="mt-0.5 text-[15px] font-bold sm:text-[16px]"><span class="amount">{ formatValue(account.data()!.balance, symbol, decimals) }</span></dd>
                 </div>
                 {/* The two numbers the page is FOR, in the two colours that mean them. */}
-                <div class="panel px-4 py-3">
-                    <dt class="flex items-center gap-1.5 text-[13px] text-muted">
-                        <Icon name="inflow" size={ 13 } class="text-inflow" /> { locale.t('address.received') }
+                <div class="panel px-3 py-3 sm:px-4">
+                    <dt class="flex items-center gap-1.5 text-[12px] sm:text-[13px] text-muted">
+                        <Icon name="inflow" size={ 12 } class="text-inflow" /> { locale.t('address.received') }
                     </dt>
-                    <dd class="mt-0.5 text-[16px] font-bold text-inflow sm:text-[17px]"><span class="amount">{ formatAmount(account.data()!.flow.in, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[15px] font-bold text-inflow sm:text-[16px]"><span class="amount">{ formatAmount(account.data()!.flow.in, decimals) }</span></dd>
                 </div>
-                <div class="panel px-4 py-3">
-                    <dt class="flex items-center gap-1.5 text-[13px] text-muted">
-                        <Icon name="outflow" size={ 13 } class="text-outflow" /> { locale.t('address.sent') }
+                <div class="panel px-3 py-3 sm:px-4">
+                    <dt class="flex items-center gap-1.5 text-[12px] sm:text-[13px] text-muted">
+                        <Icon name="outflow" size={ 12 } class="text-outflow" /> { locale.t('address.sent') }
                     </dt>
-                    <dd class="mt-0.5 text-[16px] font-bold text-outflow sm:text-[17px]"><span class="amount">{ formatAmount(account.data()!.flow.out, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[15px] font-bold text-outflow sm:text-[16px]"><span class="amount">{ formatAmount(account.data()!.flow.out, decimals) }</span></dd>
                 </div>
-                <div class="panel px-4 py-3">
-                    <dt class="flex items-center gap-1.5 text-[13px] text-muted">
-                        <Icon name="gas" size={ 13 } /> { locale.t('address.fees') }
+                <div class="panel px-3 py-3 sm:px-4">
+                    <dt class="flex items-center gap-1.5 text-[12px] sm:text-[13px] text-muted">
+                        <Icon name="gas" size={ 12 } /> { locale.t('address.fees') }
                     </dt>
-                    <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatAmount(account.data()!.flow.fees, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[15px] font-bold sm:text-[16px]"><span class="amount">{ formatAmount(account.data()!.flow.fees, decimals) }</span></dd>
                 </div>
             </div>
         }
         </Show>
 
-        <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label={ locale.t('address.activity') }>
+        <div class="flex flex-wrap items-center gap-1.5" role="tablist" aria-label={ locale.t('address.activity') }>
             <button
                 class={ active === 'flow'
-                    ? 'cursor-default rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
-                    : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[14px] text-muted transition-colors duration-150 hover:text-text' }
+                    ? 'cursor-default rounded-lg border border-nur bg-raised px-3 py-1.5 text-[13px] sm:px-3.5 sm:py-1.5 font-semibold text-nur'
+                    : 'cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[13px] sm:px-3.5 sm:py-1.5 text-muted transition-colors duration-150 hover:text-text' }
                 type="button"
                 role="tab"
                 aria-selected={ active === 'flow' }
@@ -198,13 +198,13 @@ export default component AddressPage()
             >
                 { locale.t('address.tab.transactions') }
                 <Show when={ account.data() !== undefined }>
-                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(account.data()!.txCount) }</span> }
+                { () => <span class="ms-1.5 text-[12px] sm:text-[13px] tabular-nums opacity-70">{ locale.n(account.data()!.txCount) }</span> }
                 </Show>
             </button>
             <button
                 class={ active === 'transfers'
-                    ? 'cursor-default rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
-                    : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[14px] text-muted transition-colors duration-150 hover:text-text' }
+                    ? 'cursor-default rounded-lg border border-nur bg-raised px-3 py-1.5 text-[13px] sm:px-3.5 sm:py-1.5 font-semibold text-nur'
+                    : 'cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[13px] sm:px-3.5 sm:py-1.5 text-muted transition-colors duration-150 hover:text-text' }
                 type="button"
                 role="tab"
                 aria-selected={ active === 'transfers' }
@@ -212,7 +212,7 @@ export default component AddressPage()
             >
                 { locale.t('address.tab.transfers') }
                 <Show when={ account.data() !== undefined }>
-                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
+                { () => <span class="ms-1.5 text-[12px] sm:text-[13px] tabular-nums opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
                 </Show>
             </button>
             {/* Only where there is code to show. On an ordinary account the tab would open onto an
@@ -220,8 +220,8 @@ export default component AddressPage()
             <Show when={ account.data()?.isContract === true }>
                 <button
                     class={ active === 'contract'
-                        ? 'cursor-default rounded-lg border border-nur bg-raised px-3.5 py-1.5 text-[14px] font-semibold text-nur'
-                        : 'cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-[14px] text-muted transition-colors duration-150 hover:text-text' }
+                        ? 'cursor-default rounded-lg border border-nur bg-raised px-3 py-1.5 text-[13px] sm:px-3.5 sm:py-1.5 font-semibold text-nur'
+                        : 'cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[13px] sm:px-3.5 sm:py-1.5 text-muted transition-colors duration-150 hover:text-text' }
                     type="button"
                     role="tab"
                     aria-selected={ active === 'contract' }
@@ -277,15 +277,15 @@ export default component AddressPage()
             <section class="panel overflow-hidden">
                 <ul class="divide-y divide-line">
                     <For each={ transfers.data()?.rows ?? [] } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
-                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:gap-x-4 sm:px-4">
                             <span class={ `flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised ${ FACE[way(row)].badge }` }>
                                 <Icon name={ FACE[way(row)].icon } size={ 15 } />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[14px] font-semibold">
+                                <p class="text-[13px] sm:text-[14px] font-semibold">
                                     { row.tokenSymbol === '' ? locale.t('address.transfers.token') : row.tokenSymbol }
                                     <Show when={ row.tokenId !== null }>
-                                        <span class="data ms-1.5 text-[13px] text-muted">#{ row.tokenId }</span>
+                                        <span class="data ms-1.5 text-[12px] sm:text-[13px] text-muted">#{ row.tokenId }</span>
                                     </Show>
                                 </p>
                                 {/* Only where the page cannot say "you". A row with no direction
@@ -294,25 +294,25 @@ export default component AddressPage()
                                     off on the pair: the row already carries one copy button, and
                                     three of them in a list turn the ledger into a toolbar. */}
                                 <Show when={ way(row) === 'asset' }>
-                                    <p class="text-[13px] text-muted">
-                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[13px]" />
+                                    <p class="text-[12px] sm:text-[13px] text-muted">
+                                        <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 7 } tail={ 5 } copy={ false } class="text-[12px] sm:text-[13px]" />
                                         <span class="icon-flip mx-1.5 inline-block">&rarr;</span>
-                                        <HashLink value={ row.to } to={ `/address/${ row.to }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[13px]" />
+                                        <HashLink value={ row.to } to={ `/address/${ row.to }` } tone="muted" lead={ 7 } tail={ 5 } copy={ false } class="text-[12px] sm:text-[13px]" />
                                     </p>
                                 </Show>
-                                <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
+                                <Tooltip label={ locale.dateTime(row.at) } class="flex"><p class="text-[11px] sm:text-[12px] text-muted">{ locale.ago(row.at) }</p></Tooltip>
                             </div>
-                            <div class="min-w-0 max-w-[45%] text-center">
+                            <div class="min-w-0 max-w-[50%] text-center">
                                 {/* Centred in the cell, the figure over the hash, so the pair reads
                                     as one stacked column rather than two ragged edges. `amount`
                                     stays on the span so the paragraph inherits the reader's
                                     direction and the centring lands the same way in both. The sign
                                     stays INSIDE the isolate: a bare +/- is bidi-neutral and would
                                     swap to the far side of its own digits in a mirrored line. */}
-                                <p class={ `text-[14px] font-semibold ${ FACE[way(row)].amount }` }>
+                                <p class={ `text-[13px] sm:text-[14px] font-semibold ${ FACE[way(row)].amount }` }>
                                     <span class="amount">{ FACE[way(row)].sign }{ formatAmount(row.value, row.tokenDecimals) }</span>
                                 </p>
-                                <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 8 } tail={ 4 } />
+                                <HashLink value={ row.txHash } to={ `/tx/${ row.txHash }` } tone="muted" lead={ 7 } tail={ 3 } class="text-[12px] sm:text-[13px]" />
                             </div>
                         </li>
                     </For>
