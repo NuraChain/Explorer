@@ -1,0 +1,225 @@
+import { Link } from 'azerothjs';
+
+import { client, type Proposal, type ProposalFilter } from '../api.ts';
+import { PROPOSAL_ICON, PROPOSAL_TONE } from '../lib/governance.ts';
+import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
+
+import Icon from '../icons/icon.component.azeroth';
+
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import VoteTally from '../components/chain/vote-tally.component.azeroth';
+import Badge from '../components/ui/badge.component.azeroth';
+import EmptyState from '../components/ui/empty-state.component.azeroth';
+import FilterGroup from '../components/ui/filter-group.component.azeroth';
+import Pagination from '../components/ui/pagination.component.azeroth';
+import Skeleton from '../components/ui/skeleton.component.azeroth';
+import Tooltip from '../components/ui/tooltip.component.azeroth';
+
+// Governance: every proposal a governor on this chain has recorded.
+//
+// The section exists exactly when the chain does govern itself. Nothing here is configured - a
+// governor is found by the events it emits (see the server's chain/governance.ts) - so a chain
+// with none reaches the empty state below and never sees a page pretending to have proposals.
+export default component GovernancePage()
+{
+    const locale = useLocale();
+
+    state page = 1;
+    state status: ProposalFilter = 'all';
+    state governor = '';
+
+    resource overview = () => client.governance.overview();
+
+    // All three in the source key: page 2 of the open proposals of one governor is a different
+    // list from page 2 of everything, and a resource keyed on the page alone would serve one
+    // while the controls said the other.
+    resource proposals = (key: string) =>
+    {
+        const [at = '1', narrowed = 'all', which = ''] = key.split('|');
+        return client.governance.list({
+            query: {
+                page: Number(at),
+                limit: 25,
+                status: narrowed as ProposalFilter,
+                ...(which === '' ? {} : { governor: which })
+            }
+        });
+    } with { source: `${ page }|${ status }|${ governor }` };
+
+    derived governors = overview.data()?.governors ?? [];
+
+    /** Back to the first page whenever the list under the pager changes shape. */
+    const narrow = (next: string): void =>
+    {
+        status = next as ProposalFilter;
+        page = 1;
+    };
+
+    const only = (next: string): void =>
+    {
+        governor = next;
+        page = 1;
+    };
+
+    /**
+     * When the vote closes, in the unit the governor counts in.
+     *
+     * A governor on a timestamp clock and one on a height clock both write a bare number, and
+     * printing the first as a block would say "block 1,700,000,000" - see ERC-6372.
+     */
+    const deadline = (row: Proposal): string =>
+    {
+        const open = row.status === 'pending' || row.status === 'active';
+        if (row.clock === 'timestamp')
+        {
+            const date = locale.dateTime(new Date(Number(row.voteEnd) * 1000).toISOString());
+            return locale.t(open ? 'governance.ends.date' : 'governance.ended.date', { date });
+        }
+        return locale.t(open ? 'governance.ends.block' : 'governance.ended.block', { block: locale.n(Number(row.voteEnd)) });
+    };
+
+    useTitle(() => locale.t('governance.title'));
+
+    <div class="flex flex-col gap-4">
+        <div>
+            <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('governance.title') }</h1>
+            <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('governance.hint') }</p>
+        </div>
+
+        <Show when={ overview.data() !== undefined && governors.length === 0 }>
+            <section class="panel">
+                <EmptyState icon="vote" title={ locale.t('governance.empty.chain.title') } hint={ locale.t('governance.empty.chain.hint') } />
+            </section>
+        </Show>
+
+        <Show when={ governors.length > 0 }>
+        { () =>
+            <div class="flex flex-col gap-4">
+                {/* Who governs. One governor is a line; several are a list, and the chain that
+                    has two is exactly the chain where "which one is this" matters. */}
+                <section class="panel overflow-hidden">
+                    <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        { locale.t('governance.governors') }
+                    </h2>
+                    <ul class="divide-y divide-line">
+                        <For each={ governors } key={ (row) => row.address } let={ row }>
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-raised text-nur">
+                                    <Icon name="vote" size={ 15 } />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-[14px] font-semibold">
+                                        { row.name === '' ? locale.t('governance.governor.unnamed') : row.name }
+                                    </p>
+                                    <HashLink value={ row.address } to={ `/address/${ row.address }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                                </div>
+                                <p class="w-full text-end text-[13px] text-muted sm:w-auto">
+                                    { locale.t('governance.governor.proposals', { count: locale.n(row.proposals) }) }
+                                </p>
+                            </li>
+                        </For>
+                    </ul>
+                </section>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <FilterGroup
+                        label={ locale.t('governance.filter') }
+                        name="proposal-status"
+                        value={ status }
+                        options={ [
+                            { value: 'all', label: locale.t('filter.all') },
+                            { value: 'open', label: locale.t('governance.filter.open') },
+                            { value: 'passed', label: locale.t('governance.filter.passed') },
+                            { value: 'failed', label: locale.t('governance.filter.failed') }
+                        ] }
+                        onChange={ narrow }
+                    />
+
+                    {/* Only where there is a choice to make. */}
+                    <Show when={ governors.length > 1 }>
+                        <FilterGroup
+                            label={ locale.t('governance.filter.governor') }
+                            name="proposal-governor"
+                            value={ governor }
+                            options={ [
+                                { value: '', label: locale.t('filter.all') },
+                                ...governors.map((row) => ({
+                                    value: row.address,
+                                    label: row.name === '' ? row.address.slice(0, 10) : row.name
+                                }))
+                            ] }
+                            onChange={ only }
+                        />
+                    </Show>
+                </div>
+
+                <section class="panel overflow-hidden">
+                    <ul class="divide-y divide-line">
+                        <For each={ proposals.data()?.rows ?? [] } key={ (row) => `${ row.governor }-${ row.id }` } let={ row }>
+                            <li class="flex flex-col gap-2 px-4 py-3">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                    <Badge tone={ PROPOSAL_TONE[row.status] } icon={ PROPOSAL_ICON[row.status] }>
+                                        { locale.t(`governance.state.${ row.status }`) }
+                                    </Badge>
+                                    <Link
+                                        to={ `/governance/${ row.governor }/${ row.id }` }
+                                        class="min-w-0 flex-1 text-[15px] font-semibold text-text no-underline hover:text-nur"
+                                    >
+                                        {/* `dir="auto"` because a title is whatever the proposer
+                                            wrote, in whatever script they wrote it: an English
+                                            sentence inside a mirrored page takes its full stop to
+                                            the wrong end, and a Persian one inside an LTR page
+                                            does the same. The browser reads the first strong
+                                            character and gets both right. */}
+                                        <span dir="auto">{ row.title === '' ? locale.t('governance.untitled') : row.title }</span>
+                                    </Link>
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
+                                    <span class="flex items-center gap-1.5">
+                                        { locale.t('governance.proposedBy') }
+                                        <HashLink value={ row.proposer } to={ `/address/${ row.proposer }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
+                                    </span>
+                                    <Tooltip label={ locale.dateTime(row.at) }><span>{ locale.ago(row.at) }</span></Tooltip>
+                                    <span>{ locale.t('governance.voters', { count: locale.n(row.voters) }) }</span>
+                                </div>
+
+                                <VoteTally tally={ row } compact />
+                                <p class="text-[12px] text-faint">{ deadline(row) }</p>
+                            </li>
+                        </For>
+                    </ul>
+
+                    <Show when={ proposals.data() === undefined }>
+                        <div class="flex flex-col gap-2 px-4 py-4">
+                            <Skeleton class="h-16 w-full" />
+                            <Skeleton class="h-16 w-full" />
+                            <Skeleton class="h-16 w-full" />
+                        </div>
+                    </Show>
+
+                    {/* Two empty states, because they are two different facts: a governor with no
+                        proposals at all, and a filter that matched none of the ones it has. */}
+                    <Show when={ proposals.data()?.rows.length === 0 }>
+                        <Show
+                            when={ status === 'all' && governor === '' }
+                            fallback={ <EmptyState icon="filter" title={ locale.t('governance.empty.filtered.title') } hint={ locale.t('governance.empty.filtered.hint') } /> }
+                        >
+                            <EmptyState icon="vote" title={ locale.t('governance.empty.title') } hint={ locale.t('governance.empty.hint') } />
+                        </Show>
+                    </Show>
+
+                    <Show when={ proposals.data() !== undefined }>
+                    { () => <Pagination page={ proposals.data()!.page } pages={ proposals.data()!.pages } onChange={ (next) => page = next } /> }
+                    </Show>
+                </section>
+
+                <Show when={ proposals.data() !== undefined }>
+                { () => <p class="text-[13px] text-muted">{ locale.t('governance.total', { count: locale.n(proposals.data()!.total) }) }</p> }
+                </Show>
+            </div>
+        }
+        </Show>
+    </div>
+}

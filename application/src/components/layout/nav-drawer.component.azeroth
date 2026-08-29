@@ -121,6 +121,12 @@ export default component NavDrawer()
                             onClick={ close }
                         >{ locale.t('nav.accounts') }</Link>
                         <Link
+                            to="/governance"
+                            class="rounded-lg px-3 py-2.5 text-[16px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
+                            activeClass="active"
+                            onClick={ close }
+                        >{ locale.t('nav.governance') }</Link>
+                        <Link
                             to="/charts"
                             class="rounded-lg px-3 py-2.5 text-[16px] text-muted no-underline transition-colors duration-150 hover:bg-raised hover:text-text [&.active]:bg-raised [&.active]:text-nur"
                             activeClass="active"

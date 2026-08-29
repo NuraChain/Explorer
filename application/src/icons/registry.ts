@@ -25,6 +25,7 @@ import {
     Search,
     Send,
     Sun,
+    Vote,
     Wallet,
     X,
     type IconNode
@@ -68,6 +69,7 @@ export const ICONS = {
     'theme-dark': Moon,
     'theme-light': Sun,
     'token': Coins,
+    'vote': Vote,
     'wallet': Wallet,
     'x': X
 } satisfies Record<string, IconNode>;

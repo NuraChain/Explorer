@@ -31,7 +31,10 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
     <RouterProvider router={ router }>
         <div class="flex min-h-dvh flex-col bg-void">
             <header class="sticky top-0 z-20 border-b border-line bg-void/90 backdrop-blur">
-                <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:gap-x-5 sm:px-6 sm:py-3">
+                {/* The gaps tightened by a step when governance became the fifth section: this
+                    row carries a brand, five links, a search, a language and a theme inside a
+                    1024px column, and the longest vocabulary in the catalog has to fit it too. */}
+                <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:gap-x-4 sm:px-6 sm:py-3">
                     <Link to="/" class="flex shrink-0 items-center gap-2 no-underline">
                         <span class="flex h-7 w-7 items-center justify-center rounded-md bg-nur text-void">
                             <Icon name="layers" size={ 17 } />
@@ -39,7 +42,7 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                         <BrandMark class="text-[16px] text-text" />
                     </Link>
 
-                    <nav class="hidden items-center gap-4 text-[14px] sm:flex" aria-label={ locale.t('nav.sections') }>
+                    <nav class="hidden items-center gap-3 text-[14px] sm:flex" aria-label={ locale.t('nav.sections') }>
                         <Link
                             to="/blocks"
                             class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
@@ -56,6 +59,11 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                             activeClass="active"
                         >{ locale.t('nav.accounts') }</Link>
                         <Link
+                            to="/governance"
+                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            activeClass="active"
+                        >{ locale.t('nav.governance') }</Link>
+                        <Link
                             to="/charts"
                             class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
                             activeClass="active"
@@ -63,8 +71,14 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                     </nav>
 
                     {/* Search lives in the chrome, on every page. It is the one place it appears,
-                        so no page repeats it under its own title. */}
-                    <div class="order-last w-full sm:order-none sm:ms-auto sm:w-auto sm:min-w-[280px] sm:max-w-md sm:flex-1">
+                        so no page repeats it under its own title.
+
+                        The floor is 200 and not 280 because the field is the one elastic thing in
+                        this row: five sections plus a brand, a language and a theme leave 1024px
+                        of column with nothing to give, and a wider floor pushed the theme switch
+                        onto a second line of chrome above every page - in Russian, where both the
+                        brand and the sections are longest, by 33px. */}
+                    <div class="order-last w-full sm:order-none sm:ms-auto sm:w-auto sm:min-w-[200px] sm:max-w-md sm:flex-1">
                         <SearchBar size="compact" />
                     </div>
 

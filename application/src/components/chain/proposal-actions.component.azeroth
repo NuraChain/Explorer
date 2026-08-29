@@ -1,0 +1,299 @@
+import { client, type ChainInfo, type ProposalDetail } from '../../api.ts';
+import { formatAmount } from '../../lib/format.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+import HashLink from './hash-link.component.azeroth';
+import WalletConnect from './wallet-connect.component.azeroth';
+import Button from '../ui/button.component.azeroth';
+import FilterGroup from '../ui/filter-group.component.azeroth';
+import Input from '../ui/input.component.azeroth';
+
+// Everything on this page that needs a KEY: casting a ballot, queueing a passed proposal,
+// executing a queued one, and handing voting power to somebody.
+//
+// The explorer's part of all four ends at the calldata. The bytes are encoded by the server from
+// its own signature table (see the `calls` field on the detail), handed to the wallet, and the
+// wallet asks its owner - this page never signs, never sends, and never holds a key. It is the
+// same split contract-call.component makes between reading a getter and writing to a contract,
+// and it is why the reads below (voting power, "have I voted") happen here without ceremony while
+// every write goes out through the wallet.
+//
+// The panel renders only where there is something to do: an executed proposal has no action left
+// on it, and a row of disabled buttons under it would be furniture.
+
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+export default component ProposalActions(props: {
+    detail: ProposalDetail;
+    chain: ChainInfo;
+
+    /** Called after a transaction goes out, so the page can start watching for its effect. */
+    onSent?: () => void;
+})
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+    const wallet = useWallet();
+
+    state choice = '1';
+    state reason = '';
+    state delegateTo = '';
+    state busy = '';
+    state failure = '';
+
+    /** What the governor says about this reader: their weight at the snapshot, and whether they voted. */
+    state power: string | null = null;
+    state voted = false;
+
+    derived proposal = props.detail.proposal;
+    derived ready = wallet.account() !== '' && wallet.chainId() === props.chain.chainId;
+    derived votable = proposal.status === 'active';
+    derived queueable = proposal.status === 'succeeded';
+    derived executable = proposal.status === 'queued';
+
+    /** The three arrays a queue or an execute names the proposal by, as the server stored them. */
+    derived targets = props.detail.actions.map((action) => action.target).join(',');
+    derived values = props.detail.actions.map((action) => action.value).join(',');
+    derived calldatas = props.detail.actions.map((action) => action.calldata).join(',');
+
+    // Both reads are about the CONNECTED reader, so they run again whenever that changes - a
+    // wallet switched to another account is a different question with a different answer.
+    effect
+    {
+        const account = wallet.account();
+        const token = props.detail.token;
+        if (account === '' || !votable)
+        {
+            power = null;
+            voted = false;
+            return;
+        }
+
+        void (async (): Promise<void> =>
+        {
+            const [weight, already] = await Promise.all([
+                token === null
+                    ? Promise.resolve(null)
+                    : read(token, props.detail.calls.getPastVotes, [account, proposal.voteStart]),
+                read(proposal.governor, props.detail.calls.hasVoted, [proposal.id, account])
+            ]);
+            power = weight;
+            voted = already === 'true';
+        })();
+    }
+
+    /** One view call through the explorer's own node. Null when the contract refuses to answer. */
+    const read = async (address: string, selector: string, args: string[]): Promise<string | null> =>
+    {
+        try
+        {
+            const result = await client.address.call({ params: { address }, input: { selector, args } });
+            return result.error === '' ? result.values[0]?.value ?? null : null;
+        }
+        catch
+        {
+            return null;
+        }
+    };
+
+    /**
+     * Encode, hand to the wallet, and say what happened.
+     *
+     * `value` stays '0' on every one of these, execute included. A proposal spends the
+     * treasury's money, not the executor's - and a page that quietly attached currency to
+     * somebody's transaction would be the worst kind of helpful.
+     */
+    const send = async (kind: string, selector: string, args: string[]): Promise<void> =>
+    {
+        failure = '';
+        busy = kind;
+        try
+        {
+            const { data } = await client.address.calldata({
+                params: { address: kind === 'delegate' ? props.detail.token ?? '' : proposal.governor },
+                input: { selector, args }
+            });
+            await wallet.send({
+                to: kind === 'delegate' ? props.detail.token ?? '' : proposal.governor,
+                data,
+                value: '0'
+            });
+            toasts.push('success', locale.t('governance.act.sent'), 'send');
+            props.onSent?.();
+        }
+        catch (error)
+        {
+            const message = error instanceof Error ? error.message : String(error);
+            // 4001 is "the person said no" in every injected wallet, and a refusal is not a fault.
+            failure = message.includes('4001') || message.toLowerCase().includes('rejected')
+                ? locale.t('wallet.dismissed')
+                : message;
+        }
+        finally
+        {
+            busy = '';
+        }
+    };
+
+    const castVote = (): void =>
+    {
+        // Two functions, because a reason is a string somebody wrote and an empty one is not a
+        // reason - `castVote` is the cheaper call and the honest one when nothing was said.
+        void (reason.trim() === ''
+            ? send('vote', props.detail.calls.castVote, [proposal.id, choice])
+            : send('vote', props.detail.calls.castVoteWithReason, [proposal.id, choice, reason]));
+    };
+
+    const delegate = (): void =>
+    {
+        const to = delegateTo.trim() === '' ? wallet.account() : delegateTo.trim();
+        if (!ADDRESS.test(to))
+        {
+            failure = locale.t('governance.act.badAddress');
+            return;
+        }
+        void send('delegate', props.detail.calls.delegate, [to]);
+    };
+
+    <section class="panel flex flex-col gap-4 px-4 py-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                { locale.t('governance.act.title') }
+            </h2>
+            <WalletConnect chain={ props.chain } compact />
+        </div>
+
+        <Show
+            when={ ready }
+            fallback={ <p class="text-[13px] text-muted">{ locale.t('governance.act.connect') }</p> }
+        >
+            {/* Voting */}
+            <Show when={ votable }>
+                <div class="flex flex-col gap-3">
+                    <Show when={ props.detail.tokenDecimals !== null && power !== null }>
+                        <p class="text-[13px] text-muted">
+                            { locale.t('governance.act.power', {
+                                weight: `${ formatAmount(power ?? '0', props.detail.tokenDecimals ?? 18) } ${ props.detail.tokenSymbol }`.trim()
+                            }) }
+                        </p>
+                    </Show>
+
+                    {/* Said in words, not by a disabled button: a reader who has voted and cannot
+                        see why the control is dead assumes the page is broken. The control stays
+                        live - a governor refuses a second ballot, and that refusal is its own. */}
+                    <Show when={ voted }>
+                        <p class="flex items-center gap-2 text-[13px] text-inflow">
+                            <Icon name="check" size={ 14 } />
+                            { locale.t('governance.act.voted') }
+                        </p>
+                    </Show>
+
+                    <FilterGroup
+                        label={ locale.t('governance.act.vote') }
+                        name="vote-support"
+                        value={ choice }
+                        options={ [
+                            { value: '1', label: locale.t('governance.support.for') },
+                            { value: '0', label: locale.t('governance.support.against') },
+                            { value: '2', label: locale.t('governance.support.abstain') }
+                        ] }
+                        onChange={ (next) => choice = next }
+                    />
+
+                    <Input
+                        label={ locale.t('governance.act.reason') }
+                        placeholder={ locale.t('governance.act.reason.placeholder') }
+                        size="sm"
+                        value={ reason }
+                        onInput={ (value) => reason = value }
+                    />
+
+                    <div class="flex flex-wrap gap-2">
+                        <Button variant="primary" icon="vote" busy={ busy === 'vote' } onClick={ castVote }>
+                            { locale.t('governance.act.submit') }
+                        </Button>
+                    </div>
+                </div>
+            </Show>
+
+            {/* The two lifecycle actions. Both are open to anybody - a governor checks the
+                proposal's state, not the sender - so neither is hidden behind a role this page
+                cannot verify. */}
+            <Show when={ queueable }>
+                <div class="flex flex-col gap-2">
+                    <p class="text-[13px] text-muted">{ locale.t('governance.act.queue.hint') }</p>
+                    <div>
+                        <Button
+                            variant="primary"
+                            icon="run"
+                            busy={ busy === 'queue' }
+                            onClick={ () => void send('queue', props.detail.calls.queue,
+                                [targets, values, calldatas, props.detail.descriptionHash]) }
+                        >
+                            { locale.t('governance.act.queue') }
+                        </Button>
+                    </div>
+                </div>
+            </Show>
+
+            <Show when={ executable }>
+                <div class="flex flex-col gap-2">
+                    <p class="text-[13px] text-muted">{ locale.t('governance.act.execute.hint') }</p>
+                    <div>
+                        <Button
+                            variant="primary"
+                            icon="run"
+                            busy={ busy === 'execute' }
+                            onClick={ () => void send('execute', props.detail.calls.execute,
+                                [targets, values, calldatas, props.detail.descriptionHash]) }
+                        >
+                            { locale.t('governance.act.execute') }
+                        </Button>
+                    </div>
+                </div>
+            </Show>
+
+            {/* Delegation is the votes TOKEN's, not the governor's, and it is offered wherever the
+                token is known: voting power that was never delegated does not count, and the
+                proposal a reader is looking at is where they find that out. */}
+            <Show when={ props.detail.token !== null }>
+                <div class="flex flex-col gap-2 border-t border-line pt-4">
+                    <h3 class="text-[13px] font-semibold">{ locale.t('governance.act.delegate') }</h3>
+                    <p class="text-[13px] text-muted">{ locale.t('governance.act.delegate.hint') }</p>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-[16rem] flex-1">
+                            <Input
+                                label={ locale.t('governance.act.delegate') }
+                                placeholder={ locale.t('governance.act.delegate.placeholder') }
+                                size="sm"
+                                value={ delegateTo }
+                                onInput={ (value) => delegateTo = value }
+                            />
+                        </div>
+                        <Button variant="outline" busy={ busy === 'delegate' } onClick={ delegate }>
+                            { delegateTo.trim() === ''
+                                ? locale.t('governance.act.delegate.self')
+                                : locale.t('governance.act.delegate.submit') }
+                        </Button>
+                    </div>
+                    <p class="flex flex-wrap items-center gap-1.5 text-[12px] text-faint">
+                        { locale.t('governance.act.delegate.token') }
+                        <HashLink value={ props.detail.token ?? '' } to={ `/address/${ props.detail.token ?? '' }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[12px]" />
+                    </p>
+                </div>
+            </Show>
+        </Show>
+
+        <Show when={ failure !== '' }>
+            <p class="flex items-start gap-2 rounded-lg border border-outflow bg-raised px-3 py-2 text-[13px] text-outflow">
+                <Icon name="alert" size={ 15 } class="mt-0.5 shrink-0" />
+                { failure }
+            </p>
+        </Show>
+    </section>
+}
