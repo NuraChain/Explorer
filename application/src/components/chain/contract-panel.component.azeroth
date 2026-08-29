@@ -78,7 +78,10 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             <Show when={ props.detail.creation } let={ creation }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.deployer') }</dt>
-                    <dd class="min-w-0 flex-1 text-left">
+                    {/* The floor the transaction page uses: under it the row wraps and the
+                        address takes the width, rather than splitting across two lines in the
+                        169px this column is left with on a phone. */}
+                    <dd class="min-w-52 flex-1 text-left">
                         <HashLink value={ creation.deployer } to={ `/address/${ creation.deployer }` } lead={ 16 } tail={ 10 } />
                     </dd>
                 </div>
@@ -102,7 +105,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                     {/* The EIP number is an identifier, so it stays as it is written everywhere
                         else - translating it would make the page disagree with the standard. */}
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.proxy') }</dt>
-                    <dd class="min-w-0 flex-1 text-left text-[14px]">
+                    <dd class="min-w-52 flex-1 text-left text-[14px]">
                         <span class="data text-[13px] uppercase text-muted">{ proxy.kind }</span>
                         <span class="ms-2 inline-flex align-middle">
                             <HashLink value={ proxy.implementation } to={ `/address/${ proxy.implementation }` } lead={ 16 } tail={ 10 } />

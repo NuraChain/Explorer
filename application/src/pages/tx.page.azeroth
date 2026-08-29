@@ -76,7 +76,11 @@ export default component TransactionPage()
                 <dl class="panel divide-y divide-line">
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.hash') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
+                        {/* A floor rather than `min-w-0`: under it the row wraps and the value
+                            takes the whole width. Thirty-three characters do not fit the 187px
+                            this column is left with on a phone, and a hash squeezed narrower than
+                            itself splits down the middle rather than clipping. */}
+                        <dd class="min-w-52 flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.block') }</dt>
@@ -89,11 +93,11 @@ export default component TransactionPage()
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.from') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
+                        <dd class="min-w-52 flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-28 shrink-0 text-[13px] text-muted">{ locale.t('tx.to') }</dt>
-                        <dd class="min-w-0 flex-1">
+                        <dd class="min-w-52 flex-1">
                             <Show
                                 when={ detail.data()!.transaction.to }
                                 fallback={
