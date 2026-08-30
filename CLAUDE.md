@@ -73,17 +73,21 @@ application/src/
 client type is inferred from that declaration, so it is decided in exactly one place.
 
 **Governance is the chain's own, and it is never indexed.** Nura is a Cosmos chain with an EVM
-module, so proposals live in `x/gov` and never touch the EVM - there is not one `ProposalCreated`
-log on the chain. What reaches the EVM is the gov PRECOMPILE at `0x…0805`: `server/src/chain/gov.ts`
-reads proposals, tallies, votes and params from it over `eth_call`, and the routes hold the answer
-for five seconds. A chain has tens of proposals where it has millions of transactions, so a copy in
-sqlite would only be a copy that can be wrong.
+module, so proposals live in `x/gov` and never touch the EVM — there is not one `ProposalCreated`
+log on the chain. It is read from the node's OTHER two apis instead: the Cosmos REST api for the
+module's state and CometBFT's rpc for the height it was read at (`server/src/chain/cosmos.ts`,
+configured by `COSMOS_REST_URL` / `COMETBFT_RPC_URL` / `COSMOS_TIMEOUT_MS`). Only the server calls
+them, the routes hold the answer for five seconds, and nothing is copied into sqlite — a chain has
+tens of proposals where it has millions of transactions, so a copy would only be one that can be
+wrong. Cosmos addresses are bech32; `server/src/chain/bech32.ts` decodes them so a proposer or a
+voter still links to the account page the EVM knows.
 
-Voting, depositing, withdrawing and SUBMITTING a proposal are ordinary EVM transactions to that
-address, encoded from the server's signature table and signed by the reader's wallet - the same
-split every write in this explorer makes. Where the precompile is not among the chain's
-`active_static_precompiles`, every read answers empty and the page says governance is not reachable
-from the EVM rather than showing a chain nobody proposes anything on.
+Writing is the separate half. Voting, depositing and submitting a proposal are ordinary EVM
+transactions to the gov PRECOMPILE at `0x…0805`, encoded from the server's signature table and
+signed by the reader's wallet. The two capabilities are reported separately — `enabled` says the
+REST api answered, `writable` says the precompile is among the chain's `active_static_precompiles`
+— because a chain that exposes one without the other is the normal case, and the page then follows
+a proposal without offering an action nothing can send.
 
 ## Design system
 
