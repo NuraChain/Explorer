@@ -105,6 +105,23 @@ export function vetoShare(tally: Tally): number
     return share(BigInt(tally.noWithVeto), totalCast(tally));
 }
 
+/**
+ * How much of the staked supply turned out, as a percentage.
+ *
+ * The first thing that decides a Cosmos proposal: a vote that nobody attends fails however the
+ * ballots that were cast are divided. Null where the node did not report the staked supply - and
+ * then the page says so rather than drawing a bar against a number nobody gave it.
+ */
+export function turnout(tally: Tally, bondedTokens: string | null): number | null
+{
+    if (bondedTokens === null)
+    {
+        return null;
+    }
+    const bonded = BigInt(bondedTokens);
+    return bonded === 0n ? null : share(totalCast(tally), bonded);
+}
+
 /** Whether this state still has something a reader can do about it. */
 export function isActionable(status: ProposalStatus): boolean
 {

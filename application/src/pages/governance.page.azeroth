@@ -118,6 +118,23 @@ export default component GovernancePage()
                             </dd>
                         </div>
                     </dl>
+                    {/* Where these figures came from. Governance is read live from the node beside
+                        the explorer, and one that is still catching up is answering from an older
+                        state machine than the chain's - which a reader deciding how to vote is
+                        entitled to know. */}
+                    <Show when={ overview.data()!.node !== null }>
+                    { () =>
+                        <p class="border-t border-line px-4 py-2.5 text-[12px] text-faint">
+                            { locale.t('governance.node', {
+                                chain: overview.data()!.node!.chainId,
+                                height: locale.n(overview.data()!.node!.height)
+                            }) }
+                            <Show when={ overview.data()!.node!.catchingUp }>
+                                <span class="ms-2 text-outflow">{ locale.t('governance.node.catchingUp') }</span>
+                            </Show>
+                        </p>
+                    }
+                    </Show>
                 </section>
 
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -135,8 +152,8 @@ export default component GovernancePage()
                     />
 
                     {/* Making one is offered from here, where the reader can see what it will cost
-                        and what it has to clear. */}
-                    <Show when={ stats.data() !== undefined && params !== null }>
+                        and what it has to clear - and only where a wallet can actually send it. */}
+                    <Show when={ stats.data() !== undefined && params !== null && overview.data()!.writable }>
                     { () =>
                         <NewProposal
                             precompile={ overview.data()!.precompile }
@@ -149,6 +166,12 @@ export default component GovernancePage()
                     </Show>
                 </div>
 
+                {/* Said once, at the top: everything below can be read, and nothing on it can be
+                    acted on until the chain exposes governance to the EVM. */}
+                <Show when={ !overview.data()!.writable }>
+                    <p class="panel px-4 py-3 text-[13px] text-muted">{ locale.t('governance.readonly') }</p>
+                </Show>
+
                 <section class="panel overflow-hidden">
                     <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                         <For each={ proposals.data()?.rows ?? [] } key={ (row) => row.id } let={ row }>
@@ -160,7 +183,7 @@ export default component GovernancePage()
                                     <span class="data text-[13px] text-muted">#{ row.id }</span>
                                     <Link
                                         to={ `/governance/${ row.id }` }
-                                        class="min-w-0 flex-1 text-[15px] font-semibold text-text no-underline hover:text-nur"
+                                        class="min-w-0 flex-1 break-words text-[15px] font-semibold text-text no-underline hover:text-nur"
                                     >
                                         {/* `dir="auto"`: a title is whatever the proposer wrote, in
                                             whatever script they wrote it, and inheriting the page's
@@ -172,7 +195,18 @@ export default component GovernancePage()
                                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
                                     <span class="flex items-center gap-1.5">
                                         { locale.t('governance.proposedBy') }
-                                        <HashLink value={ row.proposer } to={ `/address/${ row.proposer }` } tone="muted" lead={ 6 } tail={ 4 } copy={ false } class="text-[12px]" />
+                                        {/* Shown as the chain wrote it, linked to the account the
+                                            EVM knows: they are one account with two spellings, and
+                                            a reader recognises the first. */}
+                                        <HashLink
+                                            value={ row.proposer }
+                                            to={ row.proposerHex === null ? undefined : `/address/${ row.proposerHex }` }
+                                            tone="muted"
+                                            lead={ 8 }
+                                            tail={ 4 }
+                                            copy={ false }
+                                            class="text-[12px]"
+                                        />
                                     </span>
                                     <Tooltip label={ locale.dateTime(row.submitTime) }><span>{ locale.ago(row.submitTime) }</span></Tooltip>
                                 </div>

@@ -1,6 +1,6 @@
 import type { GovParams, Tally } from '../../api.ts';
 import { formatAmount } from '../../lib/format.ts';
-import { majority, ratio, share, totalCast, vetoShare } from '../../lib/governance.ts';
+import { majority, ratio, share, totalCast, turnout, vetoShare } from '../../lib/governance.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 
@@ -31,6 +31,14 @@ export default component VoteTally(props: {
 
     /** What passing turns on. Given, the panel says how the vote stands against it. */
     params?: GovParams;
+
+    /**
+     * The staked supply a quorum is measured against.
+     *
+     * Without it turnout cannot be computed at all - the tally says how the vote divided, not how
+     * much of the chain showed up - so the panel says that instead of guessing.
+     */
+    bondedTokens?: string | null;
 
     /** One slim track, no labels: the shape a list row has room for. */
     compact?: boolean;
@@ -65,8 +73,12 @@ export default component VoteTally(props: {
                                 <span class={ `h-2 w-2 shrink-0 rounded-full ${ row.bar }` } aria-hidden="true"></span>
                                 { locale.t(`governance.option.${ row.key }`) }
                             </span>
-                            <span class="text-[13px] text-muted">
-                                <span class="amount me-2 text-text">{ weight(row.value) }</span>
+                            {/* The gap is the PARENT's: `amount` forces ltr on its own box, so
+                                a margin on it would sit on the same physical side in both
+                                directions - beside the figure in one and inside the line in the
+                                other. */}
+                            <span class="flex items-baseline gap-2 text-[13px] text-muted">
+                                <span class="amount text-text">{ weight(row.value) }</span>
                                 <span class="tabular-nums">{ locale.t('governance.share', { percent: locale.n(row.percent, 1) }) }</span>
                             </span>
                         </div>
@@ -76,16 +88,29 @@ export default component VoteTally(props: {
                     </div>
                 </For>
 
-                {/* What passing turns on, where the module has told us.
-
-                    Turnout is missing on purpose: quorum is measured against the whole bonded
-                    supply, which `x/gov` does not report through this precompile, and a bar drawn
-                    against a number nobody gave us would be an invented reading. The two the tally
-                    CAN answer are here - the majority among the votes that decided, and the veto
-                    share of everything cast. */}
+                {/* What passing turns on, in the order `x/gov` decides it: enough of the staked
+                    supply has to turn out, a veto share sinks the proposal outright, and otherwise
+                    the majority among the votes that decided carries it. */}
                 <Show when={ props.params !== undefined }>
                 { () =>
                     <div class="flex flex-col gap-1.5 border-t border-line pt-2.5 text-[12px] text-muted">
+                        {/* Turnout first: it is the reading a Cosmos vote turns on before any
+                            of the others. A proposal can lead on every bar above and still fail
+                            here, and that is the case worth showing plainly. */}
+                        <Show
+                            when={ turnout(props.tally, props.bondedTokens ?? null) !== null }
+                            fallback={ <p class="text-faint">{ locale.t('governance.quorum.note') }</p> }
+                        >
+                            <p class="flex flex-wrap items-baseline justify-between gap-x-3">
+                                <span>{ locale.t('governance.turnout') }</span>
+                                <span class="tabular-nums">
+                                    { locale.t('governance.against.threshold', {
+                                        share: locale.n(turnout(props.tally, props.bondedTokens ?? null) ?? 0, 1),
+                                        needed: locale.n(ratio(props.params!.quorum), 1)
+                                    }) }
+                                </span>
+                            </p>
+                        </Show>
                         <p class="flex flex-wrap items-baseline justify-between gap-x-3">
                             <span>{ locale.t('governance.majority') }</span>
                             <span class="tabular-nums">
@@ -103,9 +128,6 @@ export default component VoteTally(props: {
                                     needed: locale.n(ratio(props.params!.vetoThreshold), 1)
                                 }) }
                             </span>
-                        </p>
-                        <p class="text-faint">
-                            { locale.t('governance.quorum.note', { percent: locale.n(ratio(props.params!.quorum), 1) }) }
                         </p>
                     </div>
                 }

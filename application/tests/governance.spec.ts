@@ -11,6 +11,7 @@ import {
     ratio,
     share,
     totalCast,
+    turnout,
     vetoShare,
     VOTE_CODE,
     VOTE_OPTIONS
@@ -88,6 +89,30 @@ describe('a tally', () =>
         const half = 10n ** 27n;
         expect(majority(tally(half + 1n, 0n, half, 0n))).toBe(50);
         expect(majority(tally(2n * half, 0n, half, 0n))).toBe(66.66);
+    });
+});
+
+describe('turnout', () =>
+{
+    it('measures everything cast against the staked supply, abstentions included', () =>
+    {
+        // Abstaining IS attending: a Cosmos quorum counts it, which is the whole point of the
+        // option existing separately from not voting at all.
+        expect(turnout(tally(10n * POWER, 10n * POWER, 5n * POWER, 5n * POWER), (100n * POWER).toString())).toBe(30);
+    });
+
+    it('has no answer where the node did not report the staked supply', () =>
+    {
+        // Null, not zero. A quorum of nothing would read as a vote nobody attended, and that is a
+        // claim about the chain rather than about what this node was able to say.
+        expect(turnout(tally(POWER, 0n, 0n, 0n), null)).toBe(null);
+        expect(turnout(tally(POWER, 0n, 0n, 0n), '0')).toBe(null);
+    });
+
+    it('holds a supply no double could count', () =>
+    {
+        const bonded = 3n * 10n ** 30n;
+        expect(turnout(tally(10n ** 30n, 0n, 0n, 0n), bonded.toString())).toBe(33.33);
     });
 });
 

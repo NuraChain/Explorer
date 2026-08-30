@@ -139,7 +139,7 @@ export default component NewProposal(props: {
                 <div class="min-w-[12rem] flex-1">
                     <Input
                         label={ locale.t('governance.new.deposit') }
-                        placeholder={ props.chain.symbol }
+                        placeholder={ `${ formatAmount(minimum, props.chain.decimals) } ${ props.chain.symbol }` }
                         size="sm"
                         value={ amount }
                         onInput={ (value) => amount = value }
@@ -147,7 +147,7 @@ export default component NewProposal(props: {
                 </div>
                 <Show
                     when={ ready }
-                    fallback={ <p class="text-[13px] text-muted">{ locale.t('governance.act.connect') }</p> }
+                    fallback={ <p class="text-[13px] text-muted">{ locale.t('governance.new.connect') }</p> }
                 >
                     <Button variant="primary" icon="send" busy={ busy } onClick={ () => void submit() }>
                         { locale.t('governance.new.submit') }

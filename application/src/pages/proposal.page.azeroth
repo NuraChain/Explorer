@@ -41,15 +41,18 @@ const OPTION_DOT: Record<string, string> = {
  */
 const NO_DETAIL: ProposalDetail = {
     proposal: {
-        id: '', title: '', summary: '', status: 'unspecified', proposer: '', messages: [], metadata: '',
+        id: '', title: '', summary: '', status: 'unspecified', proposer: '', proposerHex: null,
+        messages: [], metadata: '',
         submitTime: '1970-01-01T00:00:00.000Z', depositEndTime: '1970-01-01T00:00:00.000Z',
         votingStartTime: '1970-01-01T00:00:00.000Z', votingEndTime: '1970-01-01T00:00:00.000Z',
         totalDeposit: [], tally: { yes: '0', abstain: '0', no: '0', noWithVeto: '0' }
     },
-    params: { quorum: '0', threshold: '0', vetoThreshold: '0', votingPeriod: 0, minDeposit: [] },
+    params: { quorum: '0', threshold: '0', vetoThreshold: '0', votingPeriod: 0, maxDepositPeriod: 0, minDeposit: [] },
+    bondedTokens: null,
+    writable: false,
     precompile: '',
     calls: { vote: '', voteWeighted: '', submitProposal: '', deposit: '', cancelProposal: '' },
-    votes: [], total: 0, page: 1, pages: 1
+    deposits: [], votes: [], total: 0, page: 1, pages: 1
 };
 
 export default component ProposalPage()
@@ -106,24 +109,44 @@ export default component ProposalPage()
                     {/* `dir="auto"` on everything the PROPOSER wrote - the title here and the
                         summary below. It is text in a script this page cannot know, and left to
                         inherit the page's direction its punctuation lands at the wrong end. */}
-                    <h1 class="text-[20px] font-bold leading-snug tracking-tight sm:text-[22px]" dir="auto">
+                    <h1 class="break-words text-[20px] font-bold leading-snug tracking-tight sm:text-[22px]" dir="auto">
                         { proposal.title === '' ? locale.t('governance.untitled') : proposal.title }
                     </h1>
 
                     <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
                         { locale.t('governance.proposedBy') }
-                        <HashLink value={ proposal.proposer } to={ `/address/${ proposal.proposer }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[13px]" />
+                        {/* The chain's own spelling of the account, linked to the twenty bytes
+                            the EVM knows it by. */}
+                        <HashLink
+                            value={ proposal.proposer }
+                            to={ proposal.proposerHex === null ? undefined : `/address/${ proposal.proposerHex }` }
+                            tone="muted"
+                            lead={ 10 }
+                            tail={ 6 }
+                            copy={ false }
+                            class="text-[13px]"
+                        />
                         <Tooltip label={ locale.dateTime(proposal.submitTime) }><span>{ locale.ago(proposal.submitTime) }</span></Tooltip>
                     </p>
                 </header>
 
                 <section class="panel flex flex-col gap-4 px-4 py-4">
                     <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('governance.tally') }</h2>
-                    <VoteTally tally={ proposal.tally } decimals={ decimals } symbol={ symbol } params={ shown.params } />
+                    <VoteTally
+                        tally={ proposal.tally }
+                        decimals={ decimals }
+                        symbol={ symbol }
+                        params={ shown.params }
+                        bondedTokens={ shown.bondedTokens }
+                    />
                 </section>
 
-                {/* The write half, and only where the proposal's own state can take one. */}
-                <Show when={ isActionable(proposal.status) && stats.data() !== undefined }>
+                {/* The write half: only where the proposal's own state can take one, and only
+                    where the chain lets a wallet send it at all. */}
+                <Show when={ !shown.writable && isActionable(proposal.status) }>
+                    <p class="panel px-4 py-3 text-[13px] text-muted">{ locale.t('governance.readonly') }</p>
+                </Show>
+                <Show when={ shown.writable && isActionable(proposal.status) && stats.data() !== undefined }>
                 { () =>
                     <ProposalActions
                         detail={ shown }
@@ -184,12 +207,49 @@ export default component ProposalPage()
                         fallback={ <EmptyState icon="contract" title={ locale.t('governance.messages.none') } hint={ locale.t('governance.messages.none.hint') } /> }
                     >
                         <ul class="divide-y divide-line">
-                            <For each={ proposal.messages } key={ (message, at) => `${ at }-${ message }` } let={ message }>
-                                <li class="hash px-4 py-3 text-[13px]">{ message }</li>
+                            <For each={ proposal.messages } key={ (message, at) => `${ at }-${ message.type }` } let={ message }>
+                                <li class="flex flex-col gap-2 px-4 py-3">
+                                    <p class="hash text-[13px] font-semibold">{ message.type }</p>
+                                    {/* The message itself, not only which module it addresses: a
+                                        type url says what is being changed and nothing about how.
+                                        Printed as text - it is json from a transaction, and this
+                                        page renders none of it. */}
+                                    <pre class="hash overflow-x-auto rounded-lg bg-raised px-3 py-2 text-[12px] leading-relaxed text-muted">{ message.body }</pre>
+                                </li>
                             </For>
                         </ul>
                     </Show>
                 </section>
+
+                {/* A proposal reaches a vote only once its deposit is met, and anybody may add
+                    to it - so who did is part of the record. */}
+                <Show when={ shown.deposits.length > 0 }>
+                    <section class="panel overflow-hidden">
+                        <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                            { locale.t('governance.deposits') }
+                        </h2>
+                        <ul class="divide-y divide-line">
+                            <For each={ shown.deposits } key={ (row, at) => `${ at }-${ row.depositor }` } let={ row }>
+                                <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                    <span class="min-w-52 flex-1">
+                                        <HashLink
+                                            value={ row.depositor }
+                                            to={ row.depositorHex === null ? undefined : `/address/${ row.depositorHex }` }
+                                            tone="muted"
+                                            lead={ 10 }
+                                            tail={ 6 }
+                                            copy={ false }
+                                            class="text-[13px]"
+                                        />
+                                    </span>
+                                    <span class="w-full text-end text-[13px] sm:w-auto">
+                                        <span class="amount">{ formatAmount(row.amount[0]?.amount ?? '0', decimals) }</span> { symbol }
+                                    </span>
+                                </li>
+                            </For>
+                        </ul>
+                    </section>
+                </Show>
 
                 <section class="panel overflow-hidden">
                     <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -204,7 +264,15 @@ export default component ProposalPage()
                                         { locale.t(`governance.option.${ row.option }`) }
                                     </span>
                                     <span class="min-w-52 flex-1">
-                                        <HashLink value={ row.voter } to={ `/address/${ row.voter }` } tone="muted" lead={ 8 } tail={ 6 } copy={ false } class="text-[13px]" />
+                                        <HashLink
+                                            value={ row.voter }
+                                            to={ row.voterHex === null ? undefined : `/address/${ row.voterHex }` }
+                                            tone="muted"
+                                            lead={ 10 }
+                                            tail={ 6 }
+                                            copy={ false }
+                                            class="text-[13px]"
+                                        />
                                     </span>
                                     <span class="w-full text-end text-[13px] tabular-nums text-muted sm:w-auto">{ weightOf(row) }</span>
                                 </div>
