@@ -282,10 +282,13 @@ export default component AddressPage()
                                 <Icon name={ FACE[way(row)].icon } size={ 15 } />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[14px] font-semibold">
+                                {/* Gapped from the parent for the same reason the tally is:
+                                    `data` is an ltr island, so its own margin cannot follow the
+                                    line it sits in. */}
+                                <p class="flex flex-wrap items-baseline gap-x-1.5 text-[14px] font-semibold">
                                     { row.tokenSymbol === '' ? locale.t('address.transfers.token') : row.tokenSymbol }
                                     <Show when={ row.tokenId !== null }>
-                                        <span class="data ms-1.5 text-[13px] text-muted">#{ row.tokenId }</span>
+                                        <span class="data text-[13px] text-muted">#{ row.tokenId }</span>
                                     </Show>
                                 </p>
                                 {/* Only where the page cannot say "you". A row with no direction
