@@ -78,7 +78,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
             <Show when={ props.detail.creation } let={ creation }>
                 <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                     <dt class="w-32 shrink-0 text-[13px] text-muted">{ locale.t('contract.deployer') }</dt>
-                    {/* The floor the transaction page uses: under it the row wraps and the
+                    {/* A floor rather than `min-w-0`: under it the row wraps and the
                         address takes the width, rather than splitting across two lines in the
                         169px this column is left with on a phone. */}
                     <dd class="min-w-52 flex-1 text-left">
