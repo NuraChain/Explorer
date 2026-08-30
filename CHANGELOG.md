@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1
+
+### Fixes
+
+- **Transaction:** stack the detail list into a card below `sm:`. The `min-w-52` floor that used
+  to wrap those rows only tripped on a phone narrow enough — a wider one kept the row and split
+  the hash across two lines
+
 ## 1.3.0
 
 ### Features
