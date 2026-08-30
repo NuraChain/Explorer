@@ -4,16 +4,20 @@ import { mountPages, type KitOptions } from '@azerothjs/kit';
 
 import type { ChainGateway } from './chain/client.ts';
 import {
-    countVotes,
-    GOV_PRECOMPILE,
+    readBondedTokens,
+    readDeposits,
     readParams,
     readProposal,
     readProposals,
+    readStatus,
     readTally,
     readVotes,
-    type GovParams,
-    type GovProposal
-} from './chain/gov.ts';
+    type CosmosEnv,
+    type CosmosParams,
+    type CosmosProposal,
+    type CosmosStatus
+} from './chain/cosmos.ts';
+import { GOV_PRECOMPILE, precompileEnabled } from './chain/gov.ts';
 import { selectorOf } from './chain/signatures.ts';
 import { normalize, type DailyStats, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
@@ -24,6 +28,7 @@ import {
     meanBlockTime,
     pageCount,
     presentBlock,
+    presentDeposits,
     presentProposal,
     presentTransaction,
     presentTransfer,
@@ -79,6 +84,16 @@ export interface ApiDeps
     chain: ChainGateway;
 
     /**
+     * The chain's OWN apis - the REST module api and CometBFT - for the half of this chain that is
+     * not the EVM. Governance lives there; see chain/cosmos.ts.
+     *
+     * Optional, and empty urls are the same as absent: a deployment that cannot reach the node's
+     * module api still serves every other page, and the governance section says it is unreachable
+     * rather than the whole server refusing to start.
+     */
+    cosmos?: CosmosEnv;
+
+    /**
      * Where a USD price for the native coin comes from. Optional because it is the one dependency
      * that is not this chain: a deployment with no exchange behind it quotes nothing, and every
      * page still renders.
@@ -90,6 +105,9 @@ const DEFAULT_LIMIT = 25;
 
 /** How long a governance answer is held. Proposals move on the scale of days, not of requests. */
 const GOVERNANCE_TTL_MS = 5_000;
+
+/** No node apis configured: every governance read answers null, and the section says so. */
+const NO_COSMOS: CosmosEnv = { restUrl: '', rpcUrl: '', timeoutMs: 0 };
 
 /**
  * The five transactions the governance page can offer, hashed once at import.
@@ -142,7 +160,7 @@ export function createApi(deps: ApiDeps): ReturnType<typeof build>
 // No return type on purpose: the route literal IS the type, and naming it would erase the
 // per-route inference every `client.blocks.list` call downstream depends on.
 // oxlint-disable-next-line typescript/explicit-function-return-type
-function build({ store, chain, price }: ApiDeps)
+function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
 {
     /** Attaches the token metadata each transfer row needs, reading each token at most once. */
     const withTokens = (rows: ReturnType<IndexStore['transfersOfAddress']>['rows']): Transfer[] =>
@@ -158,7 +176,15 @@ function build({ store, chain, price }: ApiDeps)
         });
     };
 
-    let governanceCache: { at: number; params: GovParams | null; proposals: GovProposal[] } | null = null;
+    let governanceCache: {
+        at: number;
+        params: CosmosParams | null;
+        proposals: CosmosProposal[];
+        total: number;
+        bondedTokens: string | null;
+        node: CosmosStatus | null;
+        writable: boolean;
+    } | null = null;
 
     const paging = (query: { page?: number; limit?: number }): { limit: number; offset: number; page: number } =>
     {
@@ -168,29 +194,54 @@ function build({ store, chain, price }: ApiDeps)
     };
 
     /**
-     * The module's parameters and its proposals, held for a few seconds.
+     * Everything a governance page needs, asked of the node once and held for a few seconds.
      *
      * Governance is the one section of this explorer that is NOT read from the index: a chain has
-     * tens of proposals where it has millions of transactions, and every figure on the page is a
-     * live answer from the module. The cache exists so that a reader loading the list does not
-     * ask the node the same four questions per row.
+     * tens of proposals where it has millions of transactions, and every figure here is a live
+     * answer from the module. The cache is what stops a list of twenty-five rows from asking the
+     * same five questions twenty-five times.
      *
-     * `params` is null exactly when the gov precompile is not enabled on this chain - it is the
-     * cheapest question to ask, and the answer decides whether the section exists at all.
+     * `params` is null exactly when the module's api did not answer - the node is not there, or
+     * its REST api is off - and that is what decides whether the section exists at all. Being
+     * able to VOTE is a second, separate question: see `writable`.
      */
-    const readGovernance = async (): Promise<{ params: GovParams | null; proposals: GovProposal[] }> =>
+    const readGovernance = async (): Promise<{
+        params: CosmosParams | null;
+        proposals: CosmosProposal[];
+        total: number;
+        bondedTokens: string | null;
+        node: CosmosStatus | null;
+        writable: boolean;
+    }> =>
     {
         const now = Date.now();
         if (governanceCache !== null && now - governanceCache.at < GOVERNANCE_TTL_MS)
         {
             return governanceCache;
         }
-        const params = await readParams(chain);
-        // Newest first, and all of them: a chain that has passed a thousand proposals is still one
-        // page of json, and paging here would cost a call per page of a list that is filtered by a
-        // state the module does not index on.
-        const proposals = params === null ? [] : await readProposals(chain, 200, 0) ?? [];
-        governanceCache = { at: now, params, proposals };
+
+        // All five at once. They are five different endpoints of the same node, and asking them
+        // in turn would put a page's whole latency in series behind the slowest.
+        const [params, page, bondedTokens, node, writable] = await Promise.all([
+            readParams(cosmos),
+            // Newest first, and all of them: a chain that has decided a thousand proposals is
+            // still one page of json, and the list is narrowed by a state the module does not
+            // page on - so the filtering happens here, over the whole record.
+            readProposals(cosmos, 200, 0),
+            readBondedTokens(cosmos),
+            readStatus(cosmos),
+            precompileEnabled(chain)
+        ]);
+
+        governanceCache = {
+            at: now,
+            params,
+            proposals: page?.rows ?? [],
+            total: page?.total ?? 0,
+            bondedTokens,
+            node,
+            writable
+        };
         return governanceCache;
     };
 
@@ -560,22 +611,27 @@ function build({ store, chain, price }: ApiDeps)
             })
         })),
 
-        // Governance: this chain's own `x/gov` module, reached over the EVM through the gov
-        // precompile. Read live - see `readGovernance` above and chain/gov.ts.
+        // Governance: this chain's own `x/gov` module.
+        //
+        // Read from the node's REST api and CometBFT rpc - the module never touches the EVM, so
+        // there is nothing here to index and nothing to decode from a log. Writing is the other
+        // half and goes through the gov precompile; see chain/cosmos.ts and chain/gov.ts.
         governance: feature('/governance', (routes) => ({
             overview: routes.get('/', { output: governanceOverview }, async () =>
             {
-                const { params, proposals } = await readGovernance();
+                const { params, proposals, total, bondedTokens, node, writable } = await readGovernance();
                 const groups = proposals.map((row) => proposalGroup(presentProposal(row).status));
                 return {
                     enabled: params !== null,
+                    writable,
                     precompile: GOV_PRECOMPILE,
                     calls: GOV_CALLS,
                     params,
-                    // The denom a deposit is made in IS the chain's governance token; the page
-                    // formats every figure on it with the chain's own decimals.
+                    node,
+                    bondedTokens,
+                    // The denom a deposit is made in IS the chain's governance token.
                     denom: params?.minDeposit[0]?.denom ?? '',
-                    total: proposals.length,
+                    total,
                     open: groups.filter((group) => group === 'open').length,
                     passed: groups.filter((group) => group === 'passed').length,
                     failed: groups.filter((group) => group === 'failed').length
@@ -592,8 +648,16 @@ function build({ store, chain, price }: ApiDeps)
                     .map(presentProposal)
                     .filter((row) => wanted === 'all' || proposalGroup(row.status) === wanted);
 
+                // A proposal keeps a tally of zero until its vote CLOSES - the module fills
+                // `final_tally_result` at the end - so the one row a reader most wants to see the
+                // shape of would be the one drawn empty. The live count is asked for separately,
+                // for the open rows on THIS page only: a bounded handful, behind the same cache.
+                const shown = rows.slice(offset, offset + limit);
+                const live = await Promise.all(shown.map(
+                    async (row) => row.status === 'voting' ? await readTally(cosmos, row.id) : null));
+
                 return {
-                    rows: rows.slice(offset, offset + limit),
+                    rows: shown.map((row, at) => live[at] === null ? row : { ...row, tally: live[at]! }),
                     total: rows.length,
                     page,
                     pages: pageCount(rows.length, limit)
@@ -601,11 +665,11 @@ function build({ store, chain, price }: ApiDeps)
             }),
 
             /**
-             * One proposal, with a page of the ballots cast on it.
+             * One proposal, with its deposits and a page of the ballots cast on it.
              *
-             * The tally comes from `getTallyResult` rather than from the proposal itself: while a
-             * vote is open the module leaves the proposal's own final tally at zero, and a page
-             * that printed that would report every live vote as untouched.
+             * The tally comes from the module's `/tally` endpoint rather than from the proposal
+             * itself: while a vote is open the proposal's own final tally is left at zero, and a
+             * page that printed that would report a live vote as one nobody had touched.
              */
             one: routes.get('/proposals/:id', { query: pageQuery, output: proposalDetail }, async ({ params: route, query }) =>
             {
@@ -613,31 +677,36 @@ function build({ store, chain, price }: ApiDeps)
                 {
                     throw new NotFoundError('No such proposal');
                 }
-                const { params } = await readGovernance();
+                const { params, bondedTokens, writable } = await readGovernance();
                 if (params === null)
                 {
-                    throw new NotFoundError('This chain does not expose governance to the EVM');
+                    throw new NotFoundError('This chain\'s governance api is not reachable');
                 }
-                const row = await readProposal(chain, route.id);
+
+                const { limit, offset, page } = paging(query);
+                const [row, live, votes, deposits] = await Promise.all([
+                    readProposal(cosmos, route.id),
+                    readTally(cosmos, route.id),
+                    readVotes(cosmos, route.id, limit, offset),
+                    readDeposits(cosmos, route.id, 25, 0)
+                ]);
+
                 if (row === null)
                 {
                     throw new NotFoundError('No such proposal');
                 }
-
-                const { limit, offset, page } = paging(query);
-                const [live, votes, total] = await Promise.all([
-                    readTally(chain, route.id),
-                    readVotes(chain, route.id, limit, offset),
-                    countVotes(chain, route.id)
-                ]);
                 const presented = presentProposal(row);
+                const total = votes?.total ?? 0;
 
                 return {
                     proposal: live === null ? presented : { ...presented, tally: live },
                     params,
+                    bondedTokens,
+                    writable,
                     precompile: GOV_PRECOMPILE,
                     calls: GOV_CALLS,
-                    votes: presentVotes(votes ?? []),
+                    deposits: presentDeposits(deposits?.rows ?? []),
+                    votes: presentVotes(votes?.rows ?? []),
                     total,
                     page,
                     pages: pageCount(total, limit)

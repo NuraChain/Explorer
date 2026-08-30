@@ -9,6 +9,7 @@ import { fileStream } from '@azerothjs/logger/node';
 import { buildApp } from './app.ts';
 import { CachedChain, loadCacheOptions } from './chain/cache.ts';
 import { ChainReader, loadChainEnv } from './chain/client.ts';
+import { loadCosmosEnv } from './chain/cosmos.ts';
 import { IndexStore } from './chain/store.ts';
 import { startIndexer } from './chain/indexer.ts';
 import { loadPriceEnv, SwapPriceFeed } from './price.ts';
@@ -37,6 +38,9 @@ const log = createLogger({ stream: fileStream('logs/'), fields: { service: 'nura
 // takes minutes, and the explorer must serve what it already has while the rest arrives. The
 // stats endpoint reports both heads so a reader can see the gap.
 const chainEnv = loadChainEnv();
+// The same node's OTHER two apis: the Cosmos REST module api and CometBFT's rpc. Governance lives
+// there rather than in the EVM, and the explorer is meant to run beside the node that serves them.
+const cosmosEnv = loadCosmosEnv();
 const chain = new ChainReader(chainEnv);
 const store = new IndexStore(chainEnv.dbPath);
 const indexer = startIndexer(store, chain, log);
@@ -64,11 +68,14 @@ const ssr = isProduction
     ? await import(pathToFileURL(config.ssrEntry).href) as { routes: PageRoute[]; renderPage: PageRenderer }
     : undefined;
 
+log.info('governance', { rest: cosmosEnv.restUrl, cometbft: cosmosEnv.rpcUrl });
+
 const app = buildApp({
     dev: !isProduction,
     observe: logRequests(log),
     store,
     chain: reads,
+    cosmos: cosmosEnv,
     price,
     pages: ssr === undefined ? undefined : { routes: ssr.routes, clientDir: config.clientDir, renderer: ssr.renderPage }
 });

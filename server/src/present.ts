@@ -1,6 +1,6 @@
-import { PROPOSAL_STATUS_BY_CODE, VOTE_OPTION_BY_CODE, type GovProposal, type GovVote } from './chain/gov.ts';
+import type { CosmosDeposit, CosmosProposal, CosmosVote } from './chain/cosmos.ts';
 import type { BlockRow, TokenRow, TransactionRow, TransferRow } from './chain/store.ts';
-import type { Block, Proposal, ProposalStatus, Transaction, Transfer, Vote } from './schemas.ts';
+import type { Block, GovDeposit, Proposal, ProposalStatus, Transaction, Transfer, Vote, VoteOption } from './schemas.ts';
 
 // Row -> wire. The index stores what the chain said; these functions decide what a reader is
 // told. Amounts stay decimal strings the whole way across (see schemas.ts).
@@ -71,25 +71,63 @@ export function presentTransfer(row: TransferRow, token: TokenRow | null): Trans
 }
 
 /**
- * One proposal, as the wire declares it.
+ * The module's own names for a proposal's state.
  *
- * The module counts states as numbers and time in seconds; this is where they become the names and
- * the ISO strings every other surface in this explorer uses.
+ * Written down rather than derived from the string: `PROPOSAL_STATUS_FAILED` means a proposal that
+ * PASSED and then failed to execute, and an explorer that guessed from the word alone would file
+ * it beside the ones that were rejected.
  */
-export function presentProposal(row: GovProposal): Proposal
+const STATUS_BY_NAME: Record<string, ProposalStatus> = {
+    PROPOSAL_STATUS_UNSPECIFIED: 'unspecified',
+    PROPOSAL_STATUS_DEPOSIT_PERIOD: 'deposit',
+    PROPOSAL_STATUS_VOTING_PERIOD: 'voting',
+    PROPOSAL_STATUS_PASSED: 'passed',
+    PROPOSAL_STATUS_REJECTED: 'rejected',
+    PROPOSAL_STATUS_FAILED: 'failed'
+};
+
+/** The same for a ballot. Some builds answer the enum's NUMBER, so both spellings are read. */
+const OPTION_BY_NAME: Record<string, VoteOption> = {
+    VOTE_OPTION_UNSPECIFIED: 'unspecified',
+    VOTE_OPTION_YES: 'yes',
+    VOTE_OPTION_ABSTAIN: 'abstain',
+    VOTE_OPTION_NO: 'no',
+    VOTE_OPTION_NO_WITH_VETO: 'noWithVeto',
+    '0': 'unspecified',
+    '1': 'yes',
+    '2': 'abstain',
+    '3': 'no',
+    '4': 'noWithVeto'
+};
+
+/**
+ * One of the module's timestamps as the ISO this wire uses.
+ *
+ * The module writes RFC3339 with nanoseconds; `Date` keeps milliseconds, which is every digit a
+ * page can show. An unparseable or missing time becomes the epoch rather than `Invalid Date`,
+ * because a field that renders as an error is worse than one that renders as nothing.
+ */
+function when(value: string): string
+{
+    const at = Date.parse(value);
+    return new Date(Number.isNaN(at) ? 0 : at).toISOString();
+}
+
+export function presentProposal(row: CosmosProposal): Proposal
 {
     return {
         id: row.id,
         title: row.title,
         summary: row.summary,
-        status: PROPOSAL_STATUS_BY_CODE[row.status] ?? 'unspecified',
+        status: STATUS_BY_NAME[row.status] ?? 'unspecified',
         proposer: row.proposer,
+        proposerHex: row.proposerHex,
         messages: row.messages,
         metadata: row.metadata,
-        submitTime: iso(row.submitTime),
-        depositEndTime: iso(row.depositEndTime),
-        votingStartTime: iso(row.votingStartTime),
-        votingEndTime: iso(row.votingEndTime),
+        submitTime: when(row.submitTime),
+        depositEndTime: when(row.depositEndTime),
+        votingStartTime: when(row.votingStartTime),
+        votingEndTime: when(row.votingEndTime),
         totalDeposit: row.totalDeposit,
         tally: row.tally
     };
@@ -100,16 +138,22 @@ export function presentProposal(row: GovProposal): Proposal
  *
  * A Cosmos vote may split its weight across several options, and flattening it here is what lets
  * the page show what was actually cast rather than a first choice standing in for the rest. A
- * plain vote has exactly one option and comes through unchanged.
+ * plain vote has one option at full weight and comes through unchanged.
  */
-export function presentVotes(rows: readonly GovVote[]): Vote[]
+export function presentVotes(rows: readonly CosmosVote[]): Vote[]
 {
     return rows.flatMap((row) => row.options.map((entry) => ({
         voter: row.voter,
-        option: VOTE_OPTION_BY_CODE[entry.option] ?? 'unspecified',
+        voterHex: row.voterHex,
+        option: OPTION_BY_NAME[entry.option] ?? 'unspecified',
         weight: entry.weight,
         metadata: row.metadata
     })));
+}
+
+export function presentDeposits(rows: readonly CosmosDeposit[]): GovDeposit[]
+{
+    return rows.map((row) => ({ depositor: row.depositor, depositorHex: row.depositorHex, amount: row.amount }));
 }
 
 /** The three groups a list of proposals is narrowed by. See PROPOSAL_FILTER in schemas.ts. */

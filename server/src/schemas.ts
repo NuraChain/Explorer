@@ -332,15 +332,26 @@ export type Coin = Infer<typeof coin>;
 export const tally = object({ yes: string(), abstain: string(), no: string(), noWithVeto: string() });
 export type Tally = Infer<typeof tally>;
 
+/** One message a proposal would run: its type url, and the message itself as json. */
+export const govMessage = object({ type: string(), body: string() });
+export type GovMessage = Infer<typeof govMessage>;
+
 export const proposal = object({
     id: string(),
     title: string(),
     summary: string(),
     status: enumOf(PROPOSAL_STATUSES),
-    /** The proposer's EVM address: the precompile converts the chain's bech32 account for us. */
+    /**
+     * The proposer, in both spellings the chain gives one account.
+     *
+     * `proposer` is what the module wrote (`nura1…`) and is what a reader recognises; `proposerHex`
+     * is the same twenty bytes as the EVM knows them, which is what every other page here is keyed
+     * on. Null where the address did not decode - and then the page prints the bech32 and no link.
+     */
     proposer: string(),
-    /** What the proposal RUNS if it passes, as the type urls of its messages. */
-    messages: array(string()),
+    proposerHex: string().nullable(),
+    /** What the proposal RUNS if it passes. */
+    messages: array(govMessage),
     /** Whatever the proposer attached - an ipfs uri by convention, and often nothing. */
     metadata: string(),
     submitTime: string(),
@@ -363,12 +374,21 @@ export type ProposalPage = Infer<typeof proposalPage>;
 
 export const vote = object({
     voter: string(),
+    voterHex: string().nullable(),
     option: enumOf(VOTE_OPTIONS),
     /** '1.000000000000000000' for a plain vote; a weighted one splits across several options. */
     weight: string(),
     metadata: string()
 });
 export type Vote = Infer<typeof vote>;
+
+/** One account's stake behind a proposal while it is still collecting its deposit. */
+export const govDeposit = object({
+    depositor: string(),
+    depositorHex: string().nullable(),
+    amount: array(coin)
+});
+export type GovDeposit = Infer<typeof govDeposit>;
 
 /** The module's parameters - what a proposal needs to pass, and what it costs to make one. */
 export const govParams = object({
@@ -377,9 +397,24 @@ export const govParams = object({
     vetoThreshold: string(),
     /** Seconds a vote stays open. */
     votingPeriod: number({ int: true, min: 0 }),
+    /** Seconds a proposal has to reach its minimum deposit before it is dropped. */
+    maxDepositPeriod: number({ int: true, min: 0 }),
     minDeposit: array(coin)
 });
 export type GovParams = Infer<typeof govParams>;
+
+/**
+ * What the node says about itself, from CometBFT.
+ *
+ * The provenance of everything else on the page: governance is read live from this node, and one
+ * that is still catching up is answering from an older state than the chain's.
+ */
+export const govNode = object({
+    chainId: string(),
+    height: number({ int: true, min: 0 }),
+    catchingUp: boolean()
+});
+export type GovNode = Infer<typeof govNode>;
 
 /**
  * The selectors the governance controls encode against.
@@ -399,9 +434,14 @@ export type GovCalls = Infer<typeof govCalls>;
 export const proposalDetail = object({
     proposal,
     params: govParams,
+    /** The staked supply a quorum is measured against. Null where the node would not say. */
+    bondedTokens: string().nullable(),
+    /** Whether a wallet can act on this chain's governance at all - see the overview. */
+    writable: boolean(),
     /** The address every governance transaction is sent to. */
     precompile: string(),
     calls: govCalls,
+    deposits: array(govDeposit),
     votes: array(vote),
     total: number({ int: true, min: 0 }),
     page: number({ int: true, min: 1 }),
@@ -417,11 +457,22 @@ export type ProposalDetail = Infer<typeof proposalDetail>;
  * empty list that looks like a chain nobody proposes anything on.
  */
 export const governanceOverview = object({
+    /** Whether the module answered at all - the chain's own api, read from the node beside us. */
     enabled: boolean(),
+    /**
+     * Whether a vote can be CAST from here.
+     *
+     * Reading governance needs only the node's api; writing needs the gov precompile, which is a
+     * chain setting. The two are separate facts and the page states them separately: a reader can
+     * follow a proposal either way, and is told plainly when they cannot act on it.
+     */
+    writable: boolean(),
     precompile: string(),
     /** Carried here as well as on a proposal: a NEW one is made from this page, not from that. */
     calls: govCalls,
     params: govParams.nullable(),
+    node: govNode.nullable(),
+    bondedTokens: string().nullable(),
     denom: string(),
     total: number({ int: true, min: 0 }),
     open: number({ int: true, min: 0 }),

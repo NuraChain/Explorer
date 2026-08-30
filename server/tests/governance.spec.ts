@@ -1,17 +1,18 @@
-// Governance against a stubbed gov PRECOMPILE.
+// Governance against a stubbed NODE.
 //
-// The fixtures below are this chain's own three proposals, as `evmd q gov proposals` prints them,
-// encoded the way the precompile hands them to `eth_call`. Encoding them here rather than handing
-// the server a plain object is the point: the thing worth testing is that thirteen fields of a
-// nested tuple are read back in the module's order, and an explorer that shifted `status` by one
-// would report a rejected proposal as a passed one.
-import { describe, it, expect } from 'vitest';
-import { encodeAbiParameters, toFunctionSelector } from 'viem';
+// The fixtures are this chain's own three proposals, in the shape `/cosmos/gov/v1/proposals`
+// returns them - the same json `evmd q gov proposals` prints. They go through `fetch`, because
+// that is the boundary: everything below tests what the explorer does with what the node says,
+// including the parts that are easy to get quietly wrong (a status name filed under the wrong
+// outcome, a nanosecond timestamp, a weighted vote, an address in the chain's own spelling).
+import { describe, it, expect, afterEach, vi } from 'vitest';
 
 import { buildApp } from '../src/app.ts';
-import { GOV_PRECOMPILE, PROPOSAL_STATUS_BY_CODE, VOTE_OPTION_BY_CODE } from '../src/chain/gov.ts';
+import { bech32ToHex } from '../src/chain/bech32.ts';
+import { GOV_PRECOMPILE } from '../src/chain/gov.ts';
 import { IndexStore } from '../src/chain/store.ts';
 import type { ChainEnv, ChainGateway } from '../src/chain/client.ts';
+import type { CosmosEnv } from '../src/chain/cosmos.ts';
 import type { GovernanceOverview, ProposalDetail, ProposalPage } from '../src/schemas.ts';
 
 const ENV: ChainEnv = {
@@ -19,102 +20,140 @@ const ENV: ChainEnv = {
     startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
 };
 
-// Typed as viem's own hex string, because these are encoded and not merely printed.
-const PROPOSER: `0x${ string }` = '0x4ac0d9300422b408ba2abf47995c87cf32763712';
-const VOTER: `0x${ string }` = '0x8140e993f48005a7d9b0c1e2f3a4b5c6d7e966b9';
-const NURA = 10n ** 18n;
+const COSMOS: CosmosEnv = { restUrl: 'http://node.test:1317', rpcUrl: 'http://node.test:26657', timeoutMs: 1000 };
 
-const COIN = { type: 'tuple', components: [{ type: 'string' }, { type: 'uint256' }] } as const;
-const COINS = { type: 'tuple[]', components: COIN.components } as const;
-const TALLY = {
-    type: 'tuple',
-    components: [{ type: 'string' }, { type: 'string' }, { type: 'string' }, { type: 'string' }]
-} as const;
-const PROPOSAL = {
-    type: 'tuple',
-    components: [
-        { type: 'uint64' }, { type: 'string[]' }, { type: 'uint32' }, TALLY, { type: 'uint64' },
-        { type: 'uint64' }, COINS, { type: 'uint64' }, { type: 'uint64' }, { type: 'string' },
-        { type: 'string' }, { type: 'string' }, { type: 'address' }
-    ]
-} as const;
-const PROPOSALS = { type: 'tuple[]', components: PROPOSAL.components } as const;
-const PAGE_RESPONSE = { type: 'tuple', components: [{ type: 'bytes' }, { type: 'uint64' }] } as const;
-const WEIGHTED_VOTES = {
-    type: 'tuple[]',
-    components: [
-        { type: 'uint64' }, { type: 'address' },
-        { type: 'tuple[]', components: [{ type: 'uint8' }, { type: 'string' }] }, { type: 'string' }
-    ]
-} as const;
-const PARAMS = {
-    type: 'tuple',
-    components: [
-        { type: 'int64' }, COINS, { type: 'int64' }, { type: 'string' }, { type: 'string' },
-        { type: 'string' }, { type: 'string' }, { type: 'string' }, { type: 'string' },
-        { type: 'int64' }, { type: 'string' }, COINS, { type: 'bool' }, { type: 'bool' },
-        { type: 'bool' }, { type: 'string' }
-    ]
-} as const;
+/** The proposer of all three, in the chain's own spelling and in the EVM's. */
+const PROPOSER = 'nura1ftqdjvqyy26q3w32harejhy8eue8vdcjfp6r77';
+const PROPOSER_HEX = '0x4ac0d9300422b408ba2abf47995c87cf32763712';
+const VOTER = 'nura10d07y265gmmuvt4z0w9aw880jnsr700j98snzy';
 
-const SELECTOR = {
-    params: toFunctionSelector('getParams()'),
-    proposals: toFunctionSelector('getProposals(uint32,address,address,(bytes,uint64,uint64,bool,bool))'),
-    proposal: toFunctionSelector('getProposal(uint64)'),
-    tally: toFunctionSelector('getTallyResult(uint64)'),
-    votes: toFunctionSelector('getVotes(uint64,(bytes,uint64,uint64,bool,bool))')
-};
-
-/** Seconds since the epoch, from the timestamps the module prints. */
-const at = (iso: string): bigint => BigInt(Math.floor(Date.parse(iso) / 1000));
-
-/** One ProposalData tuple, in the module's own field order. */
-type Row = readonly [bigint, readonly string[], number, readonly [string, string, string, string],
-    bigint, bigint, ReadonlyArray<readonly [string, bigint]>, bigint, bigint, string, string, string, `0x${ string }`];
-
+const NURA = (whole: bigint): string => (whole * 10n ** 18n).toString();
+const DEPOSIT = [{ denom: 'anura', amount: NURA(100_000n) }];
 const FEE_MARKET = '/cosmos.evm.feemarket.v1.MsgUpdateParams';
-const DEPOSIT: ReadonlyArray<readonly [string, bigint]> = [['anura', 100_000n * NURA]];
 
-/** The three proposals this chain has, exactly as `evmd q gov proposals` reports them. */
-const PROPOSALS_FIXTURE: Row[] = [
-    [1n, [FEE_MARKET], 3, [(1_000_000n * NURA).toString(), '0', '0', '0'],
-        at('2026-08-24T00:34:18Z'), at('2026-08-26T00:34:18Z'), DEPOSIT,
-        at('2026-08-24T00:34:18Z'), at('2026-08-26T00:34:18Z'),
-        'ipfs://CID', 'Increase EVM Base Fee to 47619 Gwei',
-        'Increase the EVM base fee from 1 Gwei to 47,619 Gwei.', PROPOSER],
-    [2n, [FEE_MARKET], 3, [(1_000_000n * NURA).toString(), '0', '0', '0'],
-        at('2026-08-26T07:18:33Z'), at('2026-08-28T07:18:33Z'), DEPOSIT,
-        at('2026-08-26T07:33:01Z'), at('2026-08-28T07:33:01Z'),
-        'ipfs://CID', 'Set EVM Base Fee to 47619 Gwei',
-        'Set the Nura Chain EVM base fee to 47,619 Gwei while keeping EIP-1559 enabled.', PROPOSER],
-    // Still open, so the module leaves its FINAL tally at zero - the running count is a separate
-    // question, and the detail route is the one that asks it.
-    [3n, [FEE_MARKET], 2, ['0', '0', '0', '0'],
-        at('2026-08-28T19:42:31Z'), at('2026-08-30T19:42:31Z'), DEPOSIT,
-        at('2026-08-28T19:42:31Z'), at('2026-08-30T19:42:31Z'),
-        'ipfs://', 'Increase EVM Base Fee to 45,000 Gwei',
-        'Increase the Nura Chain EVM base fee from 1 Gwei to 45,000 Gwei.', PROPOSER]
+const message = (baseFee: string): Record<string, unknown> => ({
+    '@type': FEE_MARKET,
+    authority: VOTER,
+    params: { base_fee: baseFee, elasticity_multiplier: 2, base_fee_change_denominator: 8 }
+});
+
+const PROPOSALS = [
+    {
+        id: '3', messages: [message('45000000000000000000000000000000')],
+        status: 'PROPOSAL_STATUS_VOTING_PERIOD',
+        final_tally_result: { yes_count: '0', abstain_count: '0', no_count: '0', no_with_veto_count: '0' },
+        submit_time: '2026-08-28T19:42:31.441216284Z', deposit_end_time: '2026-08-30T19:42:31.441216284Z',
+        total_deposit: DEPOSIT, voting_start_time: '2026-08-28T19:42:31.441216284Z',
+        voting_end_time: '2026-08-30T19:42:31.441216284Z', metadata: 'ipfs://',
+        title: 'Increase EVM Base Fee to 45,000 Gwei',
+        summary: 'Increase the Nura Chain EVM base fee from 1 Gwei to 45,000 Gwei.', proposer: PROPOSER
+    },
+    {
+        id: '2', messages: [message('47619000000000000000000000000000')],
+        status: 'PROPOSAL_STATUS_PASSED',
+        final_tally_result: { yes_count: NURA(1_000_000n), abstain_count: '0', no_count: '0', no_with_veto_count: '0' },
+        submit_time: '2026-08-26T07:18:33.843665051Z', deposit_end_time: '2026-08-28T07:18:33.843665051Z',
+        total_deposit: DEPOSIT, voting_start_time: '2026-08-26T07:33:01.556147410Z',
+        voting_end_time: '2026-08-28T07:33:01.556147410Z', metadata: 'ipfs://CID',
+        title: 'Set EVM Base Fee to 47619 Gwei', summary: 'Set the base fee to 47,619 Gwei.', proposer: PROPOSER
+    },
+    {
+        id: '1', messages: [message('47619000000000')],
+        status: 'PROPOSAL_STATUS_PASSED',
+        final_tally_result: { yes_count: NURA(1_000_000n), abstain_count: '0', no_count: '0', no_with_veto_count: '0' },
+        submit_time: '2026-08-24T00:34:18.065105580Z', deposit_end_time: '2026-08-26T00:34:18.065105580Z',
+        total_deposit: DEPOSIT, voting_start_time: '2026-08-24T00:34:18.065105580Z',
+        voting_end_time: '2026-08-26T00:34:18.065105580Z', metadata: 'ipfs://CID',
+        title: 'Increase EVM Base Fee to 47619 Gwei', summary: 'Increase the base fee to 47,619 Gwei.', proposer: PROPOSER
+    }
 ];
 
-interface GovStub
+interface NodeStub
 {
-    /** False puts the precompile back where it is on a chain that has not enabled it. */
-    enabled?: boolean;
-    /** What `getTallyResult` answers - the running count while a vote is open. */
-    live?: readonly [string, string, string, string];
-    votes?: ReadonlyArray<readonly [bigint, `0x${ string }`, ReadonlyArray<readonly [number, string]>, string]>;
+    /** False is a node that is not there at all: every call fails, as a refused connection does. */
+    up?: boolean;
+    /** What `/tally` answers - the running count while a vote is open. */
+    tally?: Record<string, string>;
+    votes?: unknown[];
+    deposits?: unknown[];
+    /** True mounts the gov precompile, which is what lets the page offer a vote. */
+    writable?: boolean;
+    /** The REST api off, with CometBFT still answering: params null, so the section is off. */
+    restDown?: boolean;
 }
 
-/**
- * A chain whose only answer is the gov precompile's.
- *
- * An address with nothing mounted at it answers `0x` WITHOUT reverting, which is exactly how a
- * chain that has not enabled the precompile behaves - so `enabled: false` returns empty data
- * rather than throwing.
- */
-function stubChain(stub: GovStub = {}): ChainGateway
+/** The node's two apis, answering over `fetch` exactly as they do in production. */
+function stubNode(stub: NodeStub = {}): void
 {
-    const enabled = stub.enabled !== false;
+    const json = (body: unknown): Response =>
+        new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+
+    vi.stubGlobal('fetch', async (input: string | URL | Request): Promise<Response> =>
+    {
+        if (stub.up === false)
+        {
+            throw new Error('connect ECONNREFUSED');
+        }
+        const url = String(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+
+        if (url.includes(':26657/status'))
+        {
+            return json({
+                result: {
+                    node_info: { network: 'nura_1020-1' },
+                    sync_info: { latest_block_height: '459832', catching_up: false }
+                }
+            });
+        }
+        if (stub.restDown === true)
+        {
+            return new Response('not found', { status: 501 });
+        }
+        if (url.includes('/cosmos/gov/v1/params/'))
+        {
+            return json({
+                params: {
+                    quorum: '0.334000000000000000', threshold: '0.500000000000000000',
+                    veto_threshold: '0.334000000000000000', voting_period: '172800s',
+                    max_deposit_period: '172800s', min_deposit: [{ denom: 'anura', amount: NURA(100_000n) }]
+                }
+            });
+        }
+        if (url.includes('/tally'))
+        {
+            return json({ tally: stub.tally ?? { yes_count: '0', abstain_count: '0', no_count: '0', no_with_veto_count: '0' } });
+        }
+        if (url.includes('/votes'))
+        {
+            const votes = stub.votes ?? [];
+            return json({ votes, pagination: { total: String(votes.length) } });
+        }
+        if (url.includes('/deposits'))
+        {
+            const deposits = stub.deposits ?? [];
+            return json({ deposits, pagination: { total: String(deposits.length) } });
+        }
+        if (url.includes('/cosmos/staking/v1beta1/pool'))
+        {
+            return json({ pool: { bonded_tokens: NURA(2_000_000n), not_bonded_tokens: '0' } });
+        }
+        const one = /\/cosmos\/gov\/v1\/proposals\/(\d+)$/.exec(url.split('?')[0] ?? '');
+        if (one !== null)
+        {
+            const found = PROPOSALS.find((row) => row.id === one[1]);
+            return found === undefined ? new Response('not found', { status: 404 }) : json({ proposal: found });
+        }
+        if (url.includes('/cosmos/gov/v1/proposals'))
+        {
+            return json({ proposals: PROPOSALS, pagination: { total: String(PROPOSALS.length) } });
+        }
+        return new Response('not found', { status: 404 });
+    });
+}
+
+/** The EVM side: only the precompile probe reaches it. */
+function stubChain(writable = false): ChainGateway
+{
     return {
         env: ENV,
         head: async () => 100,
@@ -126,95 +165,77 @@ function stubChain(stub: GovStub = {}): ChainGateway
         isContract: async () => false,
         code: async () => '0x',
         storageAt: async () => `0x${ '0'.repeat(64) }`,
-        call: async (address, data) =>
-        {
-            if (address.toLowerCase() !== GOV_PRECOMPILE || !enabled)
-            {
-                return '0x';
-            }
-            const selector = data.slice(0, 10);
-            if (selector === SELECTOR.params)
-            {
-                return encodeAbiParameters([PARAMS], [[
-                    172_800n, [['anura', 100_000n * NURA]], 172_800n,
-                    '0.334000000000000000', '0.500000000000000000', '0.334000000000000000',
-                    '0.100000000000000000', '0.500000000000000000', '', 86_400n,
-                    '0.667000000000000000', [['anura', 200_000n * NURA]], false, false, false,
-                    '0.010000000000000000'
-                ]]);
-            }
-            if (selector === SELECTOR.proposals)
-            {
-                return encodeAbiParameters([PROPOSALS, PAGE_RESPONSE], [PROPOSALS_FIXTURE, ['0x', BigInt(PROPOSALS_FIXTURE.length)]]);
-            }
-            if (selector === SELECTOR.proposal)
-            {
-                const id = BigInt(`0x${ data.slice(10) }`);
-                const found = PROPOSALS_FIXTURE.find((row) => row[0] === id);
-                if (found === undefined)
-                {
-                    throw new Error('execution reverted: proposal not found');
-                }
-                return encodeAbiParameters([PROPOSAL], [found]);
-            }
-            if (selector === SELECTOR.tally)
-            {
-                return encodeAbiParameters([TALLY], [stub.live ?? ['0', '0', '0', '0']]);
-            }
-            if (selector === SELECTOR.votes)
-            {
-                const votes = stub.votes ?? [];
-                return encodeAbiParameters([WEIGHTED_VOTES, PAGE_RESPONSE], [votes, ['0x', BigInt(votes.length)]]);
-            }
-            throw new Error('execution reverted');
-        }
+        // An address with no precompile mounted answers empty WITHOUT reverting.
+        call: async (address) =>
+            (address.toLowerCase() === GOV_PRECOMPILE && writable ? `0x${ '0'.repeat(64) }` : '0x')
     };
 }
 
-function api(stub: GovStub = {}): (path: string) => Promise<Response>
+function api(stub: NodeStub = {}): (path: string) => Promise<Response>
 {
-    const app = buildApp({ dev: false, store: new IndexStore(':memory:'), chain: stubChain(stub) });
+    stubNode(stub);
+    const app = buildApp({
+        dev: false,
+        store: new IndexStore(':memory:'),
+        chain: stubChain(stub.writable === true),
+        cosmos: COSMOS
+    });
     return (path) => app.handle(new Request(`http://local${ path }`));
 }
 
-describe('the module\'s own numbering', () =>
+afterEach(() =>
 {
-    it('names the states in x/gov\'s order', () =>
+    vi.unstubAllGlobals();
+});
+
+describe('an account in both of the chain\'s spellings', () =>
+{
+    it('decodes a bech32 account to the twenty bytes the EVM knows', () =>
     {
-        // 1 is the deposit period and 5 is a proposal that passed and then failed to execute.
-        expect(PROPOSAL_STATUS_BY_CODE).toEqual(['unspecified', 'deposit', 'voting', 'passed', 'rejected', 'failed']);
-        expect(PROPOSAL_STATUS_BY_CODE[3]).toBe('passed');
-        expect(PROPOSAL_STATUS_BY_CODE[4]).toBe('rejected');
+        // Verified against the chain: this proposer is the account that signs most of its
+        // transactions, and the explorer's address page is keyed on the hex.
+        expect(bech32ToHex(PROPOSER)).toBe(PROPOSER_HEX);
+        expect(bech32ToHex(VOTER)).toBe('0x7b5fe22b5446f7c62ea27b8bd71cef94e03f3df2');
     });
 
-    it('names the vote options in the module\'s order', () =>
+    it('refuses an address whose checksum does not hold', () =>
     {
-        expect(VOTE_OPTION_BY_CODE).toEqual(['unspecified', 'yes', 'abstain', 'no', 'noWithVeto']);
+        // One character changed. Decoding it anyway would link a proposal to somebody else.
+        expect(bech32ToHex('nura1ftqdjvqyy26q3w32harejhy8eue8vdcjfp6r78')).toBeNull();
+        expect(bech32ToHex('nura1ftqdjvqyy26q3w32harejhy8eue8vdcjfp6r7b')).toBeNull();
     });
 
-    it('sends every governance transaction to the precompile\'s fixed address', () =>
+    it('refuses what is not an address', () =>
     {
-        expect(GOV_PRECOMPILE).toBe('0x0000000000000000000000000000000000000805');
+        expect(bech32ToHex('')).toBeNull();
+        expect(bech32ToHex('nura1')).toBeNull();
+        expect(bech32ToHex('0x4ac0d9300422b408ba2abf47995c87cf32763712')).toBeNull();
+        // Mixed case is not valid bech32 - the checksum is defined over one case or the other.
+        expect(bech32ToHex('Nura1ftqdjvqyy26q3w32harejhy8eue8vdcjfp6r77')).toBeNull();
     });
 });
 
-describe('a chain that does not expose governance to the EVM', () =>
+describe('a node that is not answering', () =>
 {
-    it('says so, rather than showing a chain nobody proposes anything on', async () =>
+    it('says governance is unreachable rather than showing an empty chain', async () =>
     {
-        const get = api({ enabled: false });
+        const get = api({ up: false });
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
         expect(overview.enabled).toBe(false);
         expect(overview.params).toBeNull();
+        expect(overview.node).toBeNull();
         expect(overview.total).toBe(0);
-        expect(overview.precompile).toBe(GOV_PRECOMPILE);
     });
 
-    it('lists nothing and 404s a proposal', async () =>
+    it('says the same when only the REST api is off', async () =>
     {
-        const get = api({ enabled: false });
-        expect(((await (await get('/api/governance/proposals')).json()) as ProposalPage).total).toBe(0);
+        const get = api({ restDown: true });
+        const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
+
+        expect(overview.enabled).toBe(false);
+        // CometBFT still answers, so the node itself is reported even then.
+        expect(overview.node?.height).toBe(459_832);
         expect((await get('/api/governance/proposals/1')).status).toBe(404);
     });
 });
@@ -233,76 +254,117 @@ describe('the governance overview', () =>
         expect(overview.failed).toBe(0);
     });
 
-    it('reads the module\'s parameters, and the denom a deposit is made in', async () =>
+    it('reads the module\'s parameters, turning its durations into seconds', async () =>
     {
         const get = api();
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
-        expect(overview.params).toMatchObject({
+        expect(overview.params).toEqual({
             quorum: '0.334000000000000000',
             threshold: '0.500000000000000000',
             vetoThreshold: '0.334000000000000000',
-            votingPeriod: 172_800
+            votingPeriod: 172_800,
+            maxDepositPeriod: 172_800,
+            minDeposit: [{ denom: 'anura', amount: NURA(100_000n) }]
         });
-        expect(overview.params?.minDeposit).toEqual([{ denom: 'anura', amount: (100_000n * NURA).toString() }]);
         expect(overview.denom).toBe('anura');
+    });
+
+    it('carries the staked supply a quorum is measured against, and the node it read from', async () =>
+    {
+        const get = api();
+        const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
+
+        expect(overview.bondedTokens).toBe(NURA(2_000_000n));
+        expect(overview.node).toEqual({ chainId: 'nura_1020-1', height: 459_832, catchingUp: false });
+    });
+
+    it('reports reading and WRITING as the two separate facts they are', async () =>
+    {
+        // Reading needs the node's api; casting a vote needs the gov precompile, which is a chain
+        // setting. A reader can follow a proposal either way and is told plainly when they cannot
+        // act on it.
+        const readOnly = (await (await api()('/api/governance')).json()) as GovernanceOverview;
+        expect(readOnly.enabled).toBe(true);
+        expect(readOnly.writable).toBe(false);
+
+        const both = (await (await api({ writable: true })('/api/governance')).json()) as GovernanceOverview;
+        expect(both.enabled).toBe(true);
+        expect(both.writable).toBe(true);
+        expect(both.precompile).toBe(GOV_PRECOMPILE);
     });
 });
 
 describe('the proposal list', () =>
 {
-    it('reads thirteen fields back in the module\'s order', async () =>
+    it('reads a proposal field for field, in both spellings of its proposer', async () =>
     {
         const get = api();
         const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
 
         expect(page.total).toBe(3);
-        expect(page.rows[0]).toEqual({
-            id: '1',
-            title: 'Increase EVM Base Fee to 47619 Gwei',
-            summary: 'Increase the EVM base fee from 1 Gwei to 47,619 Gwei.',
-            status: 'passed',
+        expect(page.rows[0]).toMatchObject({
+            id: '3',
+            title: 'Increase EVM Base Fee to 45,000 Gwei',
+            status: 'voting',
             proposer: PROPOSER,
-            messages: ['/cosmos.evm.feemarket.v1.MsgUpdateParams'],
-            metadata: 'ipfs://CID',
-            submitTime: '2026-08-24T00:34:18.000Z',
-            depositEndTime: '2026-08-26T00:34:18.000Z',
-            votingStartTime: '2026-08-24T00:34:18.000Z',
-            votingEndTime: '2026-08-26T00:34:18.000Z',
-            totalDeposit: [{ denom: 'anura', amount: (100_000n * NURA).toString() }],
-            tally: { yes: (1_000_000n * NURA).toString(), abstain: '0', no: '0', noWithVeto: '0' }
+            proposerHex: PROPOSER_HEX,
+            metadata: 'ipfs://',
+            totalDeposit: [{ denom: 'anura', amount: NURA(100_000n) }]
         });
     });
 
-    it('narrows to what is still running, what carried, and what did not', async () =>
+    it('keeps the whole message, not only which module it addresses', async () =>
     {
         const get = api();
-        const at_ = async (query: string): Promise<ProposalPage> =>
-            (await (await get(`/api/governance/proposals?${ query }`)).json()) as ProposalPage;
+        const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
+        const [message] = page.rows[0]!.messages;
 
-        expect((await at_('status=open')).total).toBe(1);
-        expect((await at_('status=open')).rows[0]!.status).toBe('voting');
-        expect((await at_('status=passed')).total).toBe(2);
-        expect((await at_('status=failed')).total).toBe(0);
+        expect(message?.type).toBe(FEE_MARKET);
+        // What it DOES is the fields inside it - a type url alone says which module changes and
+        // nothing about how.
+        expect(message?.body).toContain('45000000000000000000000000000000');
     });
 
-    it('pages in the same countable envelope as every other list', async () =>
-    {
-        const get = api();
-        const page = (await (await get('/api/governance/proposals?limit=2')).json()) as ProposalPage;
-
-        expect(page.rows).toHaveLength(2);
-        expect(page.pages).toBe(2);
-        expect(page.page).toBe(1);
-    });
-
-    it('keeps a deposit whole - a uint256 does not survive a double', async () =>
+    it('normalises the module\'s nanosecond timestamps', async () =>
     {
         const get = api();
         const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
 
-        expect(page.rows[0]!.totalDeposit[0]!.amount).toBe('100000000000000000000000');
-        expect(page.rows[0]!.tally.yes).toBe('1000000000000000000000000');
+        expect(page.rows[0]!.submitTime).toBe('2026-08-28T19:42:31.441Z');
+        expect(page.rows[0]!.votingEndTime).toBe('2026-08-30T19:42:31.441Z');
+    });
+
+    it('files each state under the outcome it belongs to', async () =>
+    {
+        const get = api();
+        const at = async (query: string): Promise<ProposalPage> =>
+            (await (await get(`/api/governance/proposals?${ query }`)).json()) as ProposalPage;
+
+        expect((await at('status=open')).total).toBe(1);
+        expect((await at('status=passed')).total).toBe(2);
+        expect((await at('status=failed')).total).toBe(0);
+        expect((await at('limit=2')).pages).toBe(2);
+    });
+
+    it('carries the RUNNING tally on the rows still being voted on', async () =>
+    {
+        // The module leaves a proposal's own tally at zero until its vote closes, so the one row
+        // a reader scans for the shape of would be drawn empty. The open rows are counted live.
+        const get = api({
+            tally: {
+                yes_count: NURA(620_000n), abstain_count: NURA(90_000n),
+                no_count: NURA(240_000n), no_with_veto_count: NURA(50_000n)
+            }
+        });
+        const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
+
+        const voting = page.rows.find((row) => row.status === 'voting');
+        expect(voting?.tally.yes).toBe(NURA(620_000n));
+
+        // A closed one keeps what the module wrote when it closed, not a count taken now.
+        const passed = page.rows.find((row) => row.status === 'passed');
+        expect(passed?.tally.yes).toBe(NURA(1_000_000n));
     });
 });
 
@@ -310,53 +372,72 @@ describe('one proposal', () =>
 {
     it('prefers the RUNNING tally over the final one while a vote is open', async () =>
     {
-        // Proposal 3 is in its voting period, so the module leaves its own final tally at zero.
-        // A page that printed that would report a live vote as one nobody had touched.
-        const live = [(7n * NURA).toString(), (2n * NURA).toString(), (1n * NURA).toString(), '0'] as const;
-        const get = api({ live });
+        const get = api({
+            tally: {
+                yes_count: NURA(620_000n), abstain_count: NURA(90_000n),
+                no_count: NURA(240_000n), no_with_veto_count: NURA(50_000n)
+            }
+        });
         const detail = (await (await get('/api/governance/proposals/3')).json()) as ProposalDetail;
 
         expect(detail.proposal.status).toBe('voting');
-        expect(detail.proposal.tally).toEqual({
-            yes: (7n * NURA).toString(), abstain: (2n * NURA).toString(), no: (1n * NURA).toString(), noWithVeto: '0'
-        });
+        expect(detail.proposal.tally.yes).toBe(NURA(620_000n));
+        expect(detail.proposal.tally.noWithVeto).toBe(NURA(50_000n));
+        expect(detail.bondedTokens).toBe(NURA(2_000_000n));
     });
 
-    it('carries the precompile and the selectors its controls encode against', async () =>
-    {
-        const get = api();
-        const detail = (await (await get('/api/governance/proposals/1')).json()) as ProposalDetail;
-
-        expect(detail.precompile).toBe(GOV_PRECOMPILE);
-        expect(detail.calls.vote).toBe(toFunctionSelector('vote(address,uint64,uint8,string)'));
-        expect(detail.calls.submitProposal).toBe(toFunctionSelector('submitProposal(address,bytes,(string,uint256)[])'));
-        expect(detail.calls.deposit).toBe(toFunctionSelector('deposit(address,uint64,(string,uint256)[])'));
-        expect(detail.params.quorum).toBe('0.334000000000000000');
-    });
-
-    it('flattens a weighted vote into the options it actually split across', async () =>
+    it('flattens a weighted vote into the options it split across', async () =>
     {
         const get = api({
             votes: [
-                [3n, VOTER, [[1, '0.600000000000000000'], [3, '0.400000000000000000']], 'split'],
-                [3n, PROPOSER, [[1, '1.000000000000000000']], '']
+                { proposal_id: '3', voter: VOTER, metadata: 'split', options: [
+                    { option: 'VOTE_OPTION_YES', weight: '0.600000000000000000' },
+                    { option: 'VOTE_OPTION_NO', weight: '0.400000000000000000' }
+                ] },
+                { proposal_id: '3', voter: PROPOSER, metadata: '', options: [
+                    { option: 'VOTE_OPTION_ABSTAIN', weight: '1.000000000000000000' }
+                ] }
             ]
         });
         const detail = (await (await get('/api/governance/proposals/3')).json()) as ProposalDetail;
 
         expect(detail.votes).toEqual([
-            { voter: VOTER, option: 'yes', weight: '0.600000000000000000', metadata: 'split' },
-            { voter: VOTER, option: 'no', weight: '0.400000000000000000', metadata: 'split' },
-            { voter: PROPOSER, option: 'yes', weight: '1.000000000000000000', metadata: '' }
+            { voter: VOTER, voterHex: '0x7b5fe22b5446f7c62ea27b8bd71cef94e03f3df2', option: 'yes', weight: '0.600000000000000000', metadata: 'split' },
+            { voter: VOTER, voterHex: '0x7b5fe22b5446f7c62ea27b8bd71cef94e03f3df2', option: 'no', weight: '0.400000000000000000', metadata: 'split' },
+            { voter: PROPOSER, voterHex: PROPOSER_HEX, option: 'abstain', weight: '1.000000000000000000', metadata: '' }
         ]);
         expect(detail.total).toBe(2);
+    });
+
+    it('reads an option answered as the enum\'s number as well as by name', async () =>
+    {
+        const get = api({
+            votes: [{ proposal_id: '3', voter: VOTER, metadata: '', options: [{ option: '4', weight: '1.000000000000000000' }] }]
+        });
+        const detail = (await (await get('/api/governance/proposals/3')).json()) as ProposalDetail;
+
+        expect(detail.votes[0]!.option).toBe('noWithVeto');
+    });
+
+    it('shows who has put a deposit behind it', async () =>
+    {
+        const get = api({
+            deposits: [{ proposal_id: '3', depositor: PROPOSER, amount: [{ denom: 'anura', amount: NURA(100_000n) }] }]
+        });
+        const detail = (await (await get('/api/governance/proposals/3')).json()) as ProposalDetail;
+
+        expect(detail.deposits).toEqual([{
+            depositor: PROPOSER,
+            depositorHex: PROPOSER_HEX,
+            amount: [{ denom: 'anura', amount: NURA(100_000n) }]
+        }]);
     });
 
     it('404s an id the module does not hold, and one that is not an id at all', async () =>
     {
         const get = api();
         expect((await get('/api/governance/proposals/999')).status).toBe(404);
-        expect((await get('/api/governance/proposals/../evil')).status).toBe(404);
+        expect((await get('/api/governance/proposals/abc')).status).toBe(404);
     });
 
     it('exposes the governance routes on the manifest the client reads', async () =>
