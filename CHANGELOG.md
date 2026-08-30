@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.3.0
+
+### Features
+
+- **Governance:** follow this chain's own `x/gov` module — proposals, tallies, ballots and deposits,
+  read live from the node's Cosmos REST api with CometBFT for the height it was read at. Nothing is
+  copied into sqlite: a chain has tens of proposals where it has millions of transactions
+- **Governance:** vote, deposit and submit a proposal from the page, signed by the reader's wallet
+  through the gov precompile. Reading and writing are reported separately — a chain that answers
+  the REST api without exposing the precompile is the normal case, and the page then follows a
+  proposal without offering an action nothing can send
+- **Governance:** decode the bech32 spelling of a proposer, voter or depositor to the twenty bytes
+  the EVM knows, so each still links to its account page
+- **Charts:** add the charts and statistics page, a single-series area chart, and the daily series
+  the index is aggregated into
+- **Price:** show what the coin is worth, read from the exchange that trades it
+- **Wallet:** pick from the three wallets this explorer offers, discovered through EIP-6963
+- **Accounts:** page and search the rich list
+- **Transactions:** filter the list by status; **Blocks:** filter to blocks with transactions
+- **Address:** filter the ledger by direction; **Transaction:** page the token transfers it emitted
+- **UI:** add a filter group primitive
+- **Advertising:** add the two sponsor slots the shell can carry
+- **i18n:** the governance module's vocabulary in all ten languages
+
+### Fixes
+
+- **Mobile:** draw list rows as cards below `sm:` on blocks, transactions and accounts, and keep
+  hash values inside their panel on a phone
+- **Address:** key the page on the address the index stores, and gap the token id from outside its
+  ltr island — `data` forces its own direction, so a logical margin on it cannot follow the line
+- **Governance:** count the open rows live in the list. The module leaves a proposal's own tally at
+  zero until its vote closes, so the row a reader scans first was drawn empty
+- **Rows:** keep a counterparty pair inside the column that holds it
+- **Home:** print the block time in the reader's own digits; **Charts:** the same for a counted
+  figure, and lift the peak off the plot
+- **Block:** say a transaction outcome in words, not in colour alone
+- **Shell:** theme the browser chrome with the palette's own void
+- **Service:** enable the unit the installer actually wrote
+
+### Style
+
+- **Transactions:** move the age under the addresses, last in the row
+- Let a long proposal title break inside the word — a proposal about the EVM carries a bare address,
+  which no soft wrap can place
+
+### Chores
+
+- Replace ESLint with oxlint, and install oxfmt. `.azeroth` files are no longer linted: oxlint
+  cannot parse the single-file component format
+- Sweep the audit's dead code and drift
+
+### Documentation
+
+- Describe the governance read path, and cut the README back to a short one
+
 ## 1.2.0
 
 ### Features
