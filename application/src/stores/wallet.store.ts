@@ -1,6 +1,7 @@
 import { createStore, createSignal, type Getter } from 'azerothjs';
 
 import type { ChainInfo } from '../api.ts';
+import { installNuraDeepLink } from '../lib/nura-deeplink.ts';
 import { brandFor, usableIcon, WALLET_BRANDS } from '../lib/wallets.ts';
 
 // The reader's wallet, as far as this explorer is concerned: which one they chose, which account
@@ -254,6 +255,13 @@ export const useWallet = createStore((): WalletApi =>
                 void adopt(brand.rdns, 'eth_accounts');
             }
         });
+
+        // Nura Wallet is an application, not an extension, so outside its own in-app browser
+        // there is nothing to announce it - the page has to carry that side itself. This puts a
+        // deep-link provider on the same announcement channel as the extensions, which is why
+        // there is no branch for it anywhere below: it goes through the gate above like the rest,
+        // and does nothing at all where the transport cannot work. See ../lib/nura-deeplink.ts.
+        installNuraDeepLink();
 
         // Wallets announce unprompted at load AND on request. The request is what catches the
         // ones that finished injecting before this listener existed - without it, whether a
