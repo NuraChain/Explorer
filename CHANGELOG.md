@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.2
+
+### Features
+
+- **Wallet:** reach Nura Wallet over the `nurawallet://` deep link, so it connects from an ordinary
+  browser and not only from the wallet's own. The page announces an EIP-6963 provider whose requests
+  travel to the wallet and settle from the fragment it appends when it reopens the callback. It
+  announces nothing off an https origin — the wallet checks the callback's protocol before anything
+  else, and a request from elsewhere leaves and never comes back
+
+### Fixes
+
+- **Wallet:** gate the roster entry on the identifier the wallet announces, `net.nurachain.wallet`,
+  not on its Tauri bundle id. The store dropped every announcement it made, including the provider
+  it injects into its own in-app browser — that alone is why the entry had never connected
+
 ## 1.3.1
 
 ### Fixes
