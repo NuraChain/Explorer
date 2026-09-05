@@ -191,6 +191,34 @@ export interface DailyStats
     fees: string;
 }
 
+/**
+ * A day with nothing in it - the row a silent day would have had.
+ *
+ * Written once: statsDaily grows its rows from this, and the charts route fills the days it knows
+ * the index reached with it, so the two cannot disagree about what "nothing" looks like.
+ */
+export function silentDay(day: number): DailyStats
+{
+    return {
+        day, blocks: 0, transactions: 0, transfers: 0, contracts: 0,
+        activeAddresses: 0, newAddresses: 0, gasUsed: 0, gasLimit: 0,
+        blockSize: 0, blockTime: 0, gasPrice: '0', fees: '0'
+    };
+}
+
+/** What the index holds and how far it reaches. See {@link IndexStore.stats}. */
+export interface IndexStats
+{
+    blocks: number;
+    transactions: number;
+    transfers: number;
+    /** The newest block's height and timestamp; 0 and 0 for an empty index. */
+    head: number;
+    headTime: number;
+    /** The oldest block's timestamp; 0 for an empty index. */
+    firstTime: number;
+}
+
 /** The same figures over one arbitrary window - what a headline tile compares against. */
 export interface WindowStats
 {
@@ -467,15 +495,22 @@ export class IndexStore
     // Reads
     // ----------------------------------------------------------------------------------
 
-    public stats(): { blocks: number; transactions: number; transfers: number; head: number; headTime: number }
+    /**
+     * What the index holds, counted, and how far it reaches: the height and instant of its newest
+     * block and the instant of its oldest. The two instants bound what the index has SEEN - a day
+     * between them with nothing in it is a day the chain was silent; a day outside them is one
+     * the index never looked at.
+     */
+    public stats(): IndexStats
     {
         const row = this.#stmt(`
             SELECT (SELECT COUNT(*) FROM blocks) AS blocks,
                    (SELECT COUNT(*) FROM transactions) AS transactions,
                    (SELECT COUNT(*) FROM token_transfers) AS transfers,
                    (SELECT COALESCE(MAX(number), 0) FROM blocks) AS head,
-                   (SELECT COALESCE(MAX(timestamp), 0) FROM blocks) AS headTime`)
-            .get() as { blocks: number; transactions: number; transfers: number; head: number; headTime: number };
+                   (SELECT COALESCE(MAX(timestamp), 0) FROM blocks) AS headTime,
+                   (SELECT COALESCE(MIN(timestamp), 0) FROM blocks) AS firstTime`)
+            .get() as unknown as IndexStats;
         return row;
     }
 
@@ -814,11 +849,7 @@ export class IndexStore
             let row = days.get(day);
             if (row === undefined)
             {
-                row = {
-                    day, blocks: 0, transactions: 0, transfers: 0, contracts: 0,
-                    activeAddresses: 0, newAddresses: 0, gasUsed: 0, gasLimit: 0,
-                    blockSize: 0, blockTime: 0, gasPrice: '0', fees: '0'
-                };
+                row = silentDay(day);
                 days.set(day, row);
             }
             return row;

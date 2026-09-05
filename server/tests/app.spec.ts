@@ -297,9 +297,9 @@ describe('the index', () =>
 
 describe('the API over the index', () =>
 {
-    async function api(): Promise<(path: string) => Promise<Response>>
+    async function api(blocks: BlockWithReceipts[] = CHAIN): Promise<(path: string) => Promise<Response>>
     {
-        const { store, chain } = await indexed(CHAIN);
+        const { store, chain } = await indexed(blocks);
         const app = buildApp({ dev: false, store, chain });
         return (path) => app.handle(new Request(`http://local${ path }`));
     }
@@ -626,6 +626,37 @@ describe('the API over the index', () =>
         // work a request is - an unbounded one is a request to scan the whole index.
         expect((await get('/api/stats/charts?days=365')).status).toBe(422);
         expect((await get('/api/stats/charts?days=0')).status).toBe(422);
+    });
+
+    it('draws a day the chain was silent at zero, and leaves out a day the index has not reached', async () =>
+    {
+        // Two blocks five days ago, one block two days ago, nothing between. The two days between
+        // are zeros: the index reached them and found nothing. Yesterday and today are ABSENT: the
+        // index's head is two days old, so they are days it has not seen, not quiet ones. And the
+        // days before the first block are absent too, however wide the window. Without the zeros
+        // the "90 days" chart of a month-old chain was the "30 days" chart drawn again.
+        const DAY = 86_400;
+        const now = Math.floor(Date.now() / 1000);
+        const stamped = (entry: BlockWithReceipts, timestamp: number): BlockWithReceipts => ({ ...entry, timestamp });
+        const get = await api([
+            stamped(block(0, '0x00', '0xb0'), now - 5 * DAY),
+            stamped(block(1, '0xb0', '0xb1', 2), now - 5 * DAY),
+            stamped(block(2, '0xb1', '0xb2'), now - 2 * DAY)
+        ]);
+
+        const charts = (await (await get('/api/stats/charts?days=7')).json()) as ChartsSummary;
+        const blocks = charts.series.find((series) => series.key === 'blocks')!;
+        expect(blocks.points.map((point) => point.value)).toEqual(['2', '0', '0', '1']);
+
+        const dayOf = (at: string): number => Math.floor(Date.parse(at) / 1000 / DAY);
+        expect(dayOf(blocks.points[0]!.at)).toBe(Math.floor((now - 5 * DAY) / DAY));
+        expect(dayOf(blocks.points[3]!.at)).toBe(Math.floor((now - 2 * DAY) / DAY));
+
+        // Every series is filled alike, so the page can still read one against another.
+        expect(new Set(charts.series.map((series) => series.points.length))).toEqual(new Set([4]));
+        // A wider window adds nothing: the days before the first block were never indexed.
+        const wider = (await (await get('/api/stats/charts?days=90')).json()) as ChartsSummary;
+        expect(wider.series[0]!.points).toHaveLength(4);
     });
 
     it('serves the same answer twice, because the payload is cached', async () =>

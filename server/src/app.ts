@@ -19,7 +19,7 @@ import {
 } from './chain/cosmos.ts';
 import { GOV_PRECOMPILE, precompileEnabled } from './chain/gov.ts';
 import { selectorOf } from './chain/signatures.ts';
-import { normalize, type DailyStats, type IndexStore } from './chain/store.ts';
+import { normalize, silentDay, type DailyStats, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
 import { calldataFor, inspectContract, readContract } from './inspect.ts';
 import {
@@ -282,13 +282,40 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
         })
     });
 
+    /**
+     * The daily rows of a window, with every day the index REACHED and found nothing on drawn at
+     * zero.
+     *
+     * The store leaves such a day out, because from where it stands a silent day and a day the
+     * indexer has not got to yet look alike. Here they do not: the index's oldest and newest
+     * blocks bound what it has seen, so a day between them with no row is a day the chain
+     * produced nothing, and a day outside them stays absent. Without this, a range longer than the
+     * chain's own history drew exactly the picture of the range below it, and the axis under a
+     * "90 days" chart quietly began at the first block instead.
+     */
+    const dailyRows = (from: number, to: number): DailyStats[] =>
+    {
+        const reach = store.stats();
+        const rows = new Map(store.statsDaily(from, to).map((row) => [row.day, row]));
+        const first = Math.max(Math.floor(from / DAY_SECONDS), Math.floor(reach.firstTime / DAY_SECONDS));
+        const last = Math.min(Math.floor(to / DAY_SECONDS), Math.floor(reach.headTime / DAY_SECONDS));
+        for (let day = first; day <= last; day++)
+        {
+            if (!rows.has(day))
+            {
+                rows.set(day, silentDay(day));
+            }
+        }
+        return [...rows.values()].sort((left, right) => left.day - right.day);
+    };
+
     /** The whole payload for one window length, computed from the index. */
     const summarize = (days: number, nowSeconds: number): ChartsSummary =>
     {
         const total = store.totals();
         const dayWindow = store.statsWindow(nowSeconds - DAY_SECONDS, nowSeconds);
         const before = store.statsWindow(nowSeconds - 2 * DAY_SECONDS, nowSeconds - DAY_SECONDS);
-        const rows = store.statsDaily(nowSeconds - days * DAY_SECONDS, nowSeconds);
+        const rows = dailyRows(nowSeconds - days * DAY_SECONDS, nowSeconds);
 
         const share = (whole: number, added: number): StatFigure =>
             ({ value: String(whole), change: whole === 0 ? null : added / whole });

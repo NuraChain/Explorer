@@ -583,6 +583,11 @@ export type ChartPoint = Infer<typeof chartPoint>;
 export const chartSeries = object({
     key: enumOf(CHART_SERIES),
     unit: enumOf(CHART_UNITS),
+    /**
+     * One per UTC day, oldest first, over the part of the window the index has reached. A day the
+     * chain was silent is a zero; a day the index has not seen is absent, so the axis a chart draws
+     * is the window asked for and not merely the days that had something in them.
+     */
     points: array(chartPoint)
 });
 export type ChartSeries = Infer<typeof chartSeries>;
