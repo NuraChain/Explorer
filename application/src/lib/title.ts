@@ -27,3 +27,57 @@ export function useTitle(compose: () => string): void
         document.title = name === '' ? suffix : `${ name } · ${ suffix }`;
     });
 }
+/**
+ * The shell's own description tag, created on first use.
+ *
+ * index.html ships one, so this only builds a tag where the document arrived without it - a test
+ * environment, or a shell somebody trimmed. Returning it either way keeps the caller free of the
+ * null check.
+ */
+function descriptionTag(): Element
+{
+    const existing = document.querySelector('meta[name="description"]');
+    if (existing !== null)
+    {
+        return existing;
+    }
+    const created = document.createElement('meta');
+    created.setAttribute('name', 'description');
+    document.head.append(created);
+    return created;
+}
+
+/**
+ * Names the page for a crawler and for whatever unfurls a shared link, by writing the shell's
+ * `<meta name="description">` for as long as the page is mounted.
+ *
+ * It RESTORES the previous value on the way out, which `useTitle` has no reason to do: every page
+ * sets a title, so the last one written is always the current page's. A description is set only by
+ * the pages with prose worth describing, and one left behind would go on describing the home page
+ * as the documentation for the rest of the visit.
+ */
+export function useDescription(compose: () => string): void
+{
+    createEffect(() =>
+    {
+        if (typeof document === 'undefined')
+        {
+            return;
+        }
+        const text = compose().trim();
+        if (text === '')
+        {
+            return;
+        }
+        const tag = descriptionTag();
+        const previous = tag.getAttribute('content');
+        tag.setAttribute('content', text);
+        return () =>
+        {
+            if (previous !== null)
+            {
+                tag.setAttribute('content', previous);
+            }
+        };
+    });
+}

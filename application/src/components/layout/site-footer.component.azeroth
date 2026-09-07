@@ -50,6 +50,9 @@ export default component SiteFooter()
                     <li><Link to="/txs" class="text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link></li>
                     <li><Link to="/governance" class="text-muted no-underline hover:text-text">{ locale.t('nav.governance') }</Link></li>
                     <li><Link to="/charts" class="text-muted no-underline hover:text-text">{ locale.t('nav.charts') }</Link></li>
+                    {/* Last, and only here: the header row has no width left for a sixth link
+                        (see App.azeroth), and a page of prose is what a footer is for anyway. */}
+                    <li><Link to="/docs" class="text-muted no-underline hover:text-text">{ locale.t('docs.title') }</Link></li>
                 </ul>
             </nav>
 

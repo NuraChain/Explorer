@@ -433,6 +433,97 @@ export const en = {
     'governance.new.submit': 'Submit proposal',
     'governance.new.badJson': 'That is not valid JSON.',
 
+    // --- Docs ---------------------------------------------------------------------------------
+    // The one page here that is prose rather than chain data, which makes it the only page a
+    // search engine can rank on its words - so every entry is a whole sentence. A heading with a
+    // fragment under it indexes as noise, and a reader who arrived on a question wants it answered
+    // in the paragraph rather than in a link to somewhere else.
+    'docs.title': 'Documentation',
+    'docs.lede': 'What this explorer reads, how to read it back, and the questions people arrive with.',
+    'docs.toc': 'On this page',
+
+    'docs.section.about': 'What this explorer is',
+    'docs.about.p1': 'Nura Explorer follows an EVM node block by block, writes what it reads into an index of its own, and serves that index back as pages you can link to. Nothing on the site is an estimate: every figure is counted from blocks the chain has already sealed.',
+    'docs.about.p2': 'It asks for no account and keeps none. There is nothing to sign up for, nothing to install, and no wallet has to be connected to read any page here.',
+
+    'docs.section.search': 'Finding something',
+    'docs.search.p1': 'One field in the header takes all three identifiers - an account address, a transaction hash, or a block number. It works out which one was pasted and opens the page for it, so there is nothing to choose first.',
+    'docs.search.p2': 'A value that finds nothing is usually one of two things: a character lost from a hash, or a block the indexer has not reached yet. The home page says how far behind the node the index is, so a transaction from moments ago is worth asking for again shortly.',
+
+    'docs.section.sections': 'The sections',
+    'docs.sections.intro': 'Five sections, each answering one question about the chain.',
+    'docs.sections.blocks': 'Every block in order, newest first, with its height, its age, the transactions it carried and the gas they spent.',
+    'docs.sections.transactions': 'Every transaction the index holds, and a page for each one: sender, recipient, value, fee, status, and the transfers the call actually made.',
+    'docs.sections.accounts': 'Accounts ranked by native balance. These are read live from the node rather than from the index, because a stale balance is a wrong one.',
+    'docs.sections.governance': 'The chain’s proposals - what each would do, where its vote stands, who has voted, and what it still needs to pass.',
+    'docs.sections.charts': 'The index added up over time: transactions, blocks, addresses, fees, gas and contract activity, across a week, a month or a quarter.',
+
+    'docs.section.reading': 'Reading chain data',
+    'docs.term.address': 'Address',
+    'docs.term.address.body': 'An account: twenty bytes, written as forty hexadecimal characters after 0x. The same shape serves a person’s wallet and a deployed contract, and the address page says which of the two it found.',
+    'docs.term.hash': 'Transaction hash',
+    'docs.term.hash.body': 'A transaction’s identity: thirty-two bytes, fixed at the moment it is signed. It names the same transaction in every wallet and on every explorer, which is why it is the thing to quote when reporting one.',
+    'docs.term.block': 'Block',
+    'docs.term.block.body': 'A batch of transactions the chain agreed on at one height. Heights count from zero and never repeat, so a block number is an exact point in the chain’s history rather than a position in a list.',
+    'docs.term.gas': 'Gas and the base fee',
+    'docs.term.gas.body': 'Gas measures the work a transaction asks the network to do; the base fee is what one unit of that work costs in the block that included it. The fee charged is the gas used multiplied by the price paid per unit.',
+    'docs.term.nonce': 'Nonce',
+    'docs.term.nonce.body': 'A counter held per account, one higher on each transaction it sends. It fixes the order they execute in, and it is what stops a signed transaction being replayed a second time.',
+    'docs.term.transfer': 'Transfer',
+    'docs.term.transfer.body': 'A movement of value inside a transaction, recovered from the logs it emitted - ERC-20, ERC-721 and ERC-1155 alike. One call can produce several, so a transaction lists them rather than reporting a single number.',
+    'docs.term.decimals': 'Decimals',
+    'docs.term.decimals.body': 'Chain amounts are whole numbers of the smallest unit, and a coin’s decimals say where the point belongs. Every amount here is scaled in exact integers rather than in floating point, so a balance is never rounded into a different number.',
+
+    'docs.section.wallet': 'Connecting a wallet',
+    'docs.wallet.p1': 'Reading needs no wallet. One is asked for only where a page can send something - voting on a proposal, adding to its deposit, or calling a contract that writes - and even then the transaction is built here and signed there, in the wallet, where it can be read before it goes.',
+    'docs.wallet.p2': 'Wallets announce themselves to the page rather than being hardcoded, so whichever ones are installed appear in the picker and none of them is favoured. This explorer never asks for a seed phrase or a private key, and no page on it has any use for one.',
+
+    'docs.section.governance': 'How governance is read',
+    'docs.governance.p1': 'This is a Cosmos chain with an EVM module, so its proposals live in the chain’s own governance module and never appear as EVM events. They are read from the node’s own interfaces at the moment you ask for them, and nothing is copied into the index - a chain has tens of proposals where it has millions of transactions, so a copy would only be one that can go stale.',
+    'docs.governance.p2': 'Following a proposal and acting on one are separate capabilities. The page shows a proposal wherever the node answers; it offers a vote only where the chain has enabled the precompile that a vote is sent to. A chain with one and not the other is the ordinary case, and the page says which it has.',
+
+    'docs.section.api': 'The API',
+    'docs.api.p1': 'Every page here is drawn from a public HTTP API under /api, and it is the same one the pages themselves call - there is no private endpoint behind them. Responses are JSON, and the server publishes a machine-readable list of its routes at /api/_manifest.',
+    'docs.api.p2': 'There is also a small Etherscan-compatible surface, so a wallet configured with this explorer as its API can resolve balances and transaction lists. Both are rate limited per address, so a script that walks the chain should page through results rather than ask for all of them at once.',
+
+    'docs.section.limits': 'What this explorer does not do',
+    'docs.limits.p1': 'It counts what the chain has already committed, and nothing else. There is no view of the mempool, so a transaction that has not been included yet cannot be found here, and no pending list exists to look in.',
+    'docs.limits.p2': 'It runs no contract verification service and no market of its own either. A contract’s interface is recovered from its bytecode, so a function whose signature has been published is named while one that has not is printed as the four bytes it is; a price is quoted only where a deployment has configured an exchange to ask, and where none has, the page prints nothing rather than a number nobody measured.',
+
+    'docs.section.faq': 'Common questions',
+    'docs.faq.cost.q': 'Do I need an account, and does any of this cost anything?',
+    'docs.faq.cost.a': 'No to both. Every page is public, nothing sits behind a sign-up, and reading the chain is free. A fee is paid only when you send a transaction, and it goes to the network rather than to this explorer.',
+    'docs.faq.missing.q': 'My transaction is not here. Where is it?',
+    'docs.faq.missing.a': 'Either the index has not reached it yet, or it was never included in a block. A transaction appears as soon as the indexer reads the block that carried it, usually within seconds, and the home page shows how far behind the node the index is. If minutes pass and it is still absent, check the hash for a lost character, and check in your wallet that it was actually broadcast.',
+    'docs.faq.balance.q': 'The balance shown here is not the one my wallet shows.',
+    'docs.faq.balance.a': 'Balances on this site are read from the node as the page loads, so the usual causes are a wallet that has not refreshed, or a wallet adding tokens to a figure that is the native coin alone. Where both are current and still disagree, the node is the authority - this explorer only prints what it answered.',
+    'docs.faq.gas.q': 'Why did a plain transfer still cost a fee?',
+    'docs.faq.gas.a': 'Every transaction pays for the work it asks the network to do, and even a plain transfer asks for some. The transaction page breaks the charge into its parts: the gas used, the price paid per unit, and the total taken from the sender.',
+    'docs.faq.failed.q': 'My transaction failed. Was I charged anyway?',
+    'docs.faq.failed.a': 'Yes. The work was done before the call reverted, and the fee pays for the work rather than for the outcome. The value is not moved, though: a revert undoes every change the call made, which is why a failed transfer leaves both balances where they were.',
+    'docs.faq.pending.q': 'Where do I see pending transactions?',
+    'docs.faq.pending.a': 'Nowhere here. This explorer reads sealed blocks rather than the mempool, so a transaction exists on the site once it has been included and not before. A wallet is the right place to watch one you have just sent.',
+    'docs.faq.source.q': 'Can I read a contract’s source code?',
+    'docs.faq.source.a': 'Not here. The contract page is built from the bytecode the chain stores: a function whose signature is publicly known is named and can be called from the page, and one that is not is shown as the four bytes that identify it. No source is uploaded, matched or vouched for, so nothing on the page can claim a contract does something its bytecode does not.',
+    'docs.faq.tokens.q': 'Are token movements shown, or only the native coin?',
+    'docs.faq.tokens.a': 'Both. Token transfers are read from the logs a transaction emitted, covering ERC-20 balances, ERC-721 items and ERC-1155 batches, so a swap reads as the two sides it actually had rather than as one opaque contract call.',
+    'docs.faq.api.q': 'Can I get this data programmatically?',
+    'docs.faq.api.a': 'Yes. The public API under /api is the same one these pages use, it answers JSON, and it lists its own routes at /api/_manifest. It is rate limited, so page through long lists rather than requesting them whole.',
+    'docs.faq.wallets.q': 'Which wallets work here?',
+    'docs.faq.wallets.a': 'Any browser wallet that announces itself to the page the standard way, which current versions do. Installed wallets appear in the picker on their own, nothing has to be configured, and which one to use is always yours to choose.',
+    'docs.faq.addChain.q': 'How do I add this chain to my wallet?',
+    'docs.faq.addChain.a': 'Use the button the explorer provides rather than typing the details in by hand. It hands your wallet the network exactly as this deployment is configured - chain id, currency and endpoint - so the chain you add is by construction the one these pages describe. Your wallet still asks you to confirm before it adds anything.',
+    'docs.faq.vote.q': 'Can I vote on a proposal from here?',
+    'docs.faq.vote.a': 'Where the chain allows it, yes: connect a wallet holding a stake, open the proposal, and the page prepares the vote for your wallet to sign. Where the chain has not enabled the precompile that such a vote is sent to, the proposal is still shown in full, without the action.',
+    'docs.faq.privacy.q': 'What does this site record about me?',
+    'docs.faq.privacy.a': 'The pages load no analytics, no third-party scripts and no tracking of any kind - even the fonts are served from this origin. Your language and theme are kept in your own browser and never sent anywhere. The server keeps ordinary request logs, as any web server does, and connecting a wallet shares your address with this site alone.',
+    'docs.faq.wrong.q': 'Something on a page looks wrong.',
+    'docs.faq.wrong.a': 'Please report it. The project is open source and its issue tracker is the right place - a link to the block, transaction or address, together with what you expected to see instead, is usually enough to reproduce it.',
+
+    'docs.help.heading': 'Still stuck?',
+    'docs.help.body': 'The project is developed in the open. Read the code or open an issue on GitHub, or ask in one of the community channels linked at the foot of every page.',
+    'docs.help.repository': 'The project on GitHub',
+
     // --- Page titles --------------------------------------------------------------------------
     'title.chainExplorer': '{chain} explorer',
     'title.chainFallback': 'Chain'

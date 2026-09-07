@@ -1,0 +1,229 @@
+import { Link } from 'azerothjs';
+
+import { useDescription, useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
+import type { MessageKey } from '../locales/en.ts';
+
+import Icon from '../icons/icon.component.azeroth';
+
+// The one page here that answers questions instead of showing chain state.
+//
+// It reads nothing: no resource, no node, no index. That is deliberate rather than incidental -
+// the answers describe how this explorer works, and a deployment whose node is unreachable is
+// exactly when somebody comes looking for them. It also makes the page the only one whose SSR
+// output is complete on its own, which is what a crawler and a shared link get.
+//
+// The content is entirely in the catalog, in ten languages. Nothing below writes a sentence.
+
+/** One section of the page: an anchor a link can carry, a heading, and what sits under it. */
+interface DocSection
+{
+    /** The fragment the contents link to, and the one a shared deep link arrives on. */
+    id: string;
+    heading: MessageKey;
+
+    /** The paragraphs directly under the heading, before anything else the section holds. */
+    body: MessageKey[];
+
+    /** A definition list: a section of this site, or a term the chain uses. */
+    terms?: Array<{ term: MessageKey; body: MessageKey; to?: string }>;
+
+    /** Question and answer pairs, marked up as an FAQ for whatever is reading the markup. */
+    questions?: Array<{ id: string; question: MessageKey; answer: MessageKey }>;
+}
+
+// Order is the page AND the table of contents - the list is walked twice, so a section cannot
+// appear in one and be missing from the other.
+const SECTIONS: DocSection[] = [
+    {
+        id: 'about',
+        heading: 'docs.section.about',
+        body: ['docs.about.p1', 'docs.about.p2']
+    },
+    {
+        id: 'search',
+        heading: 'docs.section.search',
+        body: ['docs.search.p1', 'docs.search.p2']
+    },
+    {
+        id: 'sections',
+        heading: 'docs.section.sections',
+        body: ['docs.sections.intro'],
+        // The nav keys, not new ones: a section is called the same thing here as in the header
+        // that leads to it, and two strings for one name is how they drift apart.
+        terms: [
+            { term: 'nav.blocks', body: 'docs.sections.blocks', to: '/blocks' },
+            { term: 'nav.transactions', body: 'docs.sections.transactions', to: '/txs' },
+            { term: 'nav.accounts', body: 'docs.sections.accounts', to: '/accounts' },
+            { term: 'nav.governance', body: 'docs.sections.governance', to: '/governance' },
+            { term: 'nav.charts', body: 'docs.sections.charts', to: '/charts' }
+        ]
+    },
+    {
+        id: 'reading',
+        heading: 'docs.section.reading',
+        body: [],
+        terms: [
+            { term: 'docs.term.address', body: 'docs.term.address.body' },
+            { term: 'docs.term.hash', body: 'docs.term.hash.body' },
+            { term: 'docs.term.block', body: 'docs.term.block.body' },
+            { term: 'docs.term.gas', body: 'docs.term.gas.body' },
+            { term: 'docs.term.nonce', body: 'docs.term.nonce.body' },
+            { term: 'docs.term.transfer', body: 'docs.term.transfer.body' },
+            { term: 'docs.term.decimals', body: 'docs.term.decimals.body' }
+        ]
+    },
+    {
+        id: 'wallet',
+        heading: 'docs.section.wallet',
+        body: ['docs.wallet.p1', 'docs.wallet.p2']
+    },
+    {
+        id: 'governance',
+        heading: 'docs.section.governance',
+        body: ['docs.governance.p1', 'docs.governance.p2']
+    },
+    {
+        id: 'api',
+        heading: 'docs.section.api',
+        body: ['docs.api.p1', 'docs.api.p2']
+    },
+    {
+        id: 'limits',
+        heading: 'docs.section.limits',
+        body: ['docs.limits.p1', 'docs.limits.p2']
+    },
+    {
+        id: 'faq',
+        heading: 'docs.section.faq',
+        body: [],
+        questions: [
+            { id: 'faq-cost', question: 'docs.faq.cost.q', answer: 'docs.faq.cost.a' },
+            { id: 'faq-missing', question: 'docs.faq.missing.q', answer: 'docs.faq.missing.a' },
+            { id: 'faq-balance', question: 'docs.faq.balance.q', answer: 'docs.faq.balance.a' },
+            { id: 'faq-gas', question: 'docs.faq.gas.q', answer: 'docs.faq.gas.a' },
+            { id: 'faq-failed', question: 'docs.faq.failed.q', answer: 'docs.faq.failed.a' },
+            { id: 'faq-pending', question: 'docs.faq.pending.q', answer: 'docs.faq.pending.a' },
+            { id: 'faq-source', question: 'docs.faq.source.q', answer: 'docs.faq.source.a' },
+            { id: 'faq-tokens', question: 'docs.faq.tokens.q', answer: 'docs.faq.tokens.a' },
+            { id: 'faq-api', question: 'docs.faq.api.q', answer: 'docs.faq.api.a' },
+            { id: 'faq-wallets', question: 'docs.faq.wallets.q', answer: 'docs.faq.wallets.a' },
+            { id: 'faq-add-chain', question: 'docs.faq.addChain.q', answer: 'docs.faq.addChain.a' },
+            { id: 'faq-vote', question: 'docs.faq.vote.q', answer: 'docs.faq.vote.a' },
+            { id: 'faq-privacy', question: 'docs.faq.privacy.q', answer: 'docs.faq.privacy.a' },
+            { id: 'faq-wrong', question: 'docs.faq.wrong.q', answer: 'docs.faq.wrong.a' }
+        ]
+    }
+];
+
+/** Where this explorer is written. The same address the footer carries, for the same reason. */
+const REPOSITORY = 'https://github.com/NuraChain/Explorer';
+
+export default component DocsPage()
+{
+    const locale = useLocale();
+
+    useTitle(() => locale.t('docs.title'));
+    // The only page that sets one. Every other page here IS chain state, and a description
+    // written at build time would describe a height that has since moved.
+    useDescription(() => locale.t('docs.lede'));
+
+    <div class="flex flex-col gap-8">
+        <header class="max-w-3xl">
+            <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('docs.title') }</h1>
+            <p class="mt-1 text-[15px] leading-relaxed text-muted">{ locale.t('docs.lede') }</p>
+        </header>
+
+        {/* Labelled BY the heading rather than with a repeat of it: an aria-label carrying the
+            same words has a screen reader announce "On this page" twice in a row. */}
+        <nav class="panel px-4 py-4" aria-labelledby="docs-contents">
+            <h2 id="docs-contents" class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('docs.toc') }</h2>
+            <ul class="mt-2 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+                <For each={ SECTIONS } key={ (section) => section.id } let={ section }>
+                    <li>
+                        {/* A plain anchor, not a Link: the target is a fragment of this same
+                            document, and routing to it would rebuild the page to stay put. */}
+                        <a
+                            class="inline-flex min-h-9 items-center text-[14px] text-nur no-underline hover:underline"
+                            href={ `#${ section.id }` }
+                        >{ locale.t(section.heading) }</a>
+                    </li>
+                </For>
+            </ul>
+        </nav>
+
+        <For each={ SECTIONS } key={ (section) => section.id } let={ section }>
+            {/* The header is sticky, so a fragment landed on without this sits underneath it.
+                Two values because the header is two rows on a phone and one above `sm` - and it
+                is measured in PERSIAN, the tallest of the ten, at 116px and 71px. */}
+            <section id={ section.id } class="flex scroll-mt-32 flex-col gap-3 sm:scroll-mt-24">
+                <h2 class="text-[18px] font-bold tracking-tight">{ locale.t(section.heading) }</h2>
+
+                <For each={ section.body } key={ (key) => key } let={ key }>
+                    <p class="max-w-3xl text-[15px] leading-relaxed text-muted">{ locale.t(key) }</p>
+                </For>
+
+                <Show when={ section.terms !== undefined }>
+                    <dl class="panel divide-y divide-line">
+                        <For each={ section.terms ?? [] } key={ (row) => row.term } let={ row }>
+                            <div class="px-4 py-3">
+                                <dt class="text-[15px] font-semibold">
+                                    <Show when={ row.to === undefined }>{ locale.t(row.term) }</Show>
+                                    <Show when={ row.to !== undefined }>
+                                        <Link to={ row.to! } class="text-nur no-underline hover:underline">{ locale.t(row.term) }</Link>
+                                    </Show>
+                                </dt>
+                                <dd class="mt-1 max-w-3xl text-[14px] leading-relaxed text-muted">{ locale.t(row.body) }</dd>
+                            </div>
+                        </For>
+                    </dl>
+                </Show>
+
+                {/* `details` rather than a scripted accordion: fourteen answers open and shut
+                    without a line of JavaScript, keyboard support is the browser's, and the text
+                    is in the markup whether or not it is on screen - which is the whole point of
+                    writing it. The schema.org attributes ride the same elements, so the questions
+                    are readable as an FAQ without a second copy of them in a script tag. */}
+                <Show when={ section.questions !== undefined }>
+                    <div class="flex flex-col gap-2" itemscope itemtype="https://schema.org/FAQPage">
+                        <For each={ section.questions ?? [] } key={ (row) => row.id } let={ row }>
+                            <details
+                                id={ row.id }
+                                class="panel scroll-mt-32 px-4 py-3 sm:scroll-mt-24"
+                                itemscope
+                                itemprop="mainEntity"
+                                itemtype="https://schema.org/Question"
+                            >
+                                {/* The colour shift is on the SUMMARY and not on the panel
+                                    around it: the summary is the whole of what can be clicked,
+                                    and a border that lit up for the answer text too would say
+                                    otherwise. */}
+                                <summary
+                                    class="cursor-pointer text-[15px] font-semibold transition-colors duration-150 marker:text-nur hover:text-nur"
+                                    itemprop="name"
+                                >{ locale.t(row.question) }</summary>
+                                <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+                                    <p class="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted" itemprop="text">{ locale.t(row.answer) }</p>
+                                </div>
+                            </details>
+                        </For>
+                    </div>
+                </Show>
+            </section>
+        </For>
+
+        <section class="panel px-4 py-4">
+            <h2 class="text-[15px] font-bold tracking-tight">{ locale.t('docs.help.heading') }</h2>
+            <p class="mt-1 max-w-3xl text-[14px] leading-relaxed text-muted">{ locale.t('docs.help.body') }</p>
+            <a
+                class="mt-3 inline-flex min-h-9 items-center gap-2 text-[14px] text-nur no-underline transition-colors duration-150 hover:underline"
+                href={ REPOSITORY }
+                target="_blank"
+                rel="noreferrer"
+            >
+                <Icon name="social-github" size={ 16 } />
+                { locale.t('docs.help.repository') }
+            </a>
+        </section>
+    </div>
+}
