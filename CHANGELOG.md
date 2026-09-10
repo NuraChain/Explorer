@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.4.0
+
+### Features
+
+- **Docs:** answer the questions readers arrive with, at `/docs`, in all ten languages. Every other
+  page here is chain state, so a visitor who lands on a shared transaction has nowhere to read what
+  this explorer is, what it counts, or why their own transaction is not in it yet — nine anchored
+  sections, a glossary and fourteen questions now say so. It is the one route that reads nothing,
+  which is what lets it prerender at build time and what leaves it readable when the node behind
+  every other page is unreachable
+
+### Fixes
+
+- **Charts:** draw the days the chain was silent at zero, so a range is the window it names. A day
+  with no blocks was left out of the series entirely, and on a chain whose blocks begin in August
+  the "30 days" and "90 days" charts were the same 24 points. Days outside the index's reach are
+  still left out — a stale index is told apart from a quiet chain as before
+
+### Chores
+
+- **Api:** leave CORS to nginx. The Etherscan-compatible surface no longer sends an allow-origin of
+  its own: behind a proxy that already sends one, a second copy is not redundant but fatal, since
+  two values is what a browser refuses outright. Cross-Origin-Resource-Policy stays, because it is
+  not CORS and no allow-origin in front of it overrides the app-wide `same-origin` default
+- Bump the npm dependencies group — lucide, happy-dom, vite, viem and `@types/node`
+
 ## 1.3.2
 
 ### Features
