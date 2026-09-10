@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.1
+
+### Features
+
+- **Contracts:** name the Goman prediction factory, so its address page reads as a contract instead
+  of thirty-four raw selectors. A factory is the contract a whole market tree hangs off — every
+  market on this chain is an EIP-1167 clone it stamped — so leaving it unnamed left every market
+  unreadable too. Its two creates take the same `MarketParams` and differ only in which template
+  they clone, which is why the parimutuel one is called `createMarket2`, and only `createMarket` is
+  payable, because the value sent with it seeds the CPMM pool. The names are the ones the chain's
+  own prediction client publishes, and each selector is hashed from its signature here like every
+  other entry in the table — a name that does not hash to its selector never reaches the page
+
 ## 1.4.0
 
 ### Features
