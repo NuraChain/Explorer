@@ -435,6 +435,62 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['getDeposits(uint64,(bytes,uint64,uint64,bool,bool))', 'view', '(uint64,address,(string,uint256)[])[],(bytes,uint64)'],
     ['getConstitution()', 'view', 'string'],
 
+    // --- Goman prediction markets (the factory) -----------------------------------------------
+    // Not a standard, and not a guess either: these are named from the ABI this chain's own
+    // prediction client ships (NuraChain/Goman, `application/src/lib/abis/prediction-factory.json`),
+    // and the selectors below are hashed from those signatures like every other entry here. It
+    // earns a section because a chain has ONE factory and every market it stamps is reached from
+    // it - leaving the factory unnamed leaves the whole market tree unreadable.
+    //
+    // A market is a CLONE. The factory holds a CPMM implementation and a parimutuel one and
+    // stamps EIP-1167 proxies off them, so the two creates differ in nothing a signature can
+    // show: the same `MarketParams`, a different template. `createMarket` is the CPMM half and
+    // is payable because the value sent seeds the pool; the parimutuel half takes no value, and
+    // its name really is `createMarket2` - the client's ABI spells it that way.
+    //
+    // The nine-field tuple the five list calls return is one market's row - market, creator,
+    // title, category, status, createdAt, lockTime, resolveTime, outcomeCount - written out at
+    // each of them, because a signature has no way to carry a struct's NAME.
+    ['marketCount()', 'view', 'uint256'],
+    ['marketImplementation()', 'view', 'address'],
+    ['poolImplementation()', 'view', 'address'],
+    ['treasury()', 'view', 'address'],
+    ['BPS()', 'view', 'uint16'],
+    ['MAX_FEE_BPS()', 'view', 'uint16'],
+    ['MAX_SIGNERS()', 'view', 'uint256'],
+    ['defaultFeeBps()', 'view', 'uint16'],
+    ['defaultProtocolFeeShareBps()', 'view', 'uint16'],
+    ['requiredConfirmations()', 'view', 'uint256'],
+    ['marketAt(uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)'],
+    ['marketAddress(uint256)', 'view', 'address'],
+    // Which template a market was stamped from: the CPMM one, or the parimutuel pool.
+    ['marketKind(uint256)', 'view', 'uint8'],
+    ['countByStatus(uint8)', 'view', 'uint256'],
+    ['marketsPaged(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['activeMarkets(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['closedMarkets(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['resolvedMarkets(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['marketsByStatus(uint8,uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
+    // Resolution is an n-of-m the factory keeps itself: the signers confirm an outcome, and the
+    // market is only told once `requiredConfirmations()` of them have named the SAME one.
+    ['resolutionSigners()', 'view', 'address[]'],
+    ['isResolutionSigner(address)', 'view', 'bool'],
+    ['confirmationCount(uint256,uint256)', 'view', 'uint256'],
+    ['confirmationOf(uint256,address)', 'view', 'uint256'],
+    ['confirmResolution(uint256,uint256)', 'nonpayable', ''],
+    ['createMarket((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
+    ['createMarket2((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
+    ['closeMarket(uint256)', 'nonpayable', ''],
+    ['voidMarket(uint256)', 'nonpayable', ''],
+    ['pauseMarket(uint256)', 'nonpayable', ''],
+    ['unpauseMarket(uint256)', 'nonpayable', ''],
+    ['setResolutionSigners(address[],uint256)', 'nonpayable', ''],
+    ['setDefaultFees(uint16,uint16)', 'nonpayable', ''],
+    ['setTreasury(address)', 'nonpayable', ''],
+    // A market caches the treasury it was stamped with; this pushes the factory's current one on
+    // to a market already deployed, which is why it takes an id and not an address.
+    ['repointTreasury(uint256)', 'nonpayable', ''],
+
     // --- Odds and ends every toolchain emits --------------------------------------------------
     ['multicall(bytes[])', 'nonpayable', 'bytes[]'],
     ['version()', 'view', 'string'],
