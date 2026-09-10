@@ -88,14 +88,17 @@ describe('routing', () =>
         expect(await blocks.json()).toHaveProperty('rows');
     });
 
-    it('carries the cross-origin headers that make it readable from a wallet webview', async () =>
+    it('carries the CORP that makes it readable from a wallet webview, and no CORS of its own', async () =>
     {
         // securityHeaders() defaults CORP to same-origin app-wide, which discards the response in
-        // the browser even with an allow-origin header. These are what override it.
+        // the browser however correct the allow-origin in front of it. This is what overrides it.
+        //
+        // Allow-origin itself is nginx's, and the absence below is the assertion: a copy from here
+        // would reach the browser as two ACAO values, which it refuses outright.
         const get = await served();
         const response = await get(`/api?module=account&action=balance&address=${ ALICE }`);
-        expect(response.headers.get('access-control-allow-origin')).toBe('*');
         expect(response.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+        expect(response.headers.get('access-control-allow-origin')).toBeNull();
     });
 
     it('refuses an unknown module and an unknown action by name', async () =>
@@ -510,13 +513,13 @@ describe('security of the compatibility surface', () =>
         expect(((await response.json()) as Envelope).message).toBe('NOTOK');
     });
 
-    it('reads no cookie, session or authorization header, which is what makes `*` safe', async () =>
+    it('reads no cookie, session or authorization header, which is what makes the proxy wildcard safe', async () =>
     {
         const get = await served();
         const response = await get(`/api?module=account&action=balance&address=${ ALICE }`);
-        // A credentialed CORS response would have to name an origin, never `*`; the wildcard is
-        // only correct because every answer here is public chain data.
-        expect(response.headers.get('access-control-allow-origin')).toBe('*');
+        // The wildcard is applied at the proxy, but whether it is SAFE is decided here: a
+        // credentialed response would have to name an origin, never `*`. Nothing below issues a
+        // cookie or asks for one, so there is no credentialed request for that wildcard to expose.
         expect(response.headers.get('access-control-allow-credentials')).toBeNull();
         expect(response.headers.get('set-cookie')).toBeNull();
     });

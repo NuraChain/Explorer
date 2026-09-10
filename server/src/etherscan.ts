@@ -26,21 +26,22 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 
 /**
- * The headers that make this surface readable from somewhere else, which is the entire point of
- * it: the callers are a wallet's webview, a script, a dashboard - never this explorer's own pages.
+ * What still has to be said HERE to make this surface readable from somewhere else, which is the
+ * entire point of it: the callers are a wallet's webview, a script, a dashboard - never this
+ * explorer's own pages.
  *
- * `securityHeaders()` defaults Cross-Origin-Resource-Policy to `same-origin` for the whole app,
- * and that alone discards the response in the browser even when Access-Control-Allow-Origin is
- * present - the request goes out, the server answers, the reply never reaches the caller. Those
- * defaults apply only where a response does not already carry the header, so setting it here is
- * what overrides it; no proxy rule can, because nginx cannot strip a header it did not add.
+ * CORS is not in this list. Access-Control-Allow-Origin is nginx's to send, and a second copy
+ * from here would not be redundant but fatal: two ACAO headers is a value the browser refuses
+ * outright, so the surface would fail exactly where it is meant to work.
  *
- * `*` is the right value and not a loosening: every answer below is public, read-only chain data
- * that anyone can also get from the node. Nothing here reads a cookie, a session or an
- * Authorization header, so there is no credentialed request for a wildcard to expose.
+ * Cross-Origin-Resource-Policy is NOT CORS and does not travel with it. `securityHeaders()`
+ * defaults it to `same-origin` for the whole app, and that alone discards the response in the
+ * browser however correct the ACAO in front of it - the request goes out, the server answers,
+ * the reply never reaches the caller. That default applies only where a response does not
+ * already carry the header, so setting it here is what overrides it; a plain `add_header` in
+ * nginx would append a second value rather than replace this one.
  */
 const CROSS_ORIGIN: HeadersInit = {
-    'access-control-allow-origin': '*',
     'cross-origin-resource-policy': 'cross-origin'
 };
 
