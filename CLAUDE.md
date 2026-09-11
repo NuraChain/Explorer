@@ -7,16 +7,16 @@ disagrees with the code, the code is right and this file needs fixing.
 ## Commands
 
 ```sh
-npm run dev            # both halves: client on 3001, server on 3000
-npm run build          # client bundle, SSR bundle, prerender
-npm start              # run the built app (NODE_ENV=production, honours PORT)
-npm run check          # typecheck both workspaces + oxlint — the gate
-npm run lint           # oxlint on its own (`lint:fix` applies what it can fix)
-npm run format         # oxfmt — READ the note below before running this
-npx azeroth check      # the typecheck half alone; the CLI's lint step knew eslint, which is gone
-npm test               # every suite
-npm run test:shuffle   # every suite in random order — the isolation gate
-npm run test:coverage  # server suite + coverage report
+npm run dev                   # both halves: client on 3001, server on 3000
+npm run build                 # client bundle, SSR bundle, prerender
+npm start --workspace server  # run the built app (NODE_ENV=production, honours PORT)
+npm run check                 # typecheck both workspaces + oxlint — the gate
+npm run lint                  # oxlint on its own (`lint:fix` applies what it can fix)
+npm run format                # oxfmt — READ the note below before running this
+npx azeroth check             # the typecheck half alone; the CLI's lint step knew eslint, which is gone
+npm test                      # every suite
+npm run test:shuffle          # every suite in random order — the isolation gate
+npm run test:coverage         # server suite + coverage report
 ```
 
 `npm run check`, `npm test` and `npm run test:shuffle` must all pass before a change is done.

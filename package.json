@@ -19,7 +19,6 @@
         "test:shuffle": "npm run test:shuffle --workspace server && npm run test:shuffle --workspace application",
         "test:server": "npm test --workspace server",
         "test:application": "npm test --workspace application",
-        "start": "npm start --workspace server",
         "service:stop": "bash scripts/service-stop.sh",
         "service:start": "bash scripts/service-start.sh",
         "service:status": "bash scripts/service-status.sh",

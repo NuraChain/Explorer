@@ -26,8 +26,8 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3003/
 ```
 
 If nothing answers, either run the dev pair (`npm run dev` → client on **3001**, proxying `/api`
-to **3000**) or build and start production (`npm run build && npm start`, honouring `PORT`).
-Prefer the already-running instance over starting a competing one.
+to **3000**) or build and start production (`npm run build && npm start --workspace server`,
+honouring `PORT`). Prefer the already-running instance over starting a competing one.
 
 ## Viewports
 

@@ -21,9 +21,9 @@ SERVICE_NAME="nura-explorer"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERVICE_PATH="$ROOT/server"
 
-# No build step for the server - Node >= 24 runs the TypeScript source directly, exactly as the
-# Dockerfile does. WorkingDirectory is the SERVER directory, not the repo root: main.ts reads
-# `.env` from the working directory, and CLIENT_DIR/SSR_ENTRY are written relative to it.
+# No build step for the server - Node >= 24 runs the TypeScript source directly.
+# WorkingDirectory is the SERVER directory, not the repo root: main.ts reads `.env` from the
+# working directory, and CLIENT_DIR/SSR_ENTRY are written relative to it.
 SERVICE_PATH_APP="src/main.ts"
 
 SERVICE_DIR="${SERVICE_DIR:-/etc/systemd/system}"
