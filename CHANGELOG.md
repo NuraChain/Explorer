@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.2
+
+### Chores
+
+- **Build:** drop the Dockerfile and the root `start` script. Nothing here was built or deployed
+  through a container — the service is installed by `scripts/service-install.sh` and run by
+  systemd — so an image definition nobody built could only drift out of agreement with the way the
+  app is actually started. `npm start --workspace server` is the one remaining way to run the built
+  app, and the root alias that hid which workspace it meant is gone with it
+- Bump the npm dependencies group — vitest and `@vitest/coverage-v8` to 5, oxlint, oxfmt, lucide,
+  happy-dom, viem and `@types/node`
+
 ## 1.4.1
 
 ### Features
