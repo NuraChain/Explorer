@@ -125,14 +125,3 @@ export function totalUnbonding(rows: readonly { balance: string }[]): string
     return rows.reduce((sum, row) => sum + BigInt(row.balance), 0n).toString();
 }
 
-/**
- * Seconds as whole days, rounded down.
- *
- * The unbonding period is the single most important number on the page - it is how long a
- * reader's stake is locked and unearning after they ask for it back - and it is stated in days
- * because that is the unit the decision is actually made in.
- */
-export function days(seconds: number): number
-{
-    return Math.floor(seconds / 86_400);
-}

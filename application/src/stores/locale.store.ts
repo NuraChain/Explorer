@@ -1,6 +1,6 @@
 import { createStore, createSignal, type Getter } from 'azerothjs';
 
-import { elapsed, formatChange, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes } from '../lib/format.ts';
+import { elapsed, formatChange, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes, scaleDuration } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
 import { fa } from '../locales/fa.ts';
 import { ar } from '../locales/ar.ts';
@@ -192,6 +192,12 @@ export interface LocaleApi
     /** How long ago, in words. */
     ago(iso: string, now?: number): string;
 
+    /**
+     * A configured LENGTH of time, in the unit that states it best - `2 days`, `36 hours`,
+     * `5 minutes`. For a parameter a chain was set up with, never for a span between two dates.
+     */
+    duration(seconds: number): string;
+
     /** A byte size with its unit spelled in the reader's language. */
     bytes(value: number): string;
 }
@@ -252,6 +258,15 @@ export const useLocale = createStore((): LocaleApi =>
             // so this picks a form where it matters without the caller knowing about plurals.
             const key = (count === 1 ? `time.${ unit }` : `time.${ unit }s`) as MessageKey;
             return t(key, { count: formatCount(count, LOCALE_TAG[locale()]) });
+        },
+        duration: (seconds) =>
+        {
+            const { unit, count } = scaleDuration(seconds);
+            // Singular and plural picked by count, exactly as `ago` above does it.
+            const key = (count === 1 ? `duration.${ unit }` : `duration.${ unit }s`) as MessageKey;
+            // The decimal appears only where the span did not divide evenly: a voting period of
+            // two days is `2 days`, not `2.0 days`.
+            return t(key, { count: formatCount(count, LOCALE_TAG[locale()], Number.isInteger(count) ? 0 : 1) });
         },
         bytes: (value) =>
         {

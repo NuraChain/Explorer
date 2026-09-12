@@ -343,6 +343,23 @@ export const en = {
     'time.day': '{count} day ago',
     'time.days': '{count} days ago',
 
+    // A LENGTH of time, not a moment in one: a chain's voting period is "2 days", never
+    // "2 days ago", so these cannot share the keys above. Six units rather than the four
+    // `elapsed` needs, because the same parameter is two weeks on one network and five
+    // minutes on a devnet, and `{count} days` states the second as "0.0".
+    'duration.second': '{count} second',
+    'duration.seconds': '{count} seconds',
+    'duration.minute': '{count} minute',
+    'duration.minutes': '{count} minutes',
+    'duration.hour': '{count} hour',
+    'duration.hours': '{count} hours',
+    'duration.day': '{count} day',
+    'duration.days': '{count} days',
+    'duration.week': '{count} week',
+    'duration.weeks': '{count} weeks',
+    'duration.month': '{count} month',
+    'duration.months': '{count} months',
+
     'unit.bytes': '{count} B',
     'unit.kilobytes': '{count} KB',
     'unit.gwei': '{amount} gwei',
@@ -358,7 +375,6 @@ export const en = {
     'governance.veto': 'Veto',
     'governance.minDeposit': 'Minimum deposit',
     'governance.votingPeriod': 'Voting period',
-    'governance.days': '{count} days',
     'governance.share': '{percent}%',
     'governance.filter': 'Outcome',
     'governance.filter.open': 'Open',
@@ -443,7 +459,6 @@ export const en = {
     'staking.active': 'Active set',
     'staking.ofSet': '{active} of {total}',
     'staking.maxValidators': 'Maximum validators',
-    'staking.days': '{count} days',
     'staking.filter': 'Set',
     'staking.filter.active': 'Active',
     'staking.filter.inactive': 'Inactive',
@@ -479,9 +494,9 @@ export const en = {
     'staking.act.pickDestination': 'Choose where to move it.',
     'staking.act.amount': 'Amount',
     'staking.act.stake': 'Stake',
-    'staking.act.stake.hint': 'Staked coins secure the chain and earn rewards. Getting them back takes {days} days, and they earn nothing while you wait.',
+    'staking.act.stake.hint': 'Staked coins secure the chain and earn rewards. Getting them back takes {period}, and they earn nothing while you wait.',
     'staking.act.unstake': 'Unstake',
-    'staking.act.unstake.hint': 'This starts a {days} day wait. The coins earn nothing while they are locked, and nothing can shorten it.',
+    'staking.act.unstake.hint': 'This starts a wait of {period}. The coins earn nothing while they are locked, and nothing can shorten it.',
     'staking.act.move': 'Move',
     'staking.act.move.hint': 'Moving to another validator takes effect at once - the stake never leaves the set, so there is nothing to wait for.',
     'staking.act.destination': 'Move to',

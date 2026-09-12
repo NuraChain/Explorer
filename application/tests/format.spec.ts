@@ -5,7 +5,7 @@
 // misreports a balance has failed at its only job, so the arithmetic is pinned here.
 import { describe, it, expect } from 'vitest';
 
-import { elapsed, formatAmount, formatCompact, formatCount, formatDate, formatDateTime, formatGwei, formatUsd, formatValue, gasShare, parseAmount, scaleBytes, shortHash } from '../src/lib/format.ts';
+import { elapsed, formatAmount, formatCompact, formatCount, formatDate, formatDateTime, formatGwei, formatUsd, formatValue, gasShare, parseAmount, scaleBytes, scaleDuration, shortHash } from '../src/lib/format.ts';
 
 describe('parseAmount - what someone typed, into wei', () =>
 {
@@ -188,6 +188,60 @@ describe('elapsed', () =>
         // A block timestamp a second ahead of the reader's clock is routine; a negative count
         // is not something an explorer should ever print.
         expect(elapsed(new Date(now + 5000).toISOString(), now)).toEqual({ unit: 'justNow', count: 0 });
+    });
+});
+
+describe('scaleDuration - a chain parameter, not a moment', () =>
+{
+    it('names a span in the largest unit that divides it exactly', () =>
+    {
+        expect(scaleDuration(30)).toEqual({ unit: 'second', count: 30 });
+        expect(scaleDuration(300)).toEqual({ unit: 'minute', count: 5 });
+        expect(scaleDuration(3600)).toEqual({ unit: 'hour', count: 1 });
+        expect(scaleDuration(172_800)).toEqual({ unit: 'day', count: 2 });
+        expect(scaleDuration(1_209_600)).toEqual({ unit: 'week', count: 2 });
+        expect(scaleDuration(2_592_000)).toEqual({ unit: 'month', count: 1 });
+    });
+
+    it('prefers the exact unit over the biggest one', () =>
+    {
+        // Thirty-six hours is a day and a half; `1.5 days` is the same span stated worse, and
+        // twenty days is not a whole number of weeks so it stays in days.
+        expect(scaleDuration(129_600)).toEqual({ unit: 'hour', count: 36 });
+        expect(scaleDuration(1_728_000)).toEqual({ unit: 'day', count: 20 });
+    });
+
+    it('falls back to one decimal of the largest unit that fits', () =>
+    {
+        // Divides evenly nowhere: `1.2 days` is a reading, `100000 seconds` is not.
+        expect(scaleDuration(100_000)).toEqual({ unit: 'day', count: 1.2 });
+        expect(scaleDuration(90)).toEqual({ unit: 'minute', count: 1.5 });
+    });
+
+    it('never states a span as SHORTER than it is', () =>
+    {
+        // This is what the unbonding period is read through, and a lock printed as shorter than
+        // it is, is the one error here that costs the reader something. So the decimal rounds up:
+        // a second under a day is a whole day of waiting, not `0` of anything.
+        for (const seconds of [86_399, 1_814_500, 100_000, 61, 3601])
+        {
+            const { unit, count } = scaleDuration(seconds);
+            const size = { second: 1, minute: 60, hour: 3600, day: 86_400, week: 604_800, month: 2_592_000 }[unit];
+            expect(count * size, `${ seconds }s printed as ${ count } ${ unit }`).toBeGreaterThanOrEqual(seconds);
+        }
+    });
+
+    it('states a short devnet period as itself rather than as 0.0 days', () =>
+    {
+        // The bug this exists for: dividing by 86400 turned every testnet parameter into zero.
+        expect(scaleDuration(60)).toEqual({ unit: 'minute', count: 1 });
+        expect(scaleDuration(1)).toEqual({ unit: 'second', count: 1 });
+    });
+
+    it('reads an unset or negative parameter as zero seconds', () =>
+    {
+        expect(scaleDuration(0)).toEqual({ unit: 'second', count: 0 });
+        expect(scaleDuration(-5)).toEqual({ unit: 'second', count: 0 });
     });
 });
 

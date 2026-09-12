@@ -7,7 +7,6 @@ import {
     amountOf,
     commission,
     commissionMax,
-    days,
     isActive,
     totalDelegated,
     totalUnbonding,
@@ -16,6 +15,7 @@ import {
     validatorTone,
     votingPower
 } from '../src/lib/staking.ts';
+import { scaleDuration } from '../src/lib/format.ts';
 import { BOND_STATUSES, type Validator } from '../../server/src/schemas.ts';
 
 const NURA = (whole: bigint): string => (whole * 10n ** 18n).toString();
@@ -170,14 +170,21 @@ describe('one reader\'s totals', () =>
 
 describe('the unbonding period', () =>
 {
-    it('is whole days, rounded down', () =>
+    // It is read through the shared `scaleDuration` rather than a days-only helper of its own: a
+    // chain sets this to three weeks and a devnet sets it to five minutes, and `Math.floor(s/86400)`
+    // stated every one of the short ones as `0 days`.
+    it('is stated in the unit the chain configured it in', () =>
     {
-        // 21 days is the Cosmos default, and the figure the page states.
-        expect(days(1_814_400)).toBe(21);
-        expect(days(86_400)).toBe(1);
-        // Rounded DOWN, never up: a wait stated as shorter than it is would be the one lie that
-        // matters here.
-        expect(days(86_399)).toBe(0);
-        expect(days(0)).toBe(0);
+        // 21 days is the Cosmos default, and three weeks is what 21 days is.
+        expect(scaleDuration(1_814_400)).toEqual({ unit: 'week', count: 3 });
+        expect(scaleDuration(86_400)).toEqual({ unit: 'day', count: 1 });
+        expect(scaleDuration(300)).toEqual({ unit: 'minute', count: 5 });
+    });
+
+    it('never states the lock as shorter than it is', () =>
+    {
+        // The one lie that matters here: a reader deciding to unstake is agreeing to this wait.
+        expect(scaleDuration(86_399)).toEqual({ unit: 'hour', count: 24 });
+        expect(scaleDuration(1)).toEqual({ unit: 'second', count: 1 });
     });
 });

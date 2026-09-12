@@ -1,6 +1,6 @@
 import { client, type ChainInfo, type Delegation, type StakingOverview, type Validator } from '../../api.ts';
 import { formatAmount, parseAmount } from '../../lib/format.ts';
-import { days, isActive } from '../../lib/staking.ts';
+import { isActive } from '../../lib/staking.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 import { useToasts } from '../../stores/toasts.store.ts';
@@ -180,7 +180,7 @@ export default component StakeActions(props: {
                         what a reader is agreeing to, and it is not reversible once signed. */}
                     <p class="text-[13px] text-muted">
                         { locale.t('staking.act.stake.hint', {
-                            days: locale.n(days(props.overview.params?.unbondingTime ?? 0))
+                            period: locale.duration(props.overview.params?.unbondingTime ?? 0)
                         }) }
                     </p>
                     <div class="flex flex-wrap items-end gap-2">
@@ -204,7 +204,7 @@ export default component StakeActions(props: {
                 <div class="flex flex-col gap-2">
                     <p class="text-[13px] text-muted">
                         { locale.t('staking.act.unstake.hint', {
-                            days: locale.n(days(props.overview.params?.unbondingTime ?? 0))
+                            period: locale.duration(props.overview.params?.unbondingTime ?? 0)
                         }) }
                     </p>
                     <div class="flex flex-wrap items-end gap-2">

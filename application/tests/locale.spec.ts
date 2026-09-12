@@ -150,6 +150,32 @@ describe('the catalog', () =>
             expect(written.length / KEYS.length).toBeGreaterThan(0.7);
         });
 
+    it('keeps the plural partner of every "duration" key that takes a count', () =>
+    {
+        // `duration()` picks `duration.week` or `duration.weeks` by count the same way. Six units
+        // and not four: a chain parameter is two weeks on one network and five minutes on a
+        // devnet, and neither reads correctly in the units `elapsed` stops at.
+        for (const unit of ['second', 'minute', 'hour', 'day', 'week', 'month'])
+        {
+            for (const locale of LOCALES)
+            {
+                expect(CATALOG[locale], `${ locale } duration.${ unit }`).toHaveProperty(`duration.${ unit }`);
+                expect(CATALOG[locale], `${ locale } duration.${ unit }s`).toHaveProperty(`duration.${ unit }s`);
+            }
+        }
+    });
+
+    it('says a length WITHOUT the word that makes it a moment', () =>
+    {
+        // The whole reason `duration.*` is not `time.*`: "2 days ago" is not a voting period.
+        const ago: Partial<Record<Locale, string>> = { en: 'ago', fa: 'پیش', tr: 'önce', fr: 'il y a', es: 'hace', pt: 'há', ar: 'قبل', zh: '前', hi: 'पहले' };
+        for (const [locale, word] of Object.entries(ago) as Array<[Locale, string]>)
+        {
+            expect(String(CATALOG[locale]['time.days']), `${ locale } time.days`).toContain(word);
+            expect(String(CATALOG[locale]['duration.days']), `${ locale } duration.days`).not.toContain(word);
+        }
+    });
+
     it('keeps the plural partner of every "time" key that takes a count', () =>
     {
         // `ago()` picks `time.hour` or `time.hours` by count without asking the caller. A missing
@@ -222,6 +248,41 @@ describe('the locale store', () =>
         locale.setLocale('fa');
         // Persian digits, not Latin ones with a Persian separator.
         expect(locale.n(1234)).toMatch(/[۰-۹]/);
+    });
+
+    it('states a chain parameter in the unit that fits it, in the chosen language', () =>
+    {
+        locale.setLocale('en');
+        expect(locale.duration(172_800)).toBe('2 days');
+        expect(locale.duration(604_800)).toBe('1 week');
+        expect(locale.duration(300)).toBe('5 minutes');
+        // Singular and plural both picked by count, and no `2.0` where the span divided evenly.
+        expect(locale.duration(86_400)).toBe('1 day');
+        expect(locale.duration(100_000)).toBe('1.2 days');
+
+        locale.setLocale('fa');
+        // Persian digits, Persian unit, and none of the پیش that would make it a moment.
+        const written = locale.duration(172_800);
+        expect(written).toContain('روز');
+        expect(written).not.toContain('پیش');
+        expect(written).toMatch(/[۰-۹]/);
+    });
+
+    it('words the unbonding warning around the period rather than around the word "days"', () =>
+    {
+        // The sentence used to carry the unit itself ("takes {days} days"), which is wrong the
+        // moment a chain sets the lock to anything that is not a whole number of days.
+        for (const next of LOCALES)
+        {
+            locale.setLocale(next);
+            const period = locale.duration(1_814_400);
+            for (const key of ['staking.act.stake.hint', 'staking.act.unstake.hint'] as MessageKey[])
+            {
+                const written = locale.t(key, { period });
+                expect(written, `${ next } ${ key }`).toContain(period);
+                expect(written, `${ next } ${ key }`).not.toContain('{period}');
+            }
+        }
     });
 
     it('gives Persian the Jalali calendar rather than a transliterated Gregorian one', () =>

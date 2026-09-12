@@ -186,6 +186,60 @@ export function elapsed(iso: string, now = Date.now()): { unit: ElapsedUnit; cou
     return { unit: 'day', count: Math.floor(seconds / 86_400) };
 }
 
+export type DurationUnit = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month';
+
+/**
+ * Largest first, and a month is thirty days flat.
+ *
+ * Nothing calendrical is meant by it: these name a LENGTH a chain was configured with, which
+ * `x/gov` stores as a plain count of seconds with no calendar behind it.
+ */
+const SPANS: ReadonlyArray<[seconds: number, unit: DurationUnit]> = [
+    [2_592_000, 'month'],
+    [604_800, 'week'],
+    [86_400, 'day'],
+    [3600, 'hour'],
+    [60, 'minute']
+];
+
+/**
+ * A configured length of time as a unit and a count - a voting period, a deposit window.
+ *
+ * Separate from `elapsed`, which answers "how long ago" and tops out at days: this one is read
+ * off a chain's PARAMETERS, where the same field is two weeks on a mainnet and five minutes on a
+ * devnet. One fixed unit cannot state both - dividing by 86400 printed the second as `0.0 days`,
+ * which is not a reading.
+ *
+ * The unit is the largest that divides the span exactly, so a chain configured with two weeks is
+ * read back as two weeks and not as fourteen days. A span that divides evenly nowhere takes the
+ * largest unit that fits and one decimal, because `1.2 days` beats `100000 seconds`.
+ *
+ * That last decimal rounds UP and never down. One of the spans this states is the unbonding
+ * period - how long a stake is locked and unearning after its owner asks for it back - and a wait
+ * printed as shorter than it is, is the one error here that costs the reader something.
+ */
+export function scaleDuration(seconds: number): { unit: DurationUnit; count: number }
+{
+    const whole = Math.max(0, Math.round(seconds));
+
+    for (const [size, unit] of SPANS)
+    {
+        if (whole >= size && whole % size === 0)
+        {
+            return { unit, count: whole / size };
+        }
+    }
+    for (const [size, unit] of SPANS)
+    {
+        if (whole >= size)
+        {
+            return { unit, count: Math.ceil(whole / size * 10) / 10 };
+        }
+    }
+    // Under a minute, which includes the zero an unset parameter reads as.
+    return { unit: 'second', count: whole };
+}
+
 /** An absolute timestamp, for detail pages where the exact moment matters. */
 export function formatDateTime(iso: string, tag = 'en-US'): string
 {
