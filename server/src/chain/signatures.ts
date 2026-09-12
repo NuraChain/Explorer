@@ -435,6 +435,41 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['getDeposits(uint64,(bytes,uint64,uint64,bool,bool))', 'view', '(uint64,address,(string,uint256)[])[],(bytes,uint64)'],
     ['getConstitution()', 'view', 'string'],
 
+    // --- The Cosmos staking precompile (cosmos/evm, 0x…0800) ----------------------------------
+    // Governance's neighbour, and the same arrangement: `x/staking` is a Cosmos module that never
+    // touches the EVM, and this fixed address is what lets a wallet that only speaks Ethereum send
+    // a `MsgDelegate`. The explorer READS the validator set from the module's REST api instead
+    // (see chain/staking.ts) - these are here so the four transactions can be ENCODED.
+    //
+    // A validator is named by its BECH32 operator address, which is why every one of these takes
+    // a `string` where an EVM contract would take an address: `nuravaloper1…` is the module's own
+    // key for a validator, and the twenty bytes underneath it belong to the operator's ACCOUNT,
+    // not to the validator. Passing the hex form would name something else.
+    //
+    // `undelegate` and `redelegate` answer a COMPLETION TIME rather than a success flag: both
+    // start a clock the module will finish on its own, and the useful answer is when.
+    ['delegate(address,string,uint256)', 'nonpayable', 'bool'],
+    ['undelegate(address,string,uint256)', 'nonpayable', 'int64'],
+    ['redelegate(address,string,string,uint256)', 'nonpayable', 'int64'],
+    // Takes the CREATION HEIGHT of the entry being cancelled: a delegator may have several
+    // withdrawals in flight from one validator, and the height is what tells them apart.
+    ['cancelUnbondingDelegation(address,string,uint256,uint256)', 'nonpayable', 'bool'],
+    ['delegation(address,string)', 'view', 'uint256,(string,uint256)'],
+    ['validators(string,(bytes,uint64,uint64,bool,bool))', 'view', '(string,string,bool,uint8,uint256,uint256,(string,string,string,string,string),int64,int64,uint256,uint256)[],(bytes,uint64)'],
+
+    // --- The Cosmos distribution precompile (cosmos/evm, 0x…0801) -----------------------------
+    // Where a delegator's rewards are claimed from. `withdrawDelegatorRewards` takes ONE validator
+    // and answers what it paid; `claimRewards` sweeps up to `maxRetrieve` of them in one
+    // transaction, which is what a reader staked with six validators actually wants.
+    //
+    // A reward is a `DecCoin` inside the module - it accrues as an eighteen-place decimal - but
+    // what these RETURN is whole base units, because that is what was actually transferred.
+    ['withdrawDelegatorRewards(address,string)', 'nonpayable', '(string,uint256)[]'],
+    ['claimRewards(address,uint32)', 'nonpayable', 'bool'],
+    ['setWithdrawAddress(address,string)', 'nonpayable', 'bool'],
+    ['delegatorValidators(address)', 'view', 'string[]'],
+    ['delegationRewards(address,string)', 'view', '(string,uint256)[]'],
+
     // --- Goman prediction markets (the factory) -----------------------------------------------
     // Not a standard, and not a guess either: these are named from the ABI this chain's own
     // prediction client ships (NuraChain/Goman, `application/src/lib/abis/prediction-factory.json`),
@@ -451,6 +486,11 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // The nine-field tuple the five list calls return is one market's row - market, creator,
     // title, category, status, createdAt, lockTime, resolveTime, outcomeCount - written out at
     // each of them, because a signature has no way to carry a struct's NAME.
+    //
+    // `category` is a uint32 ID, not the label: the factory keeps the words in its own table, one
+    // per language (`categoryMeaning(uint32,bytes8)`), so a market carries the id and a reader is
+    // shown whichever language they asked for. A row that spelled the category as a string is an
+    // OLDER factory than the one deployed here.
     ['marketCount()', 'view', 'uint256'],
     ['marketImplementation()', 'view', 'address'],
     ['poolImplementation()', 'view', 'address'],
@@ -461,16 +501,16 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['defaultFeeBps()', 'view', 'uint16'],
     ['defaultProtocolFeeShareBps()', 'view', 'uint16'],
     ['requiredConfirmations()', 'view', 'uint256'],
-    ['marketAt(uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)'],
+    ['marketAt(uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)'],
     ['marketAddress(uint256)', 'view', 'address'],
     // Which template a market was stamped from: the CPMM one, or the parimutuel pool.
     ['marketKind(uint256)', 'view', 'uint8'],
     ['countByStatus(uint8)', 'view', 'uint256'],
-    ['marketsPaged(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['activeMarkets(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['closedMarkets(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['resolvedMarkets(uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['marketsByStatus(uint8,uint256,uint256)', 'view', '(address,address,string,string,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['marketsPaged(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['activeMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['closedMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['resolvedMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['marketsByStatus(uint8,uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
     // Resolution is an n-of-m the factory keeps itself: the signers confirm an outcome, and the
     // market is only told once `requiredConfirmations()` of them have named the SAME one.
     ['resolutionSigners()', 'view', 'address[]'],
@@ -478,8 +518,8 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['confirmationCount(uint256,uint256)', 'view', 'uint256'],
     ['confirmationOf(uint256,address)', 'view', 'uint256'],
     ['confirmResolution(uint256,uint256)', 'nonpayable', ''],
-    ['createMarket((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
-    ['createMarket2((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
+    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
+    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
     ['closeMarket(uint256)', 'nonpayable', ''],
     ['voidMarket(uint256)', 'nonpayable', ''],
     ['pauseMarket(uint256)', 'nonpayable', ''],
@@ -491,8 +531,304 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // to a market already deployed, which is why it takes an id and not an address.
     ['repointTreasury(uint256)', 'nonpayable', ''],
 
+    // --- Nura bridge tokens -------------------------------------------------------------------
+    // The three assets bridged in from other chains - BNB, USDT and the bridge token itself.
+    // Everything else they answer is ERC-20 or AccessControl and is named above; this is the one
+    // addition, the burn an operator performs when the asset leaves for the other side. It is a
+    // ROLE-gated burn of somebody else's balance, which is why it is not `burnFrom` - no
+    // allowance is involved and none is spent.
+    ['adminBurn(address,uint256)', 'nonpayable', ''],
+
+    // --- Faucet token (test networks) ---------------------------------------------------------
+    // A test-net ERC-20 anybody can draw from. `faucetEnabled` is worth naming because a faucet
+    // that stopped answering is the first thing a reader checks when a test wallet will not fill.
+    ['deployer()', 'view', 'address'],
+    ['faucet(uint256)', 'nonpayable', ''],
+    ['faucetEnabled()', 'view', 'bool'],
+
+    // --- Airdrop (one signed claim per address) -----------------------------------------------
+    // Pays a fixed amount of the native coin to the first `maxClaims` addresses that present a
+    // signature from a SIGNER_ROLE key. The signature is what decides eligibility - the on-chain
+    // checks only stop double claims and overruns - so `getReward` carries it and `claimDigest`
+    // is the EIP-712 digest that was signed, bound to this contract and this chain.
+    //
+    // The three counters beside them are what says whether a claim can still succeed: `maxClaims`
+    // caps the campaign, `fundedClaims` is how many the contract's own balance could actually
+    // pay, and `outstandingLiability` is what it already owes. A campaign whose remaining claims
+    // exceed its funded ones is one that will run out, and that is readable from these alone.
+    ['SIGNER_ROLE()', 'view', 'bytes32'],
+    ['claimDigest(address,uint256)', 'view', 'bytes32'],
+    ['fund()', 'payable', ''],
+    ['fundedClaims()', 'view', 'uint256'],
+    ['getReward(uint256,bytes)', 'nonpayable', ''],
+    ['hasClaimed(address)', 'view', 'bool'],
+    ['maxClaims()', 'view', 'uint256'],
+    ['outstandingLiability()', 'view', 'uint256'],
+    ['remainingClaims()', 'view', 'uint256'],
+    ['rewardAmount()', 'view', 'uint256'],
+    ['setRewardAmount(uint256)', 'nonpayable', ''],
+    ['totalClaims()', 'view', 'uint256'],
+    ['withdraw(address,uint256)', 'nonpayable', ''],
+
+    // --- Collateralised NFT vault -------------------------------------------------------------
+    // An ERC-721 where every token is a claim on a fixed amount of one ERC-20 held by the vault.
+    // `lockedAmount(id)` is what THAT token redeems for and never changes; `lockAmount()` is only
+    // what the NEXT mint will reserve, so the two are different questions and both are named.
+    //
+    // `vaultState()` answers eight of these counters in one call - the whole solvency picture in
+    // a single eth_call rather than eight - which is why it is worth naming even though every
+    // figure in it is separately readable.
+    ['availableBacking()', 'view', 'uint256'],
+    ['backingToken()', 'view', 'address'],
+    ['deposit(uint256)', 'nonpayable', ''],
+    ['lockAmount()', 'view', 'uint256'],
+    ['lockedAmount(uint256)', 'view', 'uint256'],
+    ['mintBatch(address,uint256)', 'nonpayable', 'uint256'],
+    ['publicMintEnabled()', 'view', 'bool'],
+    ['redeem(uint256)', 'nonpayable', ''],
+    ['remainingMintCapacity()', 'view', 'uint256'],
+    ['setBaseURI(string)', 'nonpayable', ''],
+    ['setLockAmount(uint256)', 'nonpayable', ''],
+    ['setPublicMintEnabled(bool)', 'nonpayable', ''],
+    ['tokenBalance()', 'view', 'uint256'],
+    ['totalMinted()', 'view', 'uint256'],
+    ['totalRedeemed()', 'view', 'uint256'],
+    ['totalReserved()', 'view', 'uint256'],
+    ['vaultState()', 'view', 'uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256'],
+    ['withdrawExcessTokens(address,uint256)', 'nonpayable', ''],
+
+    // --- Goman prediction markets (the factory's category table) ------------------------------
+    // A category is a uint32 ID plus a table of words for it, one row per language tag (`bytes8`,
+    // eg `en`/`fa`). The factory holds the words so a market carries only the id and every client
+    // spells it in the reader's own language - which is also why `categoryMeanings` returns the
+    // tags and the strings as two parallel arrays rather than one list of pairs.
+    ['DEFAULT_LANG()', 'view', 'bytes8'],
+    ['MAX_CATEGORY_LANGS()', 'view', 'uint256'],
+    ['addCategory(uint32,bytes8[],string[])', 'nonpayable', ''],
+    ['categoryCount()', 'view', 'uint256'],
+    ['categoryIds()', 'view', 'uint32[]'],
+    ['categoryLanguages(uint32)', 'view', 'bytes8[]'],
+    ['categoryMeaning(uint32,bytes8)', 'view', 'string'],
+    ['categoryMeanings(uint32)', 'view', 'bytes8[],string[]'],
+    ['categoryState(uint32)', 'view', 'bool,bool'],
+    ['countByCategory(uint32)', 'view', 'uint256'],
+    ['distributeMarket(uint256,uint256)', 'nonpayable', 'uint256'],
+    ['marketsByCategory(uint32,uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['setCategoryEnabled(uint32,bool)', 'nonpayable', ''],
+    ['setCategoryMeanings(uint32,bytes8[],string[])', 'nonpayable', ''],
+    ['setMarketAutoDistribute(uint256,bool)', 'nonpayable', ''],
+    ['sweepUnclaimed(uint256)', 'nonpayable', 'uint256'],
+
+    // --- Goman prediction markets (one CPMM market) -------------------------------------------
+    // The contract a reader actually lands on from a trade. Outcomes are ERC-1155 ids inside the
+    // market, so `totalSupply(uint256)` and `balanceOf(address,uint256)` are per-OUTCOME figures
+    // and not the market's own; `LP_TOKEN_ID()` is the id that holds liquidity instead of an
+    // outcome. `calcBuy`/`calcSell` quote a trade without sending it, and `getPrices` is the
+    // whole implied-probability vector in one call.
+    //
+    // A market also answers `getReserves()`, which is NOT added here: the selector already
+    // belongs to the Uniswap V2 pair above, whose `uint112,uint112,uint32` this market spells
+    // `uint256[]`. One selector cannot hold two return shapes, and a V2 pair is the commoner
+    // contract - so the pair keeps the name and a market's reserves decode as raw bytes rather
+    // than as three wrong numbers.
+    //
+    // `exists(uint256)` is shared with the profile registry below for the same reason `token()`
+    // is shared with ERC-4626: a selector has one signature, and what it MEANS is the contract's.
+    ['AUTO_DISTRIBUTE_BATCH()', 'view', 'uint256'],
+    ['CLAIM_WINDOW()', 'view', 'uint64'],
+    ['LP_TOKEN_ID()', 'view', 'uint256'],
+    ['MAX_OUTCOMES()', 'view', 'uint256'],
+    ['addFunding(uint256)', 'payable', 'uint256'],
+    ['autoDistribute()', 'view', 'bool'],
+    ['buy(uint256,uint256,uint256)', 'payable', 'uint256'],
+    ['calcBuy(uint256,uint256)', 'view', 'uint256'],
+    ['calcSell(uint256,uint256)', 'view', 'uint256'],
+    ['categoryId()', 'view', 'uint32'],
+    ['claimDeadline()', 'view', 'uint64'],
+    ['close()', 'nonpayable', ''],
+    ['controller()', 'view', 'address'],
+    ['createdAt()', 'view', 'uint64'],
+    ['creator()', 'view', 'address'],
+    ['description()', 'view', 'string'],
+    ['distribute(uint256)', 'nonpayable', 'uint256'],
+    ['distributionProgress()', 'view', 'uint256,uint256'],
+    ['endedAt()', 'view', 'uint64'],
+    ['exists(uint256)', 'view', 'bool'],
+    ['feeBps()', 'view', 'uint16'],
+    ['getPrices()', 'view', 'uint256[]'],
+    ['holderCount()', 'view', 'uint256'],
+    ['imageURI()', 'view', 'string'],
+    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', ''],
+    ['lockTime()', 'view', 'uint64'],
+    ['mergeSets(uint256)', 'nonpayable', ''],
+    ['outcomeCount()', 'view', 'uint256'],
+    ['outcomeName(uint256)', 'view', 'string'],
+    ['pendingPayout(address)', 'view', 'uint256'],
+    ['protocolFeeShareBps()', 'view', 'uint16'],
+    ['redeem()', 'nonpayable', 'uint256'],
+    ['removeFunding(uint256)', 'nonpayable', ''],
+    ['resolve(uint256)', 'nonpayable', ''],
+    ['resolveTime()', 'view', 'uint64'],
+    ['sell(uint256,uint256,uint256,uint256)', 'nonpayable', 'uint256'],
+    ['setAutoDistribute(bool)', 'nonpayable', ''],
+    ['status()', 'view', 'uint8'],
+    ['sweepUnclaimed()', 'nonpayable', 'uint256'],
+    ['title()', 'view', 'string'],
+    ['totalSets()', 'view', 'uint256'],
+    ['totalSupply(uint256)', 'view', 'uint256'],
+    ['voidMarket()', 'nonpayable', ''],
+    ['winningOutcome()', 'view', 'uint256'],
+
+    // --- Goman prediction markets (the parimutuel pool) ---------------------------------------
+    // The factory's other template: one stake per outcome, no curve and no LP. `impliedOdds` and
+    // `previewPayout` are what a pool answers instead of a price, and `myStake` reads the caller's
+    // own - it takes an outcome and not an address, so it is only meaningful through eth_call
+    // with a `from`, which is exactly how the explorer issues it.
+    ['bet(uint256)', 'payable', 'uint256'],
+    ['claim()', 'nonpayable', 'uint256'],
+    ['distributableAmount()', 'view', 'uint256'],
+    ['impliedOdds(uint256)', 'view', 'uint256'],
+    ['myStake(uint256)', 'view', 'uint256'],
+    ['participantCount()', 'view', 'uint256'],
+    ['previewPayout(uint256)', 'view', 'uint256'],
+    ['stakedFor(uint256)', 'view', 'uint256'],
+    ['totalPool()', 'view', 'uint256'],
+
+    // --- Goman prediction markets (the fee treasury) ------------------------------------------
+    // Where every market's protocol share lands. `collectedFor` splits the total by the market
+    // that paid it, so a reader can see which market funded the balance.
+    ['collectedFor(address)', 'view', 'uint256'],
+    ['depositFee(address)', 'payable', ''],
+    ['feeRecipient()', 'view', 'address'],
+    ['setFeeRecipient(address)', 'nonpayable', ''],
+    ['totalCollected()', 'view', 'uint256'],
+
+    // --- Nura profile registry ----------------------------------------------------------------
+    // One profile per address, behind a proxy, with a username the registry normalises and owns.
+    //
+    // Almost every field is stored under a hashed key and read back by its plain name, which is
+    // why so many of these take a string: `setField(id,'bio',...)` writes what `getField(id,'bio')`
+    // reads. `setLocalizedField` adds a language tag to that key, and `resolveField` is the one
+    // to call - it answers the localised value where there is one and falls back to the plain
+    // field where there is not, so a client asks once rather than twice.
+    //
+    // Transfer is TWO-STEP (`transferProfile` then `acceptProfile`, with `cancelTransfer` in
+    // between), because a profile sent to a wrong address would otherwise be gone with its
+    // username. `recoveryAddressOf` is the separate escape hatch for a lost key.
+    ['MAX_USERNAME_LENGTH()', 'view', 'uint256'],
+    ['MAX_VALUE_LENGTH()', 'view', 'uint256'],
+    ['MIN_USERNAME_LENGTH()', 'view', 'uint256'],
+    ['acceptProfile(uint256)', 'nonpayable', ''],
+    ['addImage(uint256,string,string,string)', 'nonpayable', 'uint256'],
+    ['addItem(uint256,string,(string,string,string)[])', 'nonpayable', 'uint256'],
+    ['addSocial(uint256,string,string,string)', 'nonpayable', 'uint256'],
+    ['addWebsite(uint256,string,string)', 'nonpayable', 'uint256'],
+    ['approveExtension(uint256,string,bool)', 'nonpayable', ''],
+    ['cancelTransfer(uint256)', 'nonpayable', ''],
+    ['createProfile(string,string,string,string)', 'nonpayable', 'uint256'],
+    ['deleteProfile(uint256)', 'nonpayable', ''],
+    ['extensionIdOf(address)', 'view', 'bytes32'],
+    ['getExtension(string)', 'view', 'address'],
+    ['getExtensionField(uint256,string,string,string)', 'view', 'string'],
+    ['getExtensions()', 'view', 'bytes32[],address[]'],
+    ['getField(uint256,string)', 'view', 'string'],
+    ['getItemAttribute(uint256,uint256,string,string)', 'view', 'string'],
+    ['getItemCount(uint256,string)', 'view', 'uint256'],
+    ['getItemIds(uint256,string)', 'view', 'uint256[]'],
+    ['getItemKind(uint256,uint256)', 'view', 'string'],
+    ['getLocalizedField(uint256,string,string)', 'view', 'string'],
+    ['getProfileRecord(uint256)', 'view', '(address,string,uint64,uint64,address,address,uint256)'],
+    ['isAuthorized(uint256,address)', 'view', 'bool'],
+    ['isExtensionApproved(uint256,string)', 'view', 'bool'],
+    ['isOperator(address,address)', 'view', 'bool'],
+    ['isUsernameAvailable(string)', 'view', 'bool'],
+    ['normalizeUsername(string)', 'pure', 'string'],
+    ['pendingOwnerOf(uint256)', 'view', 'address'],
+    ['profileIdOf(address)', 'view', 'uint256'],
+    ['profilesCreated()', 'view', 'uint256'],
+    ['recoveryAddressOf(uint256)', 'view', 'address'],
+    ['registerExtension(string,address)', 'nonpayable', ''],
+    ['removeExtensionField(uint256,string,string,string)', 'nonpayable', ''],
+    ['removeField(uint256,string,string)', 'nonpayable', ''],
+    ['removeImage(uint256,uint256)', 'nonpayable', ''],
+    ['removeItem(uint256,uint256)', 'nonpayable', ''],
+    ['removeSocial(uint256,uint256)', 'nonpayable', ''],
+    ['removeWebsite(uint256,uint256)', 'nonpayable', ''],
+    ['reserveUsername(string,address)', 'nonpayable', ''],
+    ['resolveField(uint256,string,string)', 'view', 'string'],
+    ['resolveFields(uint256,string[],string)', 'view', 'string[]'],
+    ['resolveItemAttribute(uint256,uint256,string,string)', 'view', 'string'],
+    ['resolveItemAttributes(uint256,uint256,string[],string)', 'view', 'string[]'],
+    ['resolveUsername(string)', 'view', 'uint256,address'],
+    ['setExtensionField(uint256,string,string,string)', 'nonpayable', ''],
+    ['setField(uint256,string,string)', 'nonpayable', ''],
+    ['setFields(uint256,(string,string,string)[])', 'nonpayable', ''],
+    ['setItemAttribute(uint256,uint256,string,string,string)', 'nonpayable', ''],
+    ['setItemAttributes(uint256,uint256,(string,string,string)[])', 'nonpayable', ''],
+    ['setLocalizedField(uint256,string,string,string)', 'nonpayable', ''],
+    ['setOperator(address,bool)', 'nonpayable', ''],
+    ['setRecoveryAddress(uint256,address)', 'nonpayable', ''],
+    ['setUsername(uint256,string)', 'nonpayable', ''],
+    ['transferProfile(uint256,address)', 'nonpayable', ''],
+    ['unregisterExtension(string)', 'nonpayable', ''],
+    ['unreserveUsername(string)', 'nonpayable', ''],
+    ['updateImage(uint256,uint256,string,string,string)', 'nonpayable', ''],
+    ['updateSocial(uint256,uint256,string,string,string)', 'nonpayable', ''],
+    ['updateWebsite(uint256,uint256,string,string)', 'nonpayable', ''],
+    ['usernameOf(uint256)', 'view', 'string'],
+    ['usernameReservation(string)', 'view', 'address,bool'],
+
+    // --- Nura profile lens (the read-only view) -----------------------------------------------
+    // A separate address that reads the registry and assembles whole profiles - the registry
+    // itself answers one field per call. Every entry takes a language tag and resolves through
+    // it, and `getFullProfile` returns the profile with its images, socials and websites in ONE
+    // call, which is the difference between a profile page and thirty eth_calls.
+    ['core()', 'view', 'address'],
+    ['getFullProfile(address,string)', 'view', '((uint256,address,string,uint64,uint64,string,string,string,string,string,string,string),(uint256,string,string,string)[],(uint256,string,string,string)[],(uint256,string,string,string)[])'],
+    ['getFullProfileById(uint256,string)', 'view', '((uint256,address,string,uint64,uint64,string,string,string,string,string,string,string),(uint256,string,string,string)[],(uint256,string,string,string)[],(uint256,string,string,string)[])'],
+    ['getImage(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
+    ['getImages(uint256,string)', 'view', '(uint256,string,string,string)[]'],
+    ['getItems(uint256,string,string,string[],uint256,uint256)', 'view', '(uint256,string[])[],uint256'],
+    ['getProfile(address,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)'],
+    ['getProfileById(uint256,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)'],
+    ['getProfileByUsername(string,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)'],
+    ['getSocial(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
+    ['getSocials(uint256,string)', 'view', '(uint256,string,string,string)[]'],
+    ['getWebsite(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
+    ['getWebsites(uint256,string)', 'view', '(uint256,string,string,string)[]'],
+
+    // --- Nura profile extensions (the social verifier) ----------------------------------------
+    // An extension contract a profile owner approves, which writes fields the registry will not
+    // let the owner write themselves: a handle is only recorded once a VERIFIER_ROLE key has
+    // signed for it. `nonces(uint256)` is per PROFILE ID, not per address - the sibling of the
+    // ERC-2612 `nonces(address)` above and a different selector.
+    ['EXTENSION_ID()', 'view', 'bytes32'],
+    ['VERIFIER_ROLE()', 'view', 'bytes32'],
+    ['extensionId()', 'pure', 'bytes32'],
+    ['hashVerifyHandle(uint256,string,string,uint256)', 'view', 'bytes32'],
+    ['nonces(uint256)', 'view', 'uint256'],
+    ['profileRegistry()', 'view', 'address'],
+    ['registry()', 'view', 'address'],
+    ['revokeHandle(uint256,string)', 'nonpayable', ''],
+    ['verifiedHandle(uint256,string)', 'view', 'string'],
+    ['verifyHandle(uint256,string,string,uint256,bytes)', 'nonpayable', ''],
+
+    // --- Uniswap V3 callbacks and the interfaces around them ----------------------------------
+    // The flash callback completes the set beside the mint and swap ones above. The other three
+    // are interfaces a periphery contract requires of its counterparty rather than calls a reader
+    // sends: `onERC721Received` is what makes a contract able to hold a position NFT at all,
+    // `isValidSignature` is ERC-1271 contract-wallet approval, and this `permit` is the DAI-style
+    // allowed-flag form - a different signature from the ERC-2612 one above, and its own selector.
+    ['isValidSignature(bytes32,bytes)', 'view', 'bytes4'],
+    ['onERC721Received(address,address,uint256,bytes)', 'nonpayable', 'bytes4'],
+    ['permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)', 'nonpayable', ''],
+    ['uniswapV3FlashCallback(uint256,uint256,bytes)', 'nonpayable', ''],
+
     // --- Odds and ends every toolchain emits --------------------------------------------------
-    ['multicall(bytes[])', 'nonpayable', 'bytes[]'],
+    // `multicall` is PAYABLE: Uniswap's periphery base declares it so, and the value sent covers
+    // whichever of the batched calls wants it. Marked nonpayable it would offer no value field,
+    // and a batch that mints a position with native currency could not be sent at all.
+    ['multicall(bytes[])', 'payable', 'bytes[]'],
     ['version()', 'view', 'string'],
     ['VERSION()', 'view', 'string']
 ];
@@ -544,7 +880,103 @@ const EVENTS: readonly string[] = [
     'PoolCreated(address,address,uint24,int24,address)',
     'IncreaseLiquidity(uint256,uint128,uint256,uint256)',
     'DecreaseLiquidity(uint256,uint128,uint256,uint256)',
-    'Collect(uint256,address,uint256,uint256)'
+    'Collect(uint256,address,uint256,uint256)',
+    // The bridged assets, minted here against a deposit on the other chain.
+    'BridgeBurn(address,uint256,address)',
+    'BridgeMint(address,uint256,address)',
+    'TokensRescued(address,address,uint256)',
+    // The airdrop.
+    'Funded(address,uint256)',
+    'RewardAmountUpdated(uint256,uint256)',
+    'RewardClaimed(address,uint256,uint256)',
+    'Withdrawn(address,uint256)',
+    // The collateralised NFT vault.
+    'BaseURIUpdated(string)',
+    'Deposited(address,uint256,uint256)',
+    'ExcessTokensWithdrawn(address,uint256)',
+    'LockAmountUpdated(uint256,uint256)',
+    'NFTMinted(address,uint256,uint256)',
+    'NFTRedeemed(address,uint256,uint256)',
+    'PublicMintUpdated(bool)',
+    // Goman prediction markets - the factory, a market, the pool and the fee treasury.
+    // `RewardClaimed` is the market's, and is a different topic from the airdrop's above - three
+    // arguments against that one's three of other types, so the two never collide.
+    'AutoDistributeSet(address,bool)',
+    'BetPlaced(address,address,uint256,uint256)',
+    'CategoryAdded(uint32)',
+    'CategoryEnabledSet(uint32,bool)',
+    'CategoryMeaningSet(uint32,bytes8,string)',
+    'DistributionAdvanced(address,uint256,uint256,uint256)',
+    'FeeCollected(address,uint256)',
+    'FeeRecipientChanged(address)',
+    'FeeWithdrawn(address,uint256)',
+    'FeesUpdated(uint16,uint16)',
+    'LiquidityAdded(address,address,uint256,uint256)',
+    'LiquidityRemoved(address,address,uint256)',
+    'MarketClosed(address)',
+    'MarketCreated(uint256,address,address,uint32,uint256,uint256)',
+    'MarketPaused(address)',
+    'MarketResolved(address,uint256)',
+    'MarketUnpaused(address)',
+    'MarketVoided(address)',
+    'PayoutDeferred(address,address,uint256)',
+    'PredictionPlaced(address,address,uint256,uint256,uint256)',
+    'PredictionSold(address,address,uint256,uint256,uint256)',
+    'ResolutionConfirmed(uint256,address,uint256,uint256)',
+    'ResolutionExecuted(uint256,uint256,uint256)',
+    'ResolutionSignersUpdated(address[],uint256)',
+    'RewardClaimed(address,address,uint256)',
+    'TreasuryUpdated(address)',
+    'UnclaimedSwept(address,address,uint256)',
+    // The profile registry and its extensions. Names and keys are logged HASHED - a username
+    // or a field key arrives as bytes32, because an indexed string is stored as its hash and the
+    // original is not in the log at all; the unhashed value is on the contract, which is what
+    // `usernameOf` and `getField` are for.
+    'ExtensionAdded(bytes32,address)',
+    'ExtensionApprovalSet(uint256,bytes32,bool)',
+    'ExtensionFieldRemoved(uint256,bytes32,bytes32,bytes32)',
+    'ExtensionFieldUpdated(uint256,bytes32,bytes32,bytes32,string)',
+    'ExtensionRemoved(bytes32,address)',
+    'FieldRemoved(uint256,bytes32,bytes32)',
+    'FieldUpdated(uint256,bytes32,string)',
+    'HandleRevoked(uint256,bytes32)',
+    'HandleVerified(uint256,bytes32,string,address)',
+    'ImageAdded(uint256,uint256,string,string,string)',
+    'ImageRemoved(uint256,uint256)',
+    'ImageUpdated(uint256,uint256,string,string,string)',
+    'ItemAdded(uint256,uint256,bytes32)',
+    'ItemAttributeRemoved(uint256,uint256,bytes32,bytes32)',
+    'ItemAttributeUpdated(uint256,uint256,bytes32,bytes32,string)',
+    'ItemRemoved(uint256,uint256,bytes32)',
+    'LocalizedFieldUpdated(uint256,bytes32,bytes32,string)',
+    'OperatorSet(address,address,bool)',
+    'ProfileCreated(uint256,address,bytes32)',
+    'ProfileDeleted(uint256,address,bytes32)',
+    'ProfileTransferCancelled(uint256)',
+    'ProfileTransferInitiated(uint256,address,address)',
+    'ProfileTransferred(uint256,address,address)',
+    'ProfileUpdated(uint256)',
+    'RecoveryAddressSet(uint256,address)',
+    'SocialAdded(uint256,uint256,string,string,string)',
+    'SocialRemoved(uint256,uint256)',
+    'SocialUpdated(uint256,uint256,string,string,string)',
+    'UsernameChanged(uint256,bytes32,bytes32)',
+    'UsernameReserved(bytes32,address)',
+    'UsernameUnreserved(bytes32)',
+    'WebsiteAdded(uint256,uint256,string,string)',
+    'WebsiteRemoved(uint256,uint256)',
+    'WebsiteUpdated(uint256,uint256,string,string)',
+    // The Uniswap V3 pool, and deliberately not the V2 pair's: `Mint`, `Burn`, `Swap` and
+    // `Collect` are spelled differently here and hash to different topics, so both sets are named.
+    'Burn(address,int24,int24,uint128,uint256,uint256)',
+    'Collect(address,address,int24,int24,uint128,uint128)',
+    'CollectProtocol(address,address,uint128,uint128)',
+    'Flash(address,address,uint256,uint256,uint256,uint256)',
+    'IncreaseObservationCardinalityNext(uint16,uint16)',
+    'Initialize(uint160,int24)',
+    'Mint(address,address,int24,int24,uint128,uint256,uint256)',
+    'SetFeeProtocol(uint8,uint8,uint8,uint8)',
+    'Swap(address,address,int256,int256,uint160,uint128,int24)'
 ];
 
 /** A comma-separated type list; '' is NO types, not one nameless one (''.split(',') is ['']). */
@@ -568,22 +1000,51 @@ function split(signature: string): { name: string; inputs: string[] }
  *
  * The selectors are computed rather than written down: a hand-copied 4-byte hash is a typo that
  * mislabels a function forever, and `toFunctionSelector` is the same keccak the compiler used.
+ *
+ * Two entries hashing to the same selector THROWS rather than resolving. Built with `new Map`
+ * the second would simply overwrite the first: the table would be one name short, and nothing
+ * anywhere would say so. A duplicate is a mistake in this file - the same signature written
+ * twice under two headings - and a genuine four-byte collision between different signatures is
+ * a thing to decide about, not to lose silently. Either way it is caught the first time anything
+ * imports this module, which is every test run.
  */
-export const FUNCTION_BY_SELECTOR: ReadonlyMap<string, KnownFunction> = new Map(
-    FUNCTIONS.map(([signature, mutability, outputs]) =>
+function indexFunctions(): ReadonlyMap<string, KnownFunction>
+{
+    const table = new Map<string, KnownFunction>();
+    for (const [signature, mutability, outputs] of FUNCTIONS)
     {
         const { name, inputs } = split(signature);
         const selector = toFunctionSelector(signature);
-        return [selector, { selector, signature, name, inputs, outputs: types(outputs), mutability }] as const;
-    }));
+        const clash = table.get(selector);
+        if (clash !== undefined)
+        {
+            throw new Error(`signature table: ${ selector } is both '${ clash.signature }' and '${ signature }'`);
+        }
+        table.set(selector, { selector, signature, name, inputs, outputs: types(outputs), mutability });
+    }
+    return table;
+}
 
-export const EVENT_BY_TOPIC: ReadonlyMap<string, KnownEvent> = new Map(
-    EVENTS.map((signature) =>
+function indexEvents(): ReadonlyMap<string, KnownEvent>
+{
+    const table = new Map<string, KnownEvent>();
+    for (const signature of EVENTS)
     {
         const { name, inputs } = split(signature);
         const topic = toEventSelector(signature);
-        return [topic, { topic, signature, name, inputs }] as const;
-    }));
+        const clash = table.get(topic);
+        if (clash !== undefined)
+        {
+            throw new Error(`signature table: ${ topic } is both '${ clash.signature }' and '${ signature }'`);
+        }
+        table.set(topic, { topic, signature, name, inputs });
+    }
+    return table;
+}
+
+export const FUNCTION_BY_SELECTOR: ReadonlyMap<string, KnownFunction> = indexFunctions();
+
+export const EVENT_BY_TOPIC: ReadonlyMap<string, KnownEvent> = indexEvents();
 
 /** The selector of a signature this table knows. Throws on a signature it does not - a typo. */
 export function selectorOf(signature: string): string
