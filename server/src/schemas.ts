@@ -485,6 +485,157 @@ export type GovernanceOverview = Infer<typeof governanceOverview>;
 export const PROPOSAL_FILTER = ['all', 'open', 'passed', 'failed'] as const;
 export type ProposalFilter = (typeof PROPOSAL_FILTER)[number];
 
+// --- Staking ---------------------------------------------------------------------------------
+// The other half of what this chain does outside the EVM. `x/staking` decides who produces blocks
+// and `x/distribution` decides what they are paid, and - exactly like governance above - neither
+// is indexed: every figure is a live answer from the module, held behind a few seconds of cache.
+//
+// Amounts are base units as decimal strings. Commission and every other rate is eighteen-place
+// fixed point as a string ('0.050000000000000000'), for the reason a quorum is: the module's
+// arithmetic is exact, and a double would round it.
+
+/** Where a validator stands in the set, in the module's own numbering. */
+export const BOND_STATUSES = ['unspecified', 'unbonded', 'unbonding', 'bonded'] as const;
+export type BondStatus = (typeof BOND_STATUSES)[number];
+
+export const validator = object({
+    /** `nuravaloper1…` - the module's key for a validator, and what a delegation names. */
+    operatorAddress: string(),
+    /**
+     * The operator's ACCOUNT, as the EVM knows it.
+     *
+     * The same twenty bytes wearing a different prefix, which is what lets a validator row link
+     * to the address page the rest of this explorer is keyed on. Null where it did not decode -
+     * and then the row is drawn without a link rather than with a wrong one.
+     */
+    accountHex: string().nullable(),
+    moniker: string(),
+    identity: string(),
+    website: string(),
+    details: string(),
+    /** Jailed for misbehaving: still in the set, earning nothing, and not producing blocks. */
+    jailed: boolean(),
+    status: enumOf(BOND_STATUSES),
+    /** Everything delegated to this validator, in base units - its weight in the set. */
+    tokens: string(),
+    delegatorShares: string(),
+    /** The cut it takes of its delegators' rewards. */
+    commissionRate: string(),
+    commissionMaxRate: string(),
+    commissionMaxChangeRate: string(),
+    minSelfDelegation: string(),
+    /** When it finishes leaving the set; '' unless it is on its way out. */
+    unbondingTime: string()
+});
+export type Validator = Infer<typeof validator>;
+
+export const validatorPage = object({
+    rows: array(validator),
+    total: number({ int: true, min: 0 }),
+    page: number({ int: true, min: 1 }),
+    pages: number({ int: true, min: 1 })
+});
+export type ValidatorPage = Infer<typeof validatorPage>;
+
+/** The module's own settings - what staking COSTS a reader in time and in risk. */
+export const stakingParams = object({
+    /** Seconds an unstake is locked for. The single most important number on the page. */
+    unbondingTime: number({ int: true, min: 0 }),
+    maxValidators: number({ int: true, min: 0 }),
+    /** How many withdrawals one delegator may have in flight with one validator at once. */
+    maxEntries: number({ int: true, min: 0 }),
+    bondDenom: string()
+});
+export type StakingParams = Infer<typeof stakingParams>;
+
+/** What is staked and what is not - the denominator every voting power is measured against. */
+export const stakingPool = object({ bondedTokens: string(), notBondedTokens: string() });
+export type StakingPool = Infer<typeof stakingPool>;
+
+/** One delegation of the reader's. `shares` is the validator's unit; `balance` is what it is worth. */
+export const delegation = object({ validatorAddress: string(), shares: string(), balance: coin });
+export type Delegation = Infer<typeof delegation>;
+
+/**
+ * One withdrawal in flight.
+ *
+ * Per ENTRY rather than per validator: each unstake runs its own clock, so a reader who withdrew
+ * twice from the same validator is waiting on two dates. `creationHeight` is what identifies an
+ * entry to `cancelUnbondingDelegation` - it is the only thing that tells two of them apart.
+ */
+export const unbondingEntry = object({
+    validatorAddress: string(),
+    creationHeight: string(),
+    completionTime: string(),
+    balance: string()
+});
+export type UnbondingEntry = Infer<typeof unbondingEntry>;
+
+/** What one validator currently owes the reader. Truncated to whole base units, as the module pays. */
+export const reward = object({ validatorAddress: string(), amount: array(coin) });
+export type Reward = Infer<typeof reward>;
+
+/**
+ * One reader's whole position.
+ *
+ * `address` is the bech32 spelling the module was actually asked under - shown on the page
+ * because it is the name the chain knows the reader by, and not one their wallet ever displays.
+ */
+export const delegatorStake = object({
+    address: string(),
+    delegations: array(delegation),
+    unbonding: array(unbondingEntry),
+    rewards: array(reward),
+    totalRewards: array(coin)
+});
+export type DelegatorStake = Infer<typeof delegatorStake>;
+
+/**
+ * The selectors the staking controls encode against.
+ *
+ * Sent rather than written into the client, for the reason the governance ones are: a selector is
+ * the hash of a signature, and the table that hashes them lives on the server.
+ */
+export const stakingCalls = object({
+    delegate: string(),
+    undelegate: string(),
+    redelegate: string(),
+    cancelUnbonding: string(),
+    withdrawRewards: string(),
+    claimRewards: string()
+});
+export type StakingCalls = Infer<typeof stakingCalls>;
+
+/**
+ * Whether this chain exposes staking, and the shape of its validator set.
+ *
+ * `enabled` and `writable` are the same two separate facts governance states: the first says the
+ * module's api answered, the second says the staking precompile is mounted. A chain that has one
+ * without the other is the normal case, and a reader can then follow the set without being
+ * offered a button that cannot send.
+ */
+export const stakingOverview = object({
+    enabled: boolean(),
+    writable: boolean(),
+    /** Where a delegation is sent, and where a reward is claimed from. Two modules, two addresses. */
+    stakingPrecompile: string(),
+    distributionPrecompile: string(),
+    calls: stakingCalls,
+    params: stakingParams.nullable(),
+    pool: stakingPool.nullable(),
+    node: govNode.nullable(),
+    /** The chain's bech32 account prefix, eg 'nura'. '' where it could not be established. */
+    prefix: string(),
+    /** In the active set - bonded and not jailed. */
+    active: number({ int: true, min: 0 }),
+    total: number({ int: true, min: 0 })
+});
+export type StakingOverview = Infer<typeof stakingOverview>;
+
+/** What a validator list can be narrowed to. `inactive` is everything not producing blocks. */
+export const VALIDATOR_FILTER = ['all', 'active', 'inactive'] as const;
+export type ValidatorFilter = (typeof VALIDATOR_FILTER)[number];
+
 export const SEARCH_KINDS = ['block', 'transaction', 'address', 'none'] as const;
 
 /** What a search term turned out to be, and where to send the reader. Resolved against the index. */
@@ -547,6 +698,19 @@ export const searchQuery = object({ q: string() });
 
 /** A page of proposals, optionally narrowed to one group of states. */
 export const proposalListQuery = object({ ...pageShape, status: enumOf(PROPOSAL_FILTER).optional() });
+
+/** A page of validators, optionally narrowed to the ones actually producing blocks. */
+export const validatorListQuery = object({ ...pageShape, status: enumOf(VALIDATOR_FILTER).optional() });
+
+/**
+ * One account's staking position, asked for by its EVM address.
+ *
+ * Hex, because that is the only spelling a browser wallet ever hands over - the server is what
+ * turns it into the bech32 one the module is keyed on, using the prefix it read from the chain.
+ * Doing that conversion here rather than in the browser keeps the chain's account prefix a fact
+ * the server establishes rather than a constant the client bundle would have to be rebuilt for.
+ */
+export const delegatorQuery = object({ address: string() });
 
 // --- Charts and statistics --------------------------------------------------------------------
 // Everything below is DERIVED from the index and from nothing else. There is no price feed, no

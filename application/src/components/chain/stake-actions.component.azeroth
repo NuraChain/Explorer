@@ -1,0 +1,288 @@
+import { client, type ChainInfo, type Delegation, type StakingOverview, type Validator } from '../../api.ts';
+import { formatAmount, parseAmount } from '../../lib/format.ts';
+import { days, isActive } from '../../lib/staking.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import Icon from '../../icons/icon.component.azeroth';
+
+import Button from '../ui/button.component.azeroth';
+import FilterGroup from '../ui/filter-group.component.azeroth';
+import Input from '../ui/input.component.azeroth';
+
+// Staking with one validator, from a browser.
+//
+// The same arrangement the governance controls make: `x/staking` is a Cosmos module no EVM wallet
+// can reach by itself, and the precompiles are what turn `MsgDelegate` and `MsgWithdrawDelegator-
+// Reward` into ordinary EVM transactions. This explorer's part ends where it always does - it
+// encodes the calldata, hands it over, and the wallet asks its owner.
+//
+// TWO addresses, because these are two modules: staking takes the first three actions,
+// distribution takes the claim. Sending a claim to the staking precompile would not be a slower
+// path to the same place, it would be a transaction to an address that has never heard of it.
+//
+// Nothing here is offered that the reader's position cannot take: unstaking, moving and claiming
+// all need an existing delegation, and a validator they have never staked with shows one control.
+export default component StakeActions(props: {
+    validator: Validator;
+    overview: StakingOverview;
+    chain: ChainInfo;
+
+    /** The reader's stake with THIS validator, or null where they have none. */
+    delegation: Delegation | null;
+
+    /** What this validator currently owes them, in base units. '0' when nothing has accrued. */
+    rewards: string;
+
+    /** The set, for the destination of a move. The current validator is not among the choices. */
+    validators: Validator[];
+
+    /** Called once a transaction is in the wallet's hands, so the page can watch for its effect. */
+    onSent?: () => void;
+})
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+    const wallet = useWallet();
+
+    state action = 'stake';
+    state amount = '';
+    state destination = '';
+    state busy = '';
+    state failure = '';
+
+    derived ready = wallet.account() !== '' && wallet.chainId() === props.chain.chainId;
+    derived staked = props.delegation !== null;
+    derived owed = BigInt(props.rewards) > 0n;
+
+    /** Where a move may send the stake: anything in the set except where it already is. */
+    derived elsewhere = props.validators.filter(
+        (row) => row.operatorAddress !== props.validator.operatorAddress && isActive(row));
+
+    /**
+     * Encode, hand to the wallet, and say what happened.
+     *
+     * No value is ever attached. A delegation is an ARGUMENT to the message - the module moves the
+     * coins itself - and a page that also sent the amount as the transaction's value would spend
+     * it twice.
+     */
+    const send = async (kind: string, to: string, selector: string, args: string[]): Promise<void> =>
+    {
+        failure = '';
+        busy = kind;
+        try
+        {
+            const { data } = await client.address.calldata({
+                params: { address: to },
+                input: { selector, args }
+            });
+            await wallet.send({ to, data, value: '0' });
+            toasts.push('success', locale.t('staking.act.sent'), 'send');
+            props.onSent?.();
+        }
+        catch (error)
+        {
+            const message = error instanceof Error ? error.message : String(error);
+            // 4001 is "the person said no" in every injected wallet, and a refusal is not a fault.
+            failure = message.includes('4001') || message.toLowerCase().includes('rejected')
+                ? locale.t('wallet.dismissed')
+                : message;
+        }
+        finally
+        {
+            busy = '';
+        }
+    };
+
+    /** The typed amount in base units, or null with the field's own complaint already shown. */
+    const base = (): string | null =>
+    {
+        const value = parseAmount(amount, props.chain.decimals);
+        if (value === null || value === '0')
+        {
+            failure = locale.t('staking.act.badAmount');
+            return null;
+        }
+        return value;
+    };
+
+    const stake = (): void =>
+    {
+        const value = base();
+        if (value !== null)
+        {
+            void send('stake', props.overview.stakingPrecompile, props.overview.calls.delegate,
+                [wallet.account(), props.validator.operatorAddress, value]);
+        }
+    };
+
+    const unstake = (): void =>
+    {
+        const value = base();
+        if (value !== null)
+        {
+            void send('unstake', props.overview.stakingPrecompile, props.overview.calls.undelegate,
+                [wallet.account(), props.validator.operatorAddress, value]);
+        }
+    };
+
+    const move = (): void =>
+    {
+        if (destination === '')
+        {
+            failure = locale.t('staking.act.pickDestination');
+            return;
+        }
+        const value = base();
+        if (value !== null)
+        {
+            void send('move', props.overview.stakingPrecompile, props.overview.calls.redelegate,
+                [wallet.account(), props.validator.operatorAddress, destination, value]);
+        }
+    };
+
+    const claim = (): void =>
+    {
+        void send('claim', props.overview.distributionPrecompile, props.overview.calls.withdrawRewards,
+            [wallet.account(), props.validator.operatorAddress]);
+    };
+
+    /** Only what this position can actually take - see the note at the top of the file. */
+    derived choices = [
+        { value: 'stake', label: locale.t('staking.act.stake') },
+        ...staked
+            ? [
+                { value: 'unstake', label: locale.t('staking.act.unstake') },
+                { value: 'move', label: locale.t('staking.act.move') },
+                { value: 'claim', label: locale.t('staking.act.claim') }
+            ]
+            : []
+    ];
+
+    <div class="flex flex-col gap-3 border-t border-line pt-3">
+        <Show
+            when={ ready }
+            fallback={ <p class="text-[13px] text-muted">{ locale.t('staking.act.connect') }</p> }
+        >
+            <FilterGroup
+                label={ locale.t('staking.act.title') }
+                name={ `stake-action-${ props.validator.operatorAddress }` }
+                value={ action }
+                options={ choices }
+                onChange={ (next) => { action = next; failure = ''; } }
+            />
+
+            <Show when={ action === 'stake' }>
+                <div class="flex flex-col gap-2">
+                    {/* Said before the field, not after the transaction: the lock is the whole of
+                        what a reader is agreeing to, and it is not reversible once signed. */}
+                    <p class="text-[13px] text-muted">
+                        { locale.t('staking.act.stake.hint', {
+                            days: locale.n(days(props.overview.params?.unbondingTime ?? 0))
+                        }) }
+                    </p>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-[12rem] flex-1">
+                            <Input
+                                label={ locale.t('staking.act.amount') }
+                                placeholder={ props.chain.symbol }
+                                size="sm"
+                                value={ amount }
+                                onInput={ (value) => amount = value }
+                            />
+                        </div>
+                        <Button variant="primary" icon="wallet" busy={ busy === 'stake' } onClick={ stake }>
+                            { locale.t('staking.act.stake') }
+                        </Button>
+                    </div>
+                </div>
+            </Show>
+
+            <Show when={ action === 'unstake' }>
+                <div class="flex flex-col gap-2">
+                    <p class="text-[13px] text-muted">
+                        { locale.t('staking.act.unstake.hint', {
+                            days: locale.n(days(props.overview.params?.unbondingTime ?? 0))
+                        }) }
+                    </p>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-[12rem] flex-1">
+                            <Input
+                                label={ locale.t('staking.act.amount') }
+                                placeholder={ formatAmount(props.delegation?.balance.amount ?? '0', props.chain.decimals) }
+                                size="sm"
+                                value={ amount }
+                                onInput={ (value) => amount = value }
+                            />
+                        </div>
+                        <Button variant="outline" icon="outflow" busy={ busy === 'unstake' } onClick={ unstake }>
+                            { locale.t('staking.act.unstake') }
+                        </Button>
+                    </div>
+                </div>
+            </Show>
+
+            {/* Moving is the one action with no unbonding period - the stake never leaves the set,
+                so nothing has to be released. That is the reason to offer it beside unstaking. */}
+            <Show when={ action === 'move' }>
+                <div class="flex flex-col gap-2">
+                    <p class="text-[13px] text-muted">{ locale.t('staking.act.move.hint') }</p>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-[12rem] flex-1">
+                            <label class="flex items-center gap-2 rounded-lg border border-line bg-field px-3 py-2 focus-within:border-nur">
+                                <span class="sr-only">{ locale.t('staking.act.destination') }</span>
+                                <select
+                                    class="min-w-0 flex-1 cursor-pointer bg-transparent text-[14px] text-text outline-none"
+                                    value={ destination }
+                                    onChange={ (event) => destination = (event.target as HTMLSelectElement).value }
+                                >
+                                    <option value="">{ locale.t('staking.act.destination') }</option>
+                                    <For each={ elsewhere } key={ (row) => row.operatorAddress } let={ row }>
+                                        <option value={ row.operatorAddress }>
+                                            { row.moniker === '' ? row.operatorAddress : row.moniker }
+                                        </option>
+                                    </For>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="min-w-[9rem] flex-1">
+                            <Input
+                                label={ locale.t('staking.act.amount') }
+                                placeholder={ props.chain.symbol }
+                                size="sm"
+                                value={ amount }
+                                onInput={ (value) => amount = value }
+                            />
+                        </div>
+                        <Button variant="outline" icon="send" busy={ busy === 'move' } onClick={ move }>
+                            { locale.t('staking.act.move') }
+                        </Button>
+                    </div>
+                </div>
+            </Show>
+
+            <Show when={ action === 'claim' }>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-[13px] text-muted">
+                        { locale.t('staking.act.claim.hint') }{ ' ' }
+                        <span class="amount font-semibold text-inflow">
+                            { formatAmount(props.rewards, props.chain.decimals) }
+                        </span> { props.chain.symbol }
+                    </p>
+                    <Button variant="primary" icon="inflow" busy={ busy === 'claim' } disabled={ !owed } onClick={ claim }>
+                        { locale.t('staking.act.claim') }
+                    </Button>
+                </div>
+            </Show>
+        </Show>
+
+        <Show when={ failure !== '' }>
+            <p class="flex items-start gap-2 rounded-lg border border-outflow bg-raised px-3 py-2 text-[13px] text-outflow">
+                <Icon name="alert" size={ 15 } class="mt-0.5 shrink-0" />
+                { failure }
+            </p>
+        </Show>
+    </div>
+}

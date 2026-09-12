@@ -121,7 +121,7 @@ export interface CosmosPage<T>
  * section that either answers or says it cannot, and there is nothing a reader can do with the
  * difference between a refused connection and a 501.
  */
-async function get<T>(base: string, path: string, timeoutMs: number): Promise<T | null>
+export async function getJson<T>(base: string, path: string, timeoutMs: number): Promise<T | null>
 {
     if (base === '')
     {
@@ -152,7 +152,7 @@ function seconds(duration: unknown): number
     return Number.isFinite(value) ? value : 0;
 }
 
-function coins(rows: unknown): CosmosCoin[]
+export function coins(rows: unknown): CosmosCoin[]
 {
     return Array.isArray(rows)
         ? rows.map((row) =>
@@ -164,7 +164,7 @@ function coins(rows: unknown): CosmosCoin[]
 }
 
 /** Both spellings of one account: what the chain wrote, and the twenty bytes the EVM knows. */
-function account(address: unknown): { bech32: string; hex: string | null }
+export function account(address: unknown): { bech32: string; hex: string | null }
 {
     const bech32 = String(address ?? '');
     return { bech32, hex: bech32 === '' ? null : bech32ToHex(bech32) };
@@ -217,7 +217,7 @@ function proposalOf(raw: unknown): CosmosProposal
 export async function readProposals(env: CosmosEnv, limit: number, offset: number): Promise<CosmosPage<CosmosProposal> | null>
 {
     const query = `?pagination.limit=${ limit }&pagination.offset=${ offset }&pagination.reverse=true&pagination.count_total=true`;
-    const body = await get<{ proposals?: unknown[]; pagination?: { total?: string } }>(
+    const body = await getJson<{ proposals?: unknown[]; pagination?: { total?: string } }>(
         env.restUrl, `/cosmos/gov/v1/proposals${ query }`, env.timeoutMs);
 
     if (body === null || !Array.isArray(body.proposals))
@@ -232,7 +232,7 @@ export async function readProposals(env: CosmosEnv, limit: number, offset: numbe
 
 export async function readProposal(env: CosmosEnv, id: string): Promise<CosmosProposal | null>
 {
-    const body = await get<{ proposal?: unknown }>(env.restUrl, `/cosmos/gov/v1/proposals/${ id }`, env.timeoutMs);
+    const body = await getJson<{ proposal?: unknown }>(env.restUrl, `/cosmos/gov/v1/proposals/${ id }`, env.timeoutMs);
     return body?.proposal === undefined ? null : proposalOf(body.proposal);
 }
 
@@ -245,7 +245,7 @@ export async function readProposal(env: CosmosEnv, id: string): Promise<CosmosPr
  */
 export async function readTally(env: CosmosEnv, id: string): Promise<CosmosProposal['tally'] | null>
 {
-    const body = await get<{ tally?: Record<string, unknown> }>(
+    const body = await getJson<{ tally?: Record<string, unknown> }>(
         env.restUrl, `/cosmos/gov/v1/proposals/${ id }/tally`, env.timeoutMs);
 
     if (body?.tally === undefined)
@@ -263,7 +263,7 @@ export async function readTally(env: CosmosEnv, id: string): Promise<CosmosPropo
 export async function readVotes(env: CosmosEnv, id: string, limit: number, offset: number): Promise<CosmosPage<CosmosVote> | null>
 {
     const query = `?pagination.limit=${ limit }&pagination.offset=${ offset }&pagination.reverse=true&pagination.count_total=true`;
-    const body = await get<{ votes?: unknown[]; pagination?: { total?: string } }>(
+    const body = await getJson<{ votes?: unknown[]; pagination?: { total?: string } }>(
         env.restUrl, `/cosmos/gov/v1/proposals/${ id }/votes${ query }`, env.timeoutMs);
 
     if (body === null || !Array.isArray(body.votes))
@@ -295,7 +295,7 @@ export async function readVotes(env: CosmosEnv, id: string, limit: number, offse
 export async function readDeposits(env: CosmosEnv, id: string, limit: number, offset: number): Promise<CosmosPage<CosmosDeposit> | null>
 {
     const query = `?pagination.limit=${ limit }&pagination.offset=${ offset }&pagination.count_total=true`;
-    const body = await get<{ deposits?: unknown[]; pagination?: { total?: string } }>(
+    const body = await getJson<{ deposits?: unknown[]; pagination?: { total?: string } }>(
         env.restUrl, `/cosmos/gov/v1/proposals/${ id }/deposits${ query }`, env.timeoutMs);
 
     if (body === null || !Array.isArray(body.deposits))
@@ -322,7 +322,7 @@ export async function readDeposits(env: CosmosEnv, id: string, limit: number, of
  */
 export async function readParams(env: CosmosEnv): Promise<CosmosParams | null>
 {
-    const body = await get<Record<string, Record<string, unknown> | undefined>>(
+    const body = await getJson<Record<string, Record<string, unknown> | undefined>>(
         env.restUrl, '/cosmos/gov/v1/params/tallying', env.timeoutMs);
 
     if (body === null)
@@ -352,7 +352,7 @@ export async function readParams(env: CosmosEnv): Promise<CosmosParams | null>
  */
 export async function readBondedTokens(env: CosmosEnv): Promise<string | null>
 {
-    const body = await get<{ pool?: { bonded_tokens?: unknown } }>(
+    const body = await getJson<{ pool?: { bonded_tokens?: unknown } }>(
         env.restUrl, '/cosmos/staking/v1beta1/pool', env.timeoutMs);
     return body?.pool?.bonded_tokens === undefined ? null : String(body.pool.bonded_tokens);
 }
@@ -366,7 +366,7 @@ export async function readBondedTokens(env: CosmosEnv): Promise<string | null>
  */
 export async function readStatus(env: CosmosEnv): Promise<CosmosStatus | null>
 {
-    const body = await get<{ result?: Record<string, Record<string, unknown>> }>(
+    const body = await getJson<{ result?: Record<string, Record<string, unknown>> }>(
         env.rpcUrl, '/status', env.timeoutMs);
 
     // CometBFT answers `{ jsonrpc, id, result }` over http as well as over json-rpc; some proxies

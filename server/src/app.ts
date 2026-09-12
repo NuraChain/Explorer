@@ -19,6 +19,19 @@ import {
 } from './chain/cosmos.ts';
 import { GOV_PRECOMPILE, precompileEnabled } from './chain/gov.ts';
 import { selectorOf } from './chain/signatures.ts';
+import {
+    readBech32Prefix,
+    readDelegatorStake,
+    readPool,
+    readStakingParams,
+    readValidators,
+    stakingWritable,
+    DISTRIBUTION_PRECOMPILE,
+    STAKING_PRECOMPILE,
+    type StakingParams,
+    type StakingPool,
+    type StakingValidator
+} from './chain/staking.ts';
 import { normalize, silentDay, type DailyStats, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
 import { calldataFor, inspectContract, readContract } from './inspect.ts';
@@ -57,12 +70,17 @@ import {
     proposalPage,
     searchQuery,
     searchResult,
+    stakingOverview,
     summary,
     transactionDetail,
     transactionListQuery,
     transactionPage,
     topAccounts,
     transferPage,
+    validatorListQuery,
+    validatorPage,
+    delegatorQuery,
+    delegatorStake,
     type ChartSeries,
     type ChartsSummary,
     type StatFigure,
@@ -123,6 +141,38 @@ const GOV_CALLS = {
     deposit: selectorOf('deposit(address,uint64,(string,uint256)[])'),
     cancelProposal: selectorOf('cancelProposal(address,uint64)')
 };
+
+/** How long a staking answer is held. A validator set moves on the scale of blocks, not requests. */
+const STAKING_TTL_MS = 5_000;
+
+/**
+ * The six transactions the staking page can offer, hashed once at import.
+ *
+ * Two precompiles, not one: the first four are `x/staking`, the last two are `x/distribution`.
+ * They are separate modules and separate addresses, and the page sends each where it belongs -
+ * see chain/staking.ts.
+ */
+const STAKING_CALLS = {
+    delegate: selectorOf('delegate(address,string,uint256)'),
+    undelegate: selectorOf('undelegate(address,string,uint256)'),
+    redelegate: selectorOf('redelegate(address,string,string,uint256)'),
+    cancelUnbonding: selectorOf('cancelUnbondingDelegation(address,string,uint256,uint256)'),
+    withdrawRewards: selectorOf('withdrawDelegatorRewards(address,string)'),
+    claimRewards: selectorOf('claimRewards(address,uint32)')
+};
+
+/**
+ * Whether a validator is actually securing the chain right now.
+ *
+ * Two conditions, not one. `bonded` says it is in the set; not `jailed` says it has not been put
+ * out of it for misbehaving. A jailed validator keeps its bonded status and its delegations while
+ * it sits out, so counting on status alone would report a set larger than the one producing
+ * blocks - and would offer a reader a validator that is currently earning them nothing.
+ */
+function inActiveSet(row: StakingValidator): boolean
+{
+    return row.status === 'bonded' && !row.jailed;
+}
 
 /** How far the charts look back when nobody says. A month reads as a trend; a week reads as noise. */
 const DEFAULT_CHART_DAYS = 30;
@@ -243,6 +293,64 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
             writable
         };
         return governanceCache;
+    };
+
+    let stakingCache: {
+        at: number;
+        params: StakingParams | null;
+        pool: StakingPool | null;
+        validators: StakingValidator[];
+        prefix: string;
+        node: CosmosStatus | null;
+        writable: boolean;
+    } | null = null;
+
+    /**
+     * Everything a staking page needs, asked of the node once and held for a few seconds.
+     *
+     * The same arrangement governance has, for the same reason: none of this is indexed, and a
+     * page listing twenty-five validators must not ask the node the same four questions
+     * twenty-five times. `params` being null is what says the module's api did not answer at all,
+     * and being able to DELEGATE is the separate question `writable` carries.
+     *
+     * The prefix is read last because its fallback needs the validator set - the auth module
+     * usually states it outright, but where it does not, a `…valoper1…` address is the chain
+     * saying the same thing.
+     */
+    const readStaking = async (): Promise<{
+        params: StakingParams | null;
+        pool: StakingPool | null;
+        validators: StakingValidator[];
+        prefix: string;
+        node: CosmosStatus | null;
+        writable: boolean;
+    }> =>
+    {
+        const now = Date.now();
+        if (stakingCache !== null && now - stakingCache.at < STAKING_TTL_MS)
+        {
+            return stakingCache;
+        }
+
+        const [params, pool, validators, node, writable] = await Promise.all([
+            readStakingParams(cosmos),
+            readPool(cosmos),
+            readValidators(cosmos),
+            readStatus(cosmos),
+            stakingWritable(chain)
+        ]);
+
+        const rows = validators ?? [];
+        stakingCache = {
+            at: now,
+            params,
+            pool,
+            validators: rows,
+            prefix: params === null ? '' : await readBech32Prefix(cosmos, rows),
+            node,
+            writable
+        };
+        return stakingCache;
     };
 
     // Resolved once rather than per request: `noPrice` is what a deployment with no exchange
@@ -738,6 +846,91 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
                     page,
                     pages: pageCount(total, limit)
                 };
+            })
+        })),
+
+        // Staking: who secures this chain, and what a reader has at stake with them.
+        //
+        // Governance's neighbour in every respect - read from the node's REST api, never indexed,
+        // and written through a precompile - except that there are TWO precompiles, because
+        // delegating and being paid for it are two Cosmos modules. See chain/staking.ts.
+        staking: feature('/staking', (routes) => ({
+            overview: routes.get('/', { output: stakingOverview }, async () =>
+            {
+                const { params, pool, validators, prefix, node, writable } = await readStaking();
+                return {
+                    enabled: params !== null,
+                    writable,
+                    stakingPrecompile: STAKING_PRECOMPILE,
+                    distributionPrecompile: DISTRIBUTION_PRECOMPILE,
+                    calls: STAKING_CALLS,
+                    params,
+                    pool,
+                    node,
+                    prefix,
+                    active: validators.filter(inActiveSet).length,
+                    total: validators.length
+                };
+            }),
+
+            /**
+             * A page of the validator set, heaviest first.
+             *
+             * Sorted by stake rather than by name, because that IS the set's order: the weight a
+             * validator carries is what decides how often it proposes a block, and a reader
+             * choosing one is choosing where to put weight that is already concentrated.
+             */
+            list: routes.get('/validators', { query: validatorListQuery, output: validatorPage }, async ({ query }) =>
+            {
+                const { limit, offset, page } = paging(query);
+                const { validators } = await readStaking();
+                const wanted = query.status ?? 'all';
+
+                const rows = validators
+                    .filter((row) => wanted === 'all'
+                        || (wanted === 'active' ? inActiveSet(row) : !inActiveSet(row)))
+                    // Through BigInt: a validator's stake is a uint256, and two of them sorted as
+                    // doubles compare equal long before they actually are.
+                    .sort((left, right) =>
+                    {
+                        const a = BigInt(left.tokens);
+                        const b = BigInt(right.tokens);
+                        return a === b ? 0 : (a < b ? 1 : -1);
+                    });
+
+                return {
+                    rows: rows.slice(offset, offset + limit),
+                    total: rows.length,
+                    page,
+                    pages: pageCount(rows.length, limit)
+                };
+            }),
+
+            /**
+             * One reader's own position, by the address their wallet hands over.
+             *
+             * The hex-to-bech32 conversion happens HERE rather than in the browser: the prefix is
+             * a fact about the chain the server has already read, and doing it in the client would
+             * bake the chain's name into a bundle.
+             */
+            delegations: routes.get('/delegations', { query: delegatorQuery, output: delegatorStake }, async ({ query }) =>
+            {
+                if (!/^0x[0-9a-fA-F]{40}$/.test(query.address))
+                {
+                    throw new NotFoundError('Not an address');
+                }
+                const { params, prefix } = await readStaking();
+                if (params === null)
+                {
+                    throw new NotFoundError('This chain\'s staking api is not reachable');
+                }
+
+                const stake = await readDelegatorStake(cosmos, normalize(query.address), prefix);
+                if (stake === null)
+                {
+                    throw new NotFoundError('This chain\'s account prefix could not be established');
+                }
+                return stake;
             })
         }))
     };

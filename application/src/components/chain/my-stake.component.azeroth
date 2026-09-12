@@ -1,0 +1,241 @@
+import { client, type ChainInfo, type StakingOverview, type Validator } from '../../api.ts';
+import { formatAmount } from '../../lib/format.ts';
+import { amountOf, totalDelegated, totalUnbonding } from '../../lib/staking.ts';
+
+import { useLocale } from '../../stores/locale.store.ts';
+import { useToasts } from '../../stores/toasts.store.ts';
+import { useWallet } from '../../stores/wallet.store.ts';
+
+import HashLink from './hash-link.component.azeroth';
+import StakeActions from './stake-actions.component.azeroth';
+import Button from '../ui/button.component.azeroth';
+import Skeleton from '../ui/skeleton.component.azeroth';
+import Tooltip from '../ui/tooltip.component.azeroth';
+
+// What the reader themselves has at stake.
+//
+// A separate component rather than a section of the page, because it is the one thing here that
+// depends on a WALLET: it mounts when an account is connected and unmounts when it is not, which
+// is also what starts and stops its request. A page-level resource would have to fetch for the
+// empty address on every load and throw the answer away.
+//
+// Three lists, and they are genuinely three different states of the same coin: delegated is
+// working and earning, unbonding is locked and earning nothing, and rewards are earned and not
+// yet moved. Collapsing them into one figure would hide the only one the reader can act on today.
+export default component MyStake(props: {
+    /** The connected account, hex. The server turns it into the bech32 the module is keyed on. */
+    address: string;
+    overview: StakingOverview;
+    chain: ChainInfo;
+    validators: Validator[];
+})
+{
+    const locale = useLocale();
+    const toasts = useToasts();
+    const wallet = useWallet();
+
+    /** Bumped after a transaction, so the position is re-read rather than left as it was. */
+    state nonce = 0;
+    state open = '';
+    state busy = false;
+
+    resource mine = (key: string) =>
+        client.staking.delegations({ query: { address: key.slice(0, key.indexOf('|')) } })
+        with { source: `${ props.address }|${ nonce }` };
+
+    derived denom = props.overview.params?.bondDenom ?? '';
+
+    /** Moniker by operator address, so a delegation row can name what it is staked with. */
+    derived named = new Map(props.validators.map((row) => [row.operatorAddress, row] as const));
+
+    const label = (operator: string): string =>
+    {
+        const row = named.get(operator);
+        return row === undefined || row.moniker === '' ? operator : row.moniker;
+    };
+
+    /** What one validator owes, in base units - '0' where it owes nothing. */
+    const owed = (operator: string): string =>
+    {
+        const row = mine.data()?.rewards.find((entry) => entry.validatorAddress === operator);
+        return row === undefined ? '0' : amountOf(row.amount, denom);
+    };
+
+    /**
+     * Every reward at once, through the distribution precompile's own sweep.
+     *
+     * `maxRetrieve` is the number of validators it will walk, and it is the count the reader
+     * actually has rather than a round number: the module charges for each one it visits, and
+     * asking it to walk a hundred when six are staked is paying for ninety-four empty reads.
+     */
+    const claimAll = async (): Promise<void> =>
+    {
+        busy = true;
+        try
+        {
+            const count = mine.data()?.delegations.length ?? 0;
+            const { data } = await client.address.calldata({
+                params: { address: props.overview.distributionPrecompile },
+                input: { selector: props.overview.calls.claimRewards, args: [props.address, String(count)] }
+            });
+            await wallet.send({ to: props.overview.distributionPrecompile, data, value: '0' });
+            toasts.push('success', locale.t('staking.act.sent'), 'send');
+            nonce += 1;
+        }
+        catch (error)
+        {
+            const message = error instanceof Error ? error.message : String(error);
+            toasts.push('error', message.includes('4001') || message.toLowerCase().includes('rejected')
+                ? locale.t('wallet.dismissed')
+                : message, 'alert');
+        }
+        finally
+        {
+            busy = false;
+        }
+    };
+
+    <section class="panel overflow-hidden">
+        <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+            { locale.t('staking.mine') }
+        </h2>
+
+        <Show when={ mine.data() === undefined }>
+            <div class="flex flex-col gap-2 px-4 py-4">
+                <Skeleton class="h-10 w-full" />
+                <Skeleton class="h-10 w-full" />
+            </div>
+        </Show>
+
+        <Show when={ mine.data() !== undefined }>
+        { () =>
+            <div class="flex flex-col">
+                {/* The three figures, and the one button that acts on them. */}
+                <dl class="flex flex-col gap-2.5 border-b border-line px-4 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-10">
+                    <div class="flex items-baseline justify-between gap-3 sm:block">
+                        <dt class="text-[12px] text-muted">{ locale.t('staking.mine.delegated') }</dt>
+                        <dd class="text-[14px] font-semibold">
+                            <span class="amount">{ formatAmount(totalDelegated(mine.data()!.delegations), props.chain.decimals) }</span>
+                            { ' ' }{ props.chain.symbol }
+                        </dd>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3 sm:block">
+                        <dt class="text-[12px] text-muted">{ locale.t('staking.mine.unbonding') }</dt>
+                        <dd class="text-[14px] font-semibold">
+                            <span class="amount">{ formatAmount(totalUnbonding(mine.data()!.unbonding), props.chain.decimals) }</span>
+                            { ' ' }{ props.chain.symbol }
+                        </dd>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-3 sm:block">
+                        <dt class="text-[12px] text-muted">{ locale.t('staking.mine.rewards') }</dt>
+                        {/* `inflow` earns its colour here: this is value on its way to the reader. */}
+                        <dd class="text-[14px] font-semibold text-inflow">
+                            <span class="amount">{ formatAmount(amountOf(mine.data()!.totalRewards, denom), props.chain.decimals) }</span>
+                            { ' ' }{ props.chain.symbol }
+                        </dd>
+                    </div>
+                    <Show when={ props.overview.writable && mine.data()!.delegations.length > 0 }>
+                        <div class="sm:ms-auto">
+                            <Button
+                                variant="primary"
+                                icon="inflow"
+                                busy={ busy }
+                                disabled={ BigInt(amountOf(mine.data()!.totalRewards, denom)) === 0n }
+                                onClick={ () => void claimAll() }
+                            >
+                                { locale.t('staking.act.claimAll') }
+                            </Button>
+                        </div>
+                    </Show>
+                </dl>
+
+                {/* The account as the CHAIN spells it. It is the name the module knows the reader
+                    by and the key this whole answer was read under, and no wallet ever shows it. */}
+                <p class="border-b border-line px-4 py-2 text-[12px] text-faint">
+                    { locale.t('staking.mine.as') }{ ' ' }
+                    <span class="hash">{ mine.data()!.address }</span>
+                </p>
+
+                <Show when={ mine.data()!.delegations.length === 0 && mine.data()!.unbonding.length === 0 }>
+                    <p class="px-4 py-4 text-[13px] text-muted">{ locale.t('staking.mine.none') }</p>
+                </Show>
+
+                <For each={ mine.data()!.delegations } key={ (row) => row.validatorAddress } let={ row }>
+                    <div class="border-b border-line px-4 py-3 last:border-b-0">
+                        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                            <span class="flex min-w-0 flex-col">
+                                <span class="text-[14px] font-semibold" dir="auto">{ label(row.validatorAddress) }</span>
+                                <HashLink value={ row.validatorAddress } tone="muted" lead={ 12 } tail={ 6 } copy={ false } class="text-[12px]" />
+                            </span>
+                            <span class="flex items-center gap-4">
+                                <span class="text-end">
+                                    <span class="block text-[14px] font-semibold">
+                                        <span class="amount">{ formatAmount(row.balance.amount, props.chain.decimals) }</span>
+                                        { ' ' }{ props.chain.symbol }
+                                    </span>
+                                    <Show when={ BigInt(owed(row.validatorAddress)) > 0n }>
+                                        <span class="block text-[12px] text-inflow">
+                                            +<span class="amount">{ formatAmount(owed(row.validatorAddress), props.chain.decimals) }</span>
+                                        </span>
+                                    </Show>
+                                </span>
+                                <Show when={ props.overview.writable }>
+                                    <Button
+                                        variant="ghost"
+                                        icon={ open === row.validatorAddress ? 'x' : 'wallet' }
+                                        onClick={ () => open = open === row.validatorAddress ? '' : row.validatorAddress }
+                                    >
+                                        { locale.t(open === row.validatorAddress ? 'staking.act.close' : 'staking.act.manage') }
+                                    </Button>
+                                </Show>
+                            </span>
+                        </div>
+
+                        <Show when={ open === row.validatorAddress && named.get(row.validatorAddress) !== undefined }>
+                        { () =>
+                            <StakeActions
+                                validator={ named.get(row.validatorAddress)! }
+                                overview={ props.overview }
+                                chain={ props.chain }
+                                delegation={ row }
+                                rewards={ owed(row.validatorAddress) }
+                                validators={ props.validators }
+                                onSent={ () => { open = ''; nonce += 1; } }
+                            />
+                        }
+                        </Show>
+                    </div>
+                </For>
+
+                {/* Separate, because these are not a position any more - they are a countdown.
+                    One row per ENTRY: two withdrawals from one validator are two clocks. */}
+                <Show when={ mine.data()!.unbonding.length > 0 }>
+                    <div class="border-t border-line">
+                        <h3 class="px-4 pt-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">
+                            { locale.t('staking.mine.releasing') }
+                        </h3>
+                        <For each={ mine.data()!.unbonding } key={ (row) => `${ row.validatorAddress }-${ row.creationHeight }` } let={ row }>
+                            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2.5">
+                                <span class="text-[13px]" dir="auto">{ label(row.validatorAddress) }</span>
+                                <span class="flex items-center gap-4 text-[13px]">
+                                    {/* The DATE, not `locale.ago`. That helper answers how long
+                                        ago something was and clamps a future moment to zero, so
+                                        a release three weeks out read as "just now" - and this is
+                                        the one date the reader is actually waiting on. */}
+                                    <Tooltip label={ locale.dateTime(row.completionTime) }>
+                                        <span class="text-muted">{ locale.t('staking.mine.releases', { when: locale.date(row.completionTime) }) }</span>
+                                    </Tooltip>
+                                    <span class="font-semibold">
+                                        <span class="amount">{ formatAmount(row.balance, props.chain.decimals) }</span>
+                                        { ' ' }{ props.chain.symbol }
+                                    </span>
+                                </span>
+                            </div>
+                        </For>
+                    </div>
+                </Show>
+            </div>
+        }
+        </Show>
+    </section>
+}

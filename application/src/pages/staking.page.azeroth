@@ -1,0 +1,281 @@
+import { client, type ValidatorFilter } from '../api.ts';
+import { formatAmount } from '../lib/format.ts';
+import { commission, commissionMax, days, validatorIcon, validatorState, validatorTone, votingPower } from '../lib/staking.ts';
+import { useTitle } from '../lib/title.ts';
+import { useLocale } from '../stores/locale.store.ts';
+import { useWallet } from '../stores/wallet.store.ts';
+
+import HashLink from '../components/chain/hash-link.component.azeroth';
+import MyStake from '../components/chain/my-stake.component.azeroth';
+import StakeActions from '../components/chain/stake-actions.component.azeroth';
+import WalletConnect from '../components/chain/wallet-connect.component.azeroth';
+import Badge from '../components/ui/badge.component.azeroth';
+import Button from '../components/ui/button.component.azeroth';
+import EmptyState from '../components/ui/empty-state.component.azeroth';
+import FilterGroup from '../components/ui/filter-group.component.azeroth';
+import Pagination from '../components/ui/pagination.component.azeroth';
+import Skeleton from '../components/ui/skeleton.component.azeroth';
+import Tooltip from '../components/ui/tooltip.component.azeroth';
+
+// Staking: who secures this chain, and what a reader can put behind them.
+//
+// Governance's neighbour in every respect. The validator set is not in a contract anybody
+// deployed - it is in the chain's own `x/staking` module, read from the node beside this
+// explorer - and delegating reaches it through a precompile. Where that precompile is not among
+// the chain's active ones the page still lists the set and says plainly that nothing on it can be
+// acted on: following the chain and acting on it are different things, and only one of them is
+// missing.
+export default component StakingPage()
+{
+    const locale = useLocale();
+    const wallet = useWallet();
+
+    state page = 1;
+    state status: ValidatorFilter = 'active';
+    state open = '';
+
+    resource stats = () => client.stats.summary();
+    resource overview = () => client.staking.overview();
+
+    resource validators = (key: string) =>
+    {
+        const [at = '1', narrowed = 'active'] = key.split('|');
+        return client.staking.list({ query: { page: Number(at), limit: 25, status: narrowed as ValidatorFilter } });
+    } with { source: `${ page }|${ status }` };
+
+    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived params = overview.data()?.params ?? null;
+    derived bonded = overview.data()?.pool?.bondedTokens ?? null;
+
+    /** The rank a row carries is its place in the WHOLE set, not on this page. */
+    derived ranked = (validators.data()?.rows ?? []).map((row, at) => ({
+        row,
+        rank: ((validators.data()?.page ?? 1) - 1) * 25 + at + 1
+    }));
+
+    const narrow = (next: string): void =>
+    {
+        status = next as ValidatorFilter;
+        page = 1;
+        open = '';
+    };
+
+    useTitle(() => locale.t('staking.title'));
+
+    <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('staking.title') }</h1>
+                <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('staking.hint') }</p>
+            </div>
+            <Show when={ stats.data() !== undefined && overview.data()?.writable === true }>
+            { () => <WalletConnect chain={ stats.data()!.chain } compact /> }
+            </Show>
+        </div>
+
+        <Show when={ overview.data()?.enabled === false }>
+        { () =>
+            <section class="panel overflow-hidden">
+                <EmptyState icon="token" title={ locale.t('staking.empty.chain.title') } hint={ locale.t('staking.empty.chain.hint') } />
+            </section>
+        }
+        </Show>
+
+        <Show when={ overview.data()?.enabled === true }>
+        { () =>
+            <div class="flex flex-col gap-4">
+                {/* What staking COSTS, as the module itself states it. The unbonding period is
+                    first because it is the only irreversible thing on this page. */}
+                <section class="panel overflow-hidden">
+                    <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        { locale.t('staking.module') }
+                    </h2>
+                    <dl class="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:flex-wrap sm:gap-x-10">
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('staking.unbonding') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">
+                                { locale.t('staking.days', { count: locale.n(days(params?.unbondingTime ?? 0)) }) }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('staking.bonded') }</dt>
+                            <dd class="text-[14px] font-semibold">
+                                <span class="amount">{ formatAmount(bonded ?? '0', decimals) }</span> { symbol }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('staking.active') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">
+                                { locale.t('staking.ofSet', {
+                                    active: locale.n(overview.data()!.active),
+                                    total: locale.n(overview.data()!.total)
+                                }) }
+                            </dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-3 sm:block">
+                            <dt class="text-[12px] text-muted">{ locale.t('staking.maxValidators') }</dt>
+                            <dd class="text-[14px] font-semibold tabular-nums">{ locale.n(params?.maxValidators ?? 0) }</dd>
+                        </div>
+                    </dl>
+                    <Show when={ overview.data()!.node !== null }>
+                    { () =>
+                        <p class="border-t border-line px-4 py-2.5 text-[12px] text-faint">
+                            { locale.t('governance.node', {
+                                chain: overview.data()!.node!.chainId,
+                                height: locale.n(overview.data()!.node!.height)
+                            }) }
+                            <Show when={ overview.data()!.node!.catchingUp }>
+                                <span class="ms-2 text-outflow">{ locale.t('governance.node.catchingUp') }</span>
+                            </Show>
+                        </p>
+                    }
+                    </Show>
+                </section>
+
+                {/* Mounted only with an account behind it - see the note in my-stake. */}
+                <Show when={ wallet.account() !== '' && stats.data() !== undefined && validators.data() !== undefined }>
+                { () =>
+                    <MyStake
+                        address={ wallet.account() }
+                        overview={ overview.data()! }
+                        chain={ stats.data()!.chain }
+                        validators={ validators.data()!.rows }
+                    />
+                }
+                </Show>
+
+                {/* Said once, at the top: everything below can be read, and nothing on it can be
+                    acted on until the chain exposes staking to the EVM. */}
+                <Show when={ !overview.data()!.writable }>
+                    <p class="panel px-4 py-3 text-[13px] text-muted">{ locale.t('staking.readonly') }</p>
+                </Show>
+
+                <FilterGroup
+                    label={ locale.t('staking.filter') }
+                    name="validator-status"
+                    value={ status }
+                    options={ [
+                        { value: 'active', label: locale.t('staking.filter.active') },
+                        { value: 'inactive', label: locale.t('staking.filter.inactive') },
+                        { value: 'all', label: locale.t('filter.all') }
+                    ] }
+                    onChange={ narrow }
+                />
+
+                <section class="panel overflow-hidden">
+                    <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
+                        <For each={ ranked } key={ (entry) => entry.row.operatorAddress } let={ entry }>
+                            <li class="flex flex-col gap-2 rounded-lg border border-line bg-raised px-3 py-2.5 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4 sm:py-3">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                    {/* `locale.n`, not `data`: a rank is a QUANTITY, not chain
+                                        data. An address stays Latin because it is an identifier
+                                        the chain owns, but a place in the set reads in the
+                                        reader's own digits like every other number here. */}
+                                    <span class="text-[13px] tabular-nums text-faint">{ locale.n(entry.rank) }</span>
+                                    {/* A moniker is whatever its operator typed, in whatever
+                                        script - `dir="auto"` keeps its punctuation at its own end
+                                        rather than at the page's. */}
+                                    <span class="min-w-0 flex-1 truncate text-[15px] font-semibold" dir="auto">
+                                        { entry.row.moniker === '' ? locale.t('staking.unnamed') : entry.row.moniker }
+                                    </span>
+                                    <Badge tone={ validatorTone(entry.row) } icon={ validatorIcon(entry.row) }>
+                                        { locale.t(validatorState(entry.row)) }
+                                    </Badge>
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
+                                    <HashLink
+                                        value={ entry.row.operatorAddress }
+                                        to={ entry.row.accountHex === null ? undefined : `/address/${ entry.row.accountHex }` }
+                                        tone="muted"
+                                        lead={ 14 }
+                                        tail={ 6 }
+                                        copy={ false }
+                                        class="text-[12px]"
+                                    />
+                                    <Show when={ entry.row.website !== '' }>
+                                        <a class="text-beam no-underline hover:text-nur" href={ entry.row.website } target="_blank" rel="noreferrer">
+                                            { locale.t('staking.website') }
+                                        </a>
+                                    </Show>
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                                    <dl class="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[12px]">
+                                        <div class="flex items-baseline gap-1.5">
+                                            <dt class="text-muted">{ locale.t('staking.stake') }</dt>
+                                            <dd class="font-semibold">
+                                                <span class="amount">{ formatAmount(entry.row.tokens, decimals) }</span> { symbol }
+                                            </dd>
+                                        </div>
+                                        <Show when={ votingPower(entry.row, bonded) !== null }>
+                                            <div class="flex items-baseline gap-1.5">
+                                                <dt class="text-muted">{ locale.t('staking.power') }</dt>
+                                                <dd class="font-semibold tabular-nums">
+                                                    { locale.t('governance.share', { percent: locale.n(votingPower(entry.row, bonded)!, 2) }) }
+                                                </dd>
+                                            </div>
+                                        </Show>
+                                        <div class="flex items-baseline gap-1.5">
+                                            <dt class="text-muted">{ locale.t('staking.commission') }</dt>
+                                            <dd class="font-semibold tabular-nums">
+                                                <Tooltip label={ locale.t('staking.commission.max', { percent: locale.n(commissionMax(entry.row), 1) }) }>
+                                                    <span>{ locale.t('governance.share', { percent: locale.n(commission(entry.row), 1) }) }</span>
+                                                </Tooltip>
+                                            </dd>
+                                        </div>
+                                    </dl>
+
+                                    <Show when={ overview.data()!.writable }>
+                                        <Button
+                                            variant={ open === entry.row.operatorAddress ? 'ghost' : 'outline' }
+                                            icon={ open === entry.row.operatorAddress ? 'x' : 'wallet' }
+                                            onClick={ () => open = open === entry.row.operatorAddress ? '' : entry.row.operatorAddress }
+                                        >
+                                            { locale.t(open === entry.row.operatorAddress ? 'staking.act.close' : 'staking.act.stake') }
+                                        </Button>
+                                    </Show>
+                                </div>
+
+                                <Show when={ open === entry.row.operatorAddress && stats.data() !== undefined }>
+                                { () =>
+                                    <StakeActions
+                                        validator={ entry.row }
+                                        overview={ overview.data()! }
+                                        chain={ stats.data()!.chain }
+                                        delegation={ null }
+                                        rewards="0"
+                                        validators={ validators.data()!.rows }
+                                        onSent={ () => open = '' }
+                                    />
+                                }
+                                </Show>
+                            </li>
+                        </For>
+                    </ul>
+
+                    <Show when={ validators.data() === undefined }>
+                        <div class="flex flex-col gap-2 px-4 py-4">
+                            <Skeleton class="h-16 w-full" />
+                            <Skeleton class="h-16 w-full" />
+                        </div>
+                    </Show>
+
+                    <Show when={ validators.data()?.rows.length === 0 }>
+                        <EmptyState icon="filter" title={ locale.t('staking.empty.title') } hint={ locale.t('staking.empty.hint') } />
+                    </Show>
+
+                    <Show when={ validators.data() !== undefined }>
+                    { () => <Pagination page={ validators.data()!.page } pages={ validators.data()!.pages } onChange={ (next) => { page = next; open = ''; } } /> }
+                    </Show>
+                </section>
+
+                <Show when={ validators.data() !== undefined }>
+                { () => <p class="text-[13px] text-muted">{ locale.t('staking.total', { count: locale.n(validators.data()!.total) }) }</p> }
+                </Show>
+            </div>
+        }
+        </Show>
+    </div>
+}
