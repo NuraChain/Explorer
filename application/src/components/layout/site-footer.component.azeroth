@@ -1,6 +1,7 @@
 import { Link } from 'azerothjs';
 
 import { useLocale } from '../../stores/locale.store.ts';
+import type { MessageKey } from '../../locales/en.ts';
 import { APP_VERSION } from '../../version.ts';
 
 import Icon from '../../icons/icon.component.azeroth';
@@ -8,9 +9,22 @@ import type { IconName } from '../../icons/registry.ts';
 
 import BrandMark from './brand-mark.component.azeroth';
 
+// The sections, in the order the header names them, with Governance among them and Staking not:
+// the header row holds five links at 1024px and Staking took the fifth (see App.azeroth), so
+// Governance is reachable from here instead. Docs is last and ONLY here - a page of prose is what
+// a footer is for.
+// Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
+const SECTIONS: Array<{ key: MessageKey; to: string; icon: IconName }> = [
+    { key: 'nav.home', to: '/', icon: 'home' },
+    { key: 'nav.blocks', to: '/blocks', icon: 'block' },
+    { key: 'nav.transactions', to: '/txs', icon: 'transaction' },
+    { key: 'nav.governance', to: '/governance', icon: 'vote' },
+    { key: 'nav.charts', to: '/charts', icon: 'chart' },
+    { key: 'docs.title', to: '/docs', icon: 'docs' }
+];
+
 // Where the PROJECT lives, which is why these are hardcoded: they belong to the explorer itself,
 // not to whichever network a deployment is pointed at, so they do not move when RPC_URL does.
-// Not ReadonlyArray: `<For each>` takes a mutable array, and a readonly one will not assign.
 const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
     { name: 'X', href: 'https://x.com/nurachainnet', icon: 'social-x' },
     { name: 'GitHub', href: 'https://github.com/NuraChain/Explorer', icon: 'social-github' },
@@ -44,19 +58,23 @@ export default component SiteFooter()
 
             <nav class="text-center" aria-label={ locale.t('footer.explore') }>
                 <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
-                <ul class="mt-3 flex flex-col gap-2 text-[14px]">
-                    <li><Link to="/" class="text-muted no-underline hover:text-text">{ locale.t('nav.home') }</Link></li>
-                    <li><Link to="/blocks" class="text-muted no-underline hover:text-text">{ locale.t('nav.blocks') }</Link></li>
-                    <li><Link to="/txs" class="text-muted no-underline hover:text-text">{ locale.t('nav.transactions') }</Link></li>
-                    <li><Link to="/governance" class="text-muted no-underline hover:text-text">{ locale.t('nav.governance') }</Link></li>
-                    {/* Here and not in the header row: that row has no width left for a sixth
-                        link (see App.azeroth), and this is the second page after Governance that
-                        a reader comes to the explorer to ACT on rather than to read. */}
-                    <li><Link to="/staking" class="text-muted no-underline hover:text-text">{ locale.t('nav.staking') }</Link></li>
-                    <li><Link to="/charts" class="text-muted no-underline hover:text-text">{ locale.t('nav.charts') }</Link></li>
-                    {/* Last, and only here: the header row has no width left for a sixth link
-                        (see App.azeroth), and a page of prose is what a footer is for anyway. */}
-                    <li><Link to="/docs" class="text-muted no-underline hover:text-text">{ locale.t('docs.title') }</Link></li>
+                {/* Two columns, like the Community list: six links down a single one left this
+                    column taller than the two beside it, and paired they end level. */}
+                <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
+                    <For each={ SECTIONS } key={ (section) => section.to } let={ section }>
+                        <li>
+                            {/* `w-fit` keeps the hover target on the words, so centring takes an
+                                explicit `mx-auto` - the column's `text-center` cannot move a
+                                block-level flex row. */}
+                            <Link
+                                class="mx-auto flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
+                                to={ section.to }
+                            >
+                                <Icon name={ section.icon } size={ 16 } />
+                                { locale.t(section.key) }
+                            </Link>
+                        </li>
+                    </For>
                 </ul>
             </nav>
 
