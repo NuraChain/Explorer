@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.5.0
+
+### Features
+
+- **Staking:** show who secures the chain, and let a reader stake with them, at `/staking`. The
+  validator set is `x/staking`, so like governance it is read from the node's REST api and never
+  indexed — a set is tens of rows against millions of transactions, and a copy could only be one
+  that goes wrong. Delegating, redelegating, unbonding and claiming are ordinary EVM transactions
+  to the staking and distribution precompiles at `0x…0800` and `0x…0801`, signed by the reader's
+  own wallet, and the two capabilities are reported apart exactly as governance reports them:
+  whether the module answered at all, and whether those precompiles are mounted, because a chain
+  that has one without the other is the normal case. A connected wallet also gets its own position
+  — what is delegated, what is unbonding and on which date, and what is owed — read under the
+  bech32 spelling of its address, since that is the only name the module knows an account by. The
+  link sits in the footer beside the docs, because the header row has no width left for a sixth
+  section
+- **Contracts:** resolve every function and event the chain's own contracts expose — 298 signatures
+  to 507, and 43 events to 127. The table is the only way a selector ever becomes a name, and it
+  drifts in silence: a contract gains a function and the page that should decode its calls simply
+  goes quiet. The bridge tokens, the faucet, the airdrop, the collateralised NFT vault, the four
+  Goman prediction contracts, the profile registry with its lens and verifier, and the Uniswap V3
+  callbacks are all named now, as are the staking and distribution precompiles the section above
+  calls
+
+### Fixes
+
+- **Contracts:** decode a prediction market's category as the `uint32` id it is rather than a
+  string. Six market tuples and both `createMarket` signatures still matched by selector while
+  describing the wrong shape, which is the drift that says nothing — a missing entry leaves a
+  selector unnamed and visibly so, but one whose types have moved prints values that are wrong.
+  `multicall` is payable for the same reason it is in the periphery it came from: a batch
+  forwarding value could not be encoded at all while the table declared it nonpayable. Two entries
+  that hash to one selector now throw where the table is built, instead of letting the second
+  quietly replace the first
+
 ## 1.4.2
 
 ### Chores
