@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.1
+
+### Features
+
+- **Nav:** Staking takes the fifth header link and Governance moves to the footer. Staking is the
+  page a reader returns to — a delegation is watched — where a proposal is read once and voted on,
+  and the header row has never had width for a sixth link. The footer's Explore column is two
+  columns now, each link with its own mark, which is what made room for Governance without leaving
+  that column taller than the two beside it
+- **Locale:** a configured period is stated in the unit that fits it — minutes, hours, days, weeks
+  or months — rather than always in days. Both places that print one were dividing by 86400: a
+  governance voting period and a staking unbonding period on a devnet are minutes, and every one of
+  them read as `0.0 days`. The unit is the largest that divides the span exactly, so a chain set to
+  two weeks is read back as two weeks rather than as fourteen days, and the Cosmos default
+  unbonding time of 21 days now says three weeks. Where a span divides evenly nowhere the decimal
+  rounds up and never down, because one of these is a lock a reader agrees to and a wait printed as
+  shorter than it is, is the one error here that costs them something. The unbonding sentences no
+  longer carry the word "days" themselves, in any of the ten languages
+
 ## 1.5.0
 
 ### Features
