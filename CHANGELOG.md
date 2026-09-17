@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.2
+
+### Fixes
+
+- **Contracts:** follow the prediction contracts' fee change through the signature table. A forecast
+  market now sends its trade fee to the treasury whole, so the protocol share it used to keep is
+  gone: `setDefaultFees` and `FeesUpdated` each lost an argument, `BPS()`,
+  `defaultProtocolFeeShareBps()` and `protocolFeeShareBps()` are on no deployed contract any more,
+  and the `MarketParams` tuple both creates and a market's `initialize` take is one `uint16`
+  shorter. A tuple that has moved is the drift that says nothing — the selector still matches, so
+  the call decodes as the wrong numbers rather than as none at all — which is why the table is read
+  back off the compiled artifacts instead of left to age
+
 ## 1.5.1
 
 ### Features
