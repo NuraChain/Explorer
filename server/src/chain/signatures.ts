@@ -495,11 +495,9 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['marketImplementation()', 'view', 'address'],
     ['poolImplementation()', 'view', 'address'],
     ['treasury()', 'view', 'address'],
-    ['BPS()', 'view', 'uint16'],
     ['MAX_FEE_BPS()', 'view', 'uint16'],
     ['MAX_SIGNERS()', 'view', 'uint256'],
     ['defaultFeeBps()', 'view', 'uint16'],
-    ['defaultProtocolFeeShareBps()', 'view', 'uint16'],
     ['requiredConfirmations()', 'view', 'uint256'],
     ['marketAt(uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)'],
     ['marketAddress(uint256)', 'view', 'address'],
@@ -518,14 +516,14 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['confirmationCount(uint256,uint256)', 'view', 'uint256'],
     ['confirmationOf(uint256,address)', 'view', 'uint256'],
     ['confirmResolution(uint256,uint256)', 'nonpayable', ''],
-    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
-    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
+    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', 'uint256,address'],
+    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'nonpayable', 'uint256,address'],
     ['closeMarket(uint256)', 'nonpayable', ''],
     ['voidMarket(uint256)', 'nonpayable', ''],
     ['pauseMarket(uint256)', 'nonpayable', ''],
     ['unpauseMarket(uint256)', 'nonpayable', ''],
     ['setResolutionSigners(address[],uint256)', 'nonpayable', ''],
-    ['setDefaultFees(uint16,uint16)', 'nonpayable', ''],
+    ['setDefaultFees(uint16)', 'nonpayable', ''],
     ['setTreasury(address)', 'nonpayable', ''],
     // A market caches the treasury it was stamped with; this pushes the factory's current one on
     // to a market already deployed, which is why it takes an id and not an address.
@@ -658,13 +656,12 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['getPrices()', 'view', 'uint256[]'],
     ['holderCount()', 'view', 'uint256'],
     ['imageURI()', 'view', 'string'],
-    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', ''],
+    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', ''],
     ['lockTime()', 'view', 'uint64'],
     ['mergeSets(uint256)', 'nonpayable', ''],
     ['outcomeCount()', 'view', 'uint256'],
     ['outcomeName(uint256)', 'view', 'string'],
     ['pendingPayout(address)', 'view', 'uint256'],
-    ['protocolFeeShareBps()', 'view', 'uint16'],
     ['redeem()', 'nonpayable', 'uint256'],
     ['removeFunding(uint256)', 'nonpayable', ''],
     ['resolve(uint256)', 'nonpayable', ''],
@@ -695,8 +692,9 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['totalPool()', 'view', 'uint256'],
 
     // --- Goman prediction markets (the fee treasury) ------------------------------------------
-    // Where every market's protocol share lands. `collectedFor` splits the total by the market
-    // that paid it, so a reader can see which market funded the balance.
+    // Where every market's trade fee lands, whole - a market keeps no share of it.
+    // `collectedFor` splits the total by the market that paid it, so a reader can see which
+    // market funded the balance.
     ['collectedFor(address)', 'view', 'uint256'],
     ['depositFee(address)', 'payable', ''],
     ['feeRecipient()', 'view', 'address'],
@@ -910,7 +908,7 @@ const EVENTS: readonly string[] = [
     'FeeCollected(address,uint256)',
     'FeeRecipientChanged(address)',
     'FeeWithdrawn(address,uint256)',
-    'FeesUpdated(uint16,uint16)',
+    'FeesUpdated(uint16)',
     'LiquidityAdded(address,address,uint256,uint256)',
     'LiquidityRemoved(address,address,uint256)',
     'MarketClosed(address)',
