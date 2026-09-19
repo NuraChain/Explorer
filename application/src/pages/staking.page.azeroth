@@ -52,6 +52,12 @@ export default component StakingPage()
     } with { source: `${ page }|${ status }` };
 
     derived decimals = summary?.chain.decimals ?? 18;
+
+    // The overview, but only once the module has answered. Declared so the branch below can
+    // BIND it: `enabled` is a fact about the overview, so a `<Show>` testing it cannot also
+    // hand its branch the value it tested - and a branch that re-reads the resource under a
+    // `!` can observe a null while it is still mounted.
+    derived live = overview.data()?.enabled === true ? overview.data() : undefined;
     derived symbol = summary?.chain.symbol ?? '';
     derived params = overview.data()?.params ?? null;
     derived bonded = overview.data()?.pool?.bondedTokens ?? null;
@@ -101,7 +107,7 @@ export default component StakingPage()
         }
         </Show>
 
-        <Show when={ overview.data()?.enabled === true }>
+        <Show when={ live } let={ shown }>
         { () =>
             <div class="flex flex-col gap-4">
                 {/* What staking COSTS, as the module itself states it. The unbonding period is
@@ -127,8 +133,8 @@ export default component StakingPage()
                             <dt class="text-[12px] text-muted">{ locale.t('staking.active') }</dt>
                             <dd class="text-[14px] font-semibold tabular-nums">
                                 { locale.t('staking.ofSet', {
-                                    active: locale.n(overview.data()!.active),
-                                    total: locale.n(overview.data()!.total)
+                                    active: locale.n(shown.active),
+                                    total: locale.n(shown.total)
                                 }) }
                             </dd>
                         </div>
@@ -137,14 +143,14 @@ export default component StakingPage()
                             <dd class="text-[14px] font-semibold tabular-nums">{ locale.n(params?.maxValidators ?? 0) }</dd>
                         </div>
                     </dl>
-                    <Show when={ overview.data()!.node !== null }>
+                    <Show when={ shown.node !== null }>
                     { () =>
                         <p class="border-t border-line px-4 py-2.5 text-[12px] text-faint">
                             { locale.t('governance.node', {
-                                chain: overview.data()!.node!.chainId,
-                                height: locale.n(overview.data()!.node!.height)
+                                chain: shown.node!.chainId,
+                                height: locale.n(shown.node!.height)
                             }) }
-                            <Show when={ overview.data()!.node!.catchingUp }>
+                            <Show when={ shown.node!.catchingUp }>
                                 <span class="ms-2 text-outflow">{ locale.t('governance.node.catchingUp') }</span>
                             </Show>
                         </p>
@@ -157,7 +163,7 @@ export default component StakingPage()
                 { () =>
                     <MyStake
                         address={ wallet.account() }
-                        overview={ overview.data()! }
+                        overview={ shown }
                         chain={ summary!.chain }
                         validators={ validators.data()!.rows }
                     />
@@ -166,7 +172,7 @@ export default component StakingPage()
 
                 {/* Said once, at the top: everything below can be read, and nothing on it can be
                     acted on until the chain exposes staking to the EVM. */}
-                <Show when={ !overview.data()!.writable }>
+                <Show when={ !shown.writable }>
                     <p class="panel px-4 py-3 text-[13px] text-muted">{ locale.t('staking.readonly') }</p>
                 </Show>
 
@@ -246,7 +252,7 @@ export default component StakingPage()
                                         </div>
                                     </dl>
 
-                                    <Show when={ overview.data()!.writable }>
+                                    <Show when={ shown.writable }>
                                         <Button
                                             variant={ open === entry.row.operatorAddress ? 'ghost' : 'outline' }
                                             icon={ open === entry.row.operatorAddress ? 'x' : 'wallet' }
@@ -261,7 +267,7 @@ export default component StakingPage()
                                 { () =>
                                     <StakeActions
                                         validator={ entry.row }
-                                        overview={ overview.data()! }
+                                        overview={ shown }
                                         chain={ summary!.chain }
                                         delegation={ null }
                                         rewards="0"
@@ -285,13 +291,13 @@ export default component StakingPage()
                         <EmptyState icon="filter" title={ locale.t('staking.empty.title') } hint={ locale.t('staking.empty.hint') } />
                     </Show>
 
-                    <Show when={ validators.data() !== undefined }>
-                    { () => <Pagination page={ validators.data()!.page } pages={ validators.data()!.pages } onChange={ (next) => { page = next; open = ''; } } /> }
+                    <Show when={ validators.data() } let={ shown }>
+                    { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => { page = next; open = ''; } } /> }
                     </Show>
                 </section>
 
-                <Show when={ validators.data() !== undefined }>
-                { () => <p class="text-[13px] text-muted">{ locale.t('staking.total', { count: locale.n(validators.data()!.total) }) }</p> }
+                <Show when={ validators.data() } let={ shown }>
+                { () => <p class="text-[13px] text-muted">{ locale.t('staking.total', { count: locale.n(shown.total) }) }</p> }
                 </Show>
             </div>
         }

@@ -83,33 +83,33 @@ export default component TransactionPage()
             </div>
         </Show>
 
-        <Show when={ detail.data() !== undefined }>
+        <Show when={ detail.data() } let={ shown }>
         { () =>
             <div class="flex flex-col gap-5">
                 <header class="flex flex-wrap items-center gap-3">
-                    <span class={ detail.data()!.transaction.status === 'reverted'
+                    <span class={ shown.transaction.status === 'reverted'
                         ? 'flex h-10 w-10 items-center justify-center rounded-lg bg-raised text-outflow'
                         : 'flex h-10 w-10 items-center justify-center rounded-lg bg-raised text-inflow' }
                     >
-                        <Icon name={ detail.data()!.transaction.status === 'reverted' ? 'alert' : 'success' } size={ 19 } />
+                        <Icon name={ shown.transaction.status === 'reverted' ? 'alert' : 'success' } size={ 19 } />
                     </span>
                     <div class="min-w-0 flex-1">
                         <h1 class="text-[20px] font-bold tracking-tight">{ locale.t('tx.title') }</h1>
                         <p class="text-[13px] text-muted">
-                            { locale.dateTime(detail.data()!.transaction.at) } &middot; { locale.ago(detail.data()!.transaction.at) }
+                            { locale.dateTime(shown.transaction.at) } &middot; { locale.ago(shown.transaction.at) }
                         </p>
                     </div>
                     <Badge
-                        tone={ detail.data()!.transaction.status === 'reverted' ? 'danger' : detail.data()!.transaction.status === 'unknown' ? 'neutral' : 'success' }
-                        icon={ detail.data()!.transaction.status === 'reverted' ? 'alert' : 'success' }
+                        tone={ shown.transaction.status === 'reverted' ? 'danger' : shown.transaction.status === 'unknown' ? 'neutral' : 'success' }
+                        icon={ shown.transaction.status === 'reverted' ? 'alert' : 'success' }
                     >
-                        { locale.t(`chain.status.${ detail.data()!.transaction.status }`) }
+                        { locale.t(`chain.status.${ shown.transaction.status }`) }
                     </Badge>
                 </header>
 
                 {/* The reverted case is said in words, not only in colour: a failed transfer that
                     reads as a successful one is the worst mistake this page could make. */}
-                <Show when={ detail.data()!.transaction.status === 'reverted' }>
+                <Show when={ shown.transaction.status === 'reverted' }>
                     <p class="flex items-start gap-2 rounded-lg border border-outflow bg-raised px-4 py-3 text-[14px] text-outflow">
                         <Icon name="alert" size={ 16 } class="mt-0.5 shrink-0" />
                         { locale.t('tx.reverted.notice') }
@@ -126,28 +126,28 @@ export default component TransactionPage()
                 <dl class="panel divide-y divide-line">
                     <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3 sm:gap-y-0">
                         <dt class="text-[13px] text-muted sm:w-28 sm:shrink-0">{ locale.t('tx.hash') }</dt>
-                        <dd class="sm:flex-1"><HashLink value={ detail.data()!.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
+                        <dd class="sm:flex-1"><HashLink value={ shown.transaction.hash } tone="text" lead={ 20 } tail={ 12 } copy /></dd>
                     </div>
                     <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3 sm:gap-y-0">
                         <dt class="text-[13px] text-muted sm:w-28 sm:shrink-0">{ locale.t('tx.block') }</dt>
                         <dd class="sm:flex-1">
-                            <Link to={ `/block/${ detail.data()!.transaction.blockNumber }` } class="data text-[14px] text-beam no-underline hover:underline">
-                                #{ detail.data()!.transaction.blockNumber }
+                            <Link to={ `/block/${ shown.transaction.blockNumber }` } class="data text-[14px] text-beam no-underline hover:underline">
+                                #{ shown.transaction.blockNumber }
                             </Link>
-                            <span class="ms-2 text-[13px] text-muted">{ locale.t('tx.position', { index: locale.n(detail.data()!.transaction.index) }) }</span>
+                            <span class="ms-2 text-[13px] text-muted">{ locale.t('tx.position', { index: locale.n(shown.transaction.index) }) }</span>
                         </dd>
                     </div>
                     <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3 sm:gap-y-0">
                         <dt class="text-[13px] text-muted sm:w-28 sm:shrink-0">{ locale.t('tx.from') }</dt>
-                        <dd class="sm:flex-1"><HashLink value={ detail.data()!.transaction.from } to={ `/address/${ detail.data()!.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
+                        <dd class="sm:flex-1"><HashLink value={ shown.transaction.from } to={ `/address/${ shown.transaction.from }` } lead={ 16 } tail={ 10 } copy /></dd>
                     </div>
                     <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3 sm:gap-y-0">
                         <dt class="text-[13px] text-muted sm:w-28 sm:shrink-0">{ locale.t('tx.to') }</dt>
                         <dd class="sm:flex-1">
                             <Show
-                                when={ detail.data()!.transaction.to }
+                                when={ shown.transaction.to }
                                 fallback={
-                                    <Show when={ detail.data()!.transaction.contractAddress } fallback={ <span class="text-[14px] text-muted">{ locale.t('chain.contractCreation') }</span> } let={ created }>
+                                    <Show when={ shown.transaction.contractAddress } fallback={ <span class="text-[14px] text-muted">{ locale.t('chain.contractCreation') }</span> } let={ created }>
                                         <span class="flex flex-wrap items-center gap-2">
                                             <span class="text-[13px] text-muted">{ locale.t('tx.created') }</span>
                                             <HashLink value={ created } to={ `/address/${ created }` } lead={ 16 } tail={ 10 } copy />
@@ -164,14 +164,14 @@ export default component TransactionPage()
                         {/* `amount` on the value, not on the dd: the utility forces ltr, and on a
                             block element that also decides where the line starts, so the figure
                             stood against the far edge from its own label in a mirrored layout. */}
-                        <dd class="text-[16px] font-bold sm:min-w-0 sm:flex-1"><span class="amount">{ formatValue(detail.data()!.transaction.value, symbol, decimals) }</span></dd>
+                        <dd class="text-[16px] font-bold sm:min-w-0 sm:flex-1"><span class="amount">{ formatValue(shown.transaction.value, symbol, decimals) }</span></dd>
                     </div>
                     <div class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3 sm:gap-y-0">
                         <dt class="text-[13px] text-muted sm:w-28 sm:shrink-0">{ locale.t('tx.fee') }</dt>
                         <dd class="sm:flex-1">
-                            <span class="amount text-[14px]">{ formatValue(detail.data()!.transaction.fee, symbol, decimals) }</span>
+                            <span class="amount text-[14px]">{ formatValue(shown.transaction.fee, symbol, decimals) }</span>
                             <span class="ms-2 text-[13px] text-muted">
-                                { locale.t('tx.feeDetail', { gas: locale.n(Number(detail.data()!.transaction.gasUsed)), price: formatGwei(detail.data()!.transaction.gasPrice) }) }
+                                { locale.t('tx.feeDetail', { gas: locale.n(Number(shown.transaction.gasUsed)), price: formatGwei(shown.transaction.gasPrice) }) }
                             </span>
                         </dd>
                     </div>
@@ -182,21 +182,21 @@ export default component TransactionPage()
                             the dd it took the whole row to the wrong edge and dragged the words
                             with it. */}
                         <dd class="text-[14px] sm:flex-1">
-                            <span class="data">{ detail.data()!.transaction.nonce }</span>
-                            <Show when={ detail.data()!.transaction.inputSize > 0 }>
-                                <span class="ms-3 text-[13px] text-muted">{ locale.t('tx.calldata', { size: locale.bytes(detail.data()!.transaction.inputSize) }) }</span>
+                            <span class="data">{ shown.transaction.nonce }</span>
+                            <Show when={ shown.transaction.inputSize > 0 }>
+                                <span class="ms-3 text-[13px] text-muted">{ locale.t('tx.calldata', { size: locale.bytes(shown.transaction.inputSize) }) }</span>
                             </Show>
                         </dd>
                     </div>
                 </dl>
 
-                <Show when={ detail.data()!.total > 0 }>
+                <Show when={ shown.total > 0 }>
                     <section class="panel overflow-hidden">
                         <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
-                            { locale.t('tx.transfers', { count: locale.n(detail.data()!.total) }) }
+                            { locale.t('tx.transfers', { count: locale.n(shown.total) }) }
                         </h2>
                         <ul class="divide-y divide-line">
-                            <For each={ detail.data()!.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
+                            <For each={ shown.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
                             <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                                     <Icon name="token" size={ 16 } class="text-nur" />
                                     <div class="min-w-0 flex-1 text-[13px] text-muted">
@@ -211,9 +211,9 @@ export default component TransactionPage()
                                 </li>
                             </For>
                         </ul>
-                        <Show when={ detail.data()!.pages > 1 }>
+                        <Show when={ shown.pages > 1 }>
                             <div class="border-t border-line">
-                                <Pagination page={ detail.data()!.page } pages={ detail.data()!.pages } onChange={ (next) => page = next } />
+                                <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } />
                             </div>
                         </Show>
                     </section>

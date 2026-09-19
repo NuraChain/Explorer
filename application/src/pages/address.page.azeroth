@@ -193,31 +193,31 @@ export default component AddressPage()
             Every figure inside wears `amount` on a SPAN. On the dd itself the utility's ltr also
             fixes where the line starts, and each card printed its label against one edge and its
             number against the other in a mirrored layout. */}
-        <Show when={ account.data() !== undefined }>
+        <Show when={ account.data() } let={ shown }>
         { () =>
             <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                 <div class="panel px-4 py-3">
                     <dt class="text-[13px] text-muted">{ locale.t('address.balance') }</dt>
-                    <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatValue(account.data()!.balance, symbol, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatValue(shown.balance, symbol, decimals) }</span></dd>
                 </div>
                 {/* The two numbers the page is FOR, in the two colours that mean them. */}
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[13px] text-muted">
                         <Icon name="inflow" size={ 13 } class="text-inflow" /> { locale.t('address.received') }
                     </dt>
-                    <dd class="mt-0.5 text-[16px] font-bold text-inflow sm:text-[17px]"><span class="amount">{ formatAmount(account.data()!.flow.in, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[16px] font-bold text-inflow sm:text-[17px]"><span class="amount">{ formatAmount(shown.flow.in, decimals) }</span></dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[13px] text-muted">
                         <Icon name="outflow" size={ 13 } class="text-outflow" /> { locale.t('address.sent') }
                     </dt>
-                    <dd class="mt-0.5 text-[16px] font-bold text-outflow sm:text-[17px]"><span class="amount">{ formatAmount(account.data()!.flow.out, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[16px] font-bold text-outflow sm:text-[17px]"><span class="amount">{ formatAmount(shown.flow.out, decimals) }</span></dd>
                 </div>
                 <div class="panel px-4 py-3">
                     <dt class="flex items-center gap-1.5 text-[13px] text-muted">
                         <Icon name="gas" size={ 13 } /> { locale.t('address.fees') }
                     </dt>
-                    <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatAmount(account.data()!.flow.fees, decimals) }</span></dd>
+                    <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatAmount(shown.flow.fees, decimals) }</span></dd>
                 </div>
             </div>
         }
@@ -234,8 +234,8 @@ export default component AddressPage()
                 onClick={ () => pick('flow') }
             >
                 { locale.t('address.tab.transactions') }
-                <Show when={ account.data() !== undefined }>
-                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(account.data()!.txCount) }</span> }
+                <Show when={ account.data() } let={ shown }>
+                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(shown.txCount) }</span> }
                 </Show>
             </button>
             <button
@@ -248,8 +248,8 @@ export default component AddressPage()
                 onClick={ () => pick('transfers') }
             >
                 { locale.t('address.tab.transfers') }
-                <Show when={ account.data() !== undefined }>
-                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(account.data()!.transferCount) }</span> }
+                <Show when={ account.data() } let={ shown }>
+                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(shown.transferCount) }</span> }
                 </Show>
             </button>
             {/* Only where there is code to show. On an ordinary account the tab would open onto an
@@ -300,11 +300,15 @@ export default component AddressPage()
                 {/* Guarded on the page COUNT, not on the data: Pagination draws nothing for a
                     single page, and an unguarded panel around nothing is an empty bordered strip
                     under the ledger. */}
-                <Show when={ (txs.data()?.pages ?? 0) > 1 }>
+                <Show when={ txs.data() } let={ sent }>
                 { () =>
-                    <div class="panel">
-                        <Pagination page={ txs.data()!.page } pages={ txs.data()!.pages } onChange={ (next) => page = next } />
-                    </div>
+                    <Show when={ sent.pages > 1 }>
+                    { () =>
+                        <div class="panel">
+                            <Pagination page={ sent.page } pages={ sent.pages } onChange={ (next) => page = next } />
+                        </div>
+                    }
+                    </Show>
                 }
                 </Show>
             </div>
@@ -360,8 +364,8 @@ export default component AddressPage()
                 <Show when={ transfers.data()?.rows.length === 0 }>
                     <EmptyState icon="token" title={ locale.t('address.transfers.empty.title') } hint={ locale.t('address.transfers.empty.hint') } />
                 </Show>
-                <Show when={ transfers.data() !== undefined }>
-                { () => <Pagination page={ transfers.data()!.page } pages={ transfers.data()!.pages } onChange={ (next) => page = next } /> }
+                <Show when={ transfers.data() } let={ shown }>
+                { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } /> }
                 </Show>
             </section>
         </Show>

@@ -45,6 +45,12 @@ export default component GovernancePage()
     } with { source: `${ page }|${ status }` };
 
     derived decimals = summary?.chain.decimals ?? 18;
+
+    // The overview, but only once the module has answered. Declared so the branch below can
+    // BIND it: `enabled` is a fact about the overview, so a `<Show>` testing it cannot also
+    // hand its branch the value it tested - and a branch that re-reads the resource under a
+    // `!` can observe a null while it is still mounted.
+    derived live = overview.data()?.enabled === true ? overview.data() : undefined;
     derived symbol = summary?.chain.symbol ?? '';
     derived params = overview.data()?.params ?? null;
 
@@ -89,13 +95,13 @@ export default component GovernancePage()
             <section class="panel overflow-hidden">
                 <EmptyState icon="vote" title={ locale.t('governance.empty.chain.title') } hint={ locale.t('governance.empty.chain.hint') } />
                 <p class="hash border-t border-line px-4 py-3 text-center text-[12px] text-faint">
-                    { overview.data()!.precompile }
+                    { overview.data()?.precompile }
                 </p>
             </section>
         }
         </Show>
 
-        <Show when={ overview.data()?.enabled === true }>
+        <Show when={ live } let={ shown }>
         { () =>
             <div class="flex flex-col gap-4">
                 {/* What passing takes on this chain, as the module itself states it. */}
@@ -139,14 +145,14 @@ export default component GovernancePage()
                         the explorer, and one that is still catching up is answering from an older
                         state machine than the chain's - which a reader deciding how to vote is
                         entitled to know. */}
-                    <Show when={ overview.data()!.node !== null }>
+                    <Show when={ shown.node !== null }>
                     { () =>
                         <p class="border-t border-line px-4 py-2.5 text-[12px] text-faint">
                             { locale.t('governance.node', {
-                                chain: overview.data()!.node!.chainId,
-                                height: locale.n(overview.data()!.node!.height)
+                                chain: shown.node!.chainId,
+                                height: locale.n(shown.node!.height)
                             }) }
-                            <Show when={ overview.data()!.node!.catchingUp }>
+                            <Show when={ shown.node!.catchingUp }>
                                 <span class="ms-2 text-outflow">{ locale.t('governance.node.catchingUp') }</span>
                             </Show>
                         </p>
@@ -170,11 +176,11 @@ export default component GovernancePage()
 
                     {/* Making one is offered from here, where the reader can see what it will cost
                         and what it has to clear - and only where a wallet can actually send it. */}
-                    <Show when={ summary !== undefined && params !== null && overview.data()!.writable }>
+                    <Show when={ summary !== undefined && params !== null && shown.writable }>
                     { () =>
                         <NewProposal
-                            precompile={ overview.data()!.precompile }
-                            calls={ overview.data()!.calls }
+                            precompile={ shown.precompile }
+                            calls={ shown.calls }
                             params={ params! }
                             chain={ summary!.chain }
                             onSent={ () => { overview.refetch(); proposals.refetch(); } }
@@ -185,7 +191,7 @@ export default component GovernancePage()
 
                 {/* Said once, at the top: everything below can be read, and nothing on it can be
                     acted on until the chain exposes governance to the EVM. */}
-                <Show when={ !overview.data()!.writable }>
+                <Show when={ !shown.writable }>
                     <p class="panel px-4 py-3 text-[13px] text-muted">{ locale.t('governance.readonly') }</p>
                 </Show>
 
@@ -250,13 +256,13 @@ export default component GovernancePage()
                         </Show>
                     </Show>
 
-                    <Show when={ proposals.data() !== undefined }>
-                    { () => <Pagination page={ proposals.data()!.page } pages={ proposals.data()!.pages } onChange={ (next) => page = next } /> }
+                    <Show when={ proposals.data() } let={ shown }>
+                    { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } /> }
                     </Show>
                 </section>
 
-                <Show when={ proposals.data() !== undefined }>
-                { () => <p class="text-[13px] text-muted">{ locale.t('governance.total', { count: locale.n(proposals.data()!.total) }) }</p> }
+                <Show when={ proposals.data() } let={ shown }>
+                { () => <p class="text-[13px] text-muted">{ locale.t('governance.total', { count: locale.n(shown.total) }) }</p> }
                 </Show>
             </div>
         }

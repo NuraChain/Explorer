@@ -120,15 +120,15 @@ export default component BlocksPage()
                     <EmptyState icon="block" title={ locale.t('blocks.empty.title') } hint={ locale.t('blocks.empty.hint') } />
                 </Show>
             </Show>
-            <Show when={ blocks.data() !== undefined }>
-            { () => <Pagination page={ blocks.data()!.page } pages={ blocks.data()!.pages } onChange={ (next) => page = next } /> }
+            <Show when={ blocks.data() } let={ shown }>
+            { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } /> }
             </Show>
         </section>
 
         {/* The count follows the filter: with one on, `total` is what MATCHED, and calling that
             "indexed" misreports the size of the index every time somebody narrows it. */}
-        <Show when={ blocks.data() !== undefined }>
-        { () => <p class="text-[13px] text-muted">{ locale.t(content === 'all' ? 'blocks.total' : 'blocks.total.filtered', { count: locale.n(blocks.data()!.total) }) }</p> }
+        <Show when={ blocks.data() } let={ shown }>
+        { () => <p class="text-[13px] text-muted">{ locale.t(content === 'all' ? 'blocks.total' : 'blocks.total.filtered', { count: locale.n(shown.total) }) }</p> }
         </Show>
     </div>
 }

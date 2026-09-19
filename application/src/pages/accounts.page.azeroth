@@ -148,15 +148,15 @@ export default component AccountsPage()
                     <EmptyState icon="wallet" title={ locale.t('accounts.empty.title') } hint={ locale.t('accounts.empty.hint') } />
                 </Show>
             </Show>
-            <Show when={ accounts.data() !== undefined }>
-            { () => <Pagination page={ accounts.data()!.page } pages={ accounts.data()!.pages } onChange={ (next) => page = next } /> }
+            <Show when={ accounts.data() } let={ shown }>
+            { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } /> }
             </Show>
         </section>
 
         {/* The count follows the search: with one on, `total` is what MATCHED, and calling that
             the size of the ranking would misreport it every time somebody typed. */}
-        <Show when={ accounts.data() !== undefined }>
-        { () => <p class="text-[13px] text-muted">{ locale.t(query === '' ? 'accounts.total' : 'accounts.total.filtered', { count: locale.n(accounts.data()!.total) }) }</p> }
+        <Show when={ accounts.data() } let={ shown }>
+        { () => <p class="text-[13px] text-muted">{ locale.t(query === '' ? 'accounts.total' : 'accounts.total.filtered', { count: locale.n(shown.total) }) }</p> }
         </Show>
     </div>
 }

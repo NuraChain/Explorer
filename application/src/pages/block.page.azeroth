@@ -83,7 +83,7 @@ export default component BlockPage()
             </div>
         </Show>
 
-        <Show when={ detail.data() !== undefined }>
+        <Show when={ detail.data() } let={ shown }>
         { () =>
             <>
                 <header class="flex flex-wrap items-center gap-3">
@@ -91,16 +91,16 @@ export default component BlockPage()
                         <Icon name="block" size={ 19 } />
                     </span>
                     <div class="flex-1">
-                        <h1 class="data text-[22px] font-bold tracking-tight">{ locale.t('block.title', { number: detail.data()!.block.number }) }</h1>
-                        <p class="text-[13px] text-muted">{ locale.dateTime(detail.data()!.block.at) } &middot; { locale.ago(detail.data()!.block.at) }</p>
+                        <h1 class="data text-[22px] font-bold tracking-tight">{ locale.t('block.title', { number: shown.block.number }) }</h1>
+                        <p class="text-[13px] text-muted">{ locale.dateTime(shown.block.at) } &middot; { locale.ago(shown.block.at) }</p>
                     </div>
                     <nav class="flex items-center gap-1.5">
-                        <Show when={ detail.data()!.block.number > 0 }>
-                            <Link to={ `/block/${ detail.data()!.block.number - 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label={ locale.t('block.previous') }>
+                        <Show when={ shown.block.number > 0 }>
+                            <Link to={ `/block/${ shown.block.number - 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label={ locale.t('block.previous') }>
                                 <Icon name="chevron-left" size={ 16 } class="icon-flip" />
                             </Link>
                         </Show>
-                        <Link to={ `/block/${ detail.data()!.block.number + 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label={ locale.t('block.next') }>
+                        <Link to={ `/block/${ shown.block.number + 1 }` } class="flex h-8 w-8 items-center justify-center rounded-md border border-line text-muted no-underline hover:border-nur hover:text-nur" aria-label={ locale.t('block.next') }>
                             <Icon name="chevron-right" size={ 16 } class="icon-flip" />
                         </Link>
                     </nav>
@@ -109,27 +109,27 @@ export default component BlockPage()
                 <dl class="panel grid grid-cols-1 divide-y divide-line sm:grid-cols-2 sm:divide-y-0">
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-24 shrink-0 text-[13px] text-muted">{ locale.t('block.hash') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.block.hash } tone="text" lead={ 16 } tail={ 10 } copy /></dd>
+                        <dd class="min-w-0 flex-1"><HashLink value={ shown.block.hash } tone="text" lead={ 16 } tail={ 10 } copy /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-24 shrink-0 text-[13px] text-muted">{ locale.t('block.parent') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.block.parentHash } to={ `/block/${ detail.data()!.block.number - 1 }` } lead={ 16 } tail={ 10 } /></dd>
+                        <dd class="min-w-0 flex-1"><HashLink value={ shown.block.parentHash } to={ `/block/${ shown.block.number - 1 }` } lead={ 16 } tail={ 10 } /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-24 shrink-0 text-[13px] text-muted">{ locale.t('block.validator') }</dt>
-                        <dd class="min-w-0 flex-1"><HashLink value={ detail.data()!.block.miner } to={ `/address/${ detail.data()!.block.miner }` } lead={ 12 } tail={ 8 } /></dd>
+                        <dd class="min-w-0 flex-1"><HashLink value={ shown.block.miner } to={ `/address/${ shown.block.miner }` } lead={ 12 } tail={ 8 } /></dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-24 shrink-0 text-[13px] text-muted">{ locale.t('block.size') }</dt>
-                        <dd class="flex-1 text-[14px]">{ locale.bytes(detail.data()!.block.size) }</dd>
+                        <dd class="flex-1 text-[14px]">{ locale.bytes(shown.block.size) }</dd>
                     </div>
                     <div class="flex flex-wrap items-baseline gap-x-3 px-4 py-3">
                         <dt class="w-24 shrink-0 text-[13px] text-muted">{ locale.t('block.gasUsed') }</dt>
                         <dd class="flex-1">
-                            <span class="data text-[14px]">{ locale.n(Number(detail.data()!.block.gasUsed)) }</span>
-                            <span class="ms-2 text-[13px] text-muted">{ locale.t('block.gasOf', { limit: locale.n(Number(detail.data()!.block.gasLimit)) }) }</span>
+                            <span class="data text-[14px]">{ locale.n(Number(shown.block.gasUsed)) }</span>
+                            <span class="ms-2 text-[13px] text-muted">{ locale.t('block.gasOf', { limit: locale.n(Number(shown.block.gasLimit)) }) }</span>
                             <span class="mt-1.5 block h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-raised">
-                                <span class="block h-full rounded-full bg-nur" style={ `width: ${ (gasShare(detail.data()!.block.gasUsed, detail.data()!.block.gasLimit) * 100).toFixed(2) }%` }></span>
+                                <span class="block h-full rounded-full bg-nur" style={ `width: ${ (gasShare(shown.block.gasUsed, shown.block.gasLimit) * 100).toFixed(2) }%` }></span>
                             </span>
                         </dd>
                     </div>
@@ -141,17 +141,17 @@ export default component BlockPage()
                             The unavailable reading is a WORD, in the reader's language, so it stays
                             out of the monospace ltr span. */}
                         <dd class="flex-1 text-[14px]">
-                            <span class={ detail.data()!.block.baseFee === null ? '' : 'data' }>{ formatBaseFee(detail.data()!.block.baseFee) }</span>
+                            <span class={ shown.block.baseFee === null ? '' : 'data' }>{ formatBaseFee(shown.block.baseFee) }</span>
                         </dd>
                     </div>
                 </dl>
 
                 <section class="panel overflow-hidden">
                     <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
-                        { locale.t('block.transactions', { count: locale.n(detail.data()!.total) }) }
+                        { locale.t('block.transactions', { count: locale.n(shown.total) }) }
                     </h2>
                     <ul class="divide-y divide-line">
-                        <For each={ detail.data()!.transactions } key={ (row) => row.hash } let={ row }>
+                        <For each={ shown.transactions } key={ (row) => row.hash } let={ row }>
                             <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
                                 {/* The Badge the transactions list already uses, not a bare icon.
                                     Icon is aria-hidden, so the outcome of every transaction in a
@@ -192,12 +192,12 @@ export default component BlockPage()
                             </li>
                         </For>
                     </ul>
-                    <Show when={ detail.data()!.total === 0 }>
+                    <Show when={ shown.total === 0 }>
                         <EmptyState icon="block" title={ locale.t('block.empty.title') } hint={ locale.t('block.empty.hint') } />
                     </Show>
-                    <Show when={ detail.data()!.pages > 1 }>
+                    <Show when={ shown.pages > 1 }>
                         <div class="border-t border-line">
-                            <Pagination page={ detail.data()!.page } pages={ detail.data()!.pages } onChange={ (next) => page = next } />
+                            <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } />
                         </div>
                     </Show>
                 </section>
