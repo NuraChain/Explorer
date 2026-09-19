@@ -109,6 +109,11 @@ tooltip, copy, and the direction isolate.
 
 ## Framework reality
 
-This is **AzerothJS 2.0.0-beta.2**, not React. Components are `.azeroth` single-file components
+This is **AzerothJS 2.1.0**, not React. Components are `.azeroth` single-file components
 with `state` / `derived` / `effect` and `<Show>` / `<For>` control flow. There is no JSX runtime,
 no hooks, no `useMemo`/`useCallback`/`memo`. Do not import React patterns or React libraries.
+
+The framework's own `use*` functions are not hooks: `useLoader`, `useHead`, `useLocale` and
+`useParams` read the current scope and have no call-order rule. A page takes its data from
+`useLoader()` and declares its `<head>` through `pageHead()` in `lib/head.ts`, and an image goes
+through `<Image>` rather than a bare `<img>`.
