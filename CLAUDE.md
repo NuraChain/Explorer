@@ -7,7 +7,7 @@ disagrees with the code, the code is right and this file needs fixing.
 ## Commands
 
 ```sh
-npm run dev                   # both halves: client on 3001, server on 3000
+npm run dev                   # ONE process on 3000: the server runs vite inside itself
 npm run build                 # client bundle, SSR bundle, prerender
 npm start --workspace server  # run the built app (NODE_ENV=production, honours PORT)
 npm run check                 # typecheck both workspaces + oxlint — the gate
@@ -47,13 +47,20 @@ Two things went with ESLint, and neither has a replacement yet:
 
 ## Frontend architecture
 
-**AzerothJS 2.0.0-beta.2 — not React.** `.azeroth` single-file components compiled by
+**AzerothJS 2.1.0 — not React.** `.azeroth` single-file components compiled by
 `@azerothjs/compiler` through Vite 8. Reactivity is signals: `state`, `derived`, `effect`, with
-`<Show>` and `<For>` for control flow.
+`<Show>` and `<For>` for control flow. Every `@azerothjs/*` pin moves together: the compiled-output
+contract is versioned, and a bundle built against one version fails to load against another.
 
 There are **no hooks**. `useMemo`, `useCallback`, `memo`, React libraries and JSX runtimes do not
 apply and must not be introduced. Optimise only with a measured reason; the reactive graph already
-does fine-grained updates.
+does fine-grained updates. The framework's own `use*` functions — `useLoader`, `useHead`,
+`useLocale`, `useParams` — are not hooks in the React sense: they read the current scope and have
+no call-order rule.
+
+A `<Show>` never re-reads the value its `when` just checked. `<Show when={ x.data() } let={ shown }>`
+and read `shown`; `x.data()!` inside the branch is a second, independent read that can observe a
+null while the branch is still mounted, and the compiler reports it.
 
 ```
 application/src/
@@ -64,6 +71,8 @@ application/src/
   components/layout/    brand-mark search-bar nav-drawer site-footer theme-switch language-switch
   pages/                one component per route
   stores/               locale (10 languages) · theme · toasts · wallet (EIP-6963 + EIP-1193)
+  lib/loaders.ts        what each page fetches, run where the page is rendered
+  lib/head.ts           the one `pageHead()` every page declares its <head> through
   lib/format.ts         all amount arithmetic — uint256 through bigint, never a double
   styles/tokens.css     every colour, font and motion value
   styles/base.css       element rules and the @utility layer
@@ -71,6 +80,31 @@ application/src/
 
 `server/` owns the wire shape. A new chain field starts in `server/src/schemas.ts`; the browser's
 client type is inferred from that declaration, so it is decided in exactly one place.
+
+**A page gets its data from a route LOADER, never from a resource that only runs on mount.** The
+loader runs before the render and reaches this app's own api *in process* — no socket — and its
+result rides the handoff into the browser, which draws it without asking again. A paged list stays
+a `resource`, seeded from the loader so its first screen costs no request; because the `resource`
+keyword cannot express `initialValue`, those four declarations call `createResource` directly.
+A 404 from the api becomes `notFound()` in the loader, so the page and its status cannot disagree.
+
+Two consequences worth knowing before reaching for either:
+
+- An in-process call makes the render a function of the visitor, so the kit answers it
+  `private, no-store`. **A page with a loader can never be cached**, and an ISR render cannot make
+  one at all — it runs in a work unit, which is not a request root, so the api is unreachable and
+  the page answers 500. `/docs` is the only cached row, and only because it asks for nothing.
+- Nothing in `lib/loaders.ts` may read `request`. Destructuring the loader arguments counts.
+
+**The `<head>` is declared by the page**, through `pageHead()` in `lib/head.ts`, which wraps the
+framework's `useHead`. It runs on both sides, so a crawler and a reader with no JavaScript get the
+real title, description, canonical, Open Graph and JSON-LD. Absolute urls come from `EXPLORER_URL`
+only — never from the request — and where none is configured the canonical is emitted relative and
+the absolute-only tags are omitted rather than guessed.
+
+**Images go through `<Image>` and the `/_image` endpoint**, which sizes one candidate per device
+width and answers content-addressed bytes. No adapter is installed, so nothing is transcoded; the
+framework ships no codec and this app adds no dependency for one.
 
 **Governance is the chain's own, and it is never indexed.** Nura is a Cosmos chain with an EVM
 module, so proposals live in `x/gov` and never touch the EVM — there is not one `ProposalCreated`
@@ -133,7 +167,21 @@ Below `sm:` the header collapses into the nav drawer — that is where mobile bu
 
 ## RTL/LTR rules
 
-Ten languages, two right-to-left (`fa`, `ar`). **Logical properties only** — `ms-`/`me-`,
+Ten languages, two right-to-left (`fa`, `ar`). **The SERVER decides which one**, per request — the
+reader's `locale` cookie, then `Accept-Language`, then English — and stamps `<html lang>` and
+`<html dir>` before the first byte leaves. Nothing in the browser detects a language or corrects
+one; the store reads that stamp, and `setLocale` writes the cookie the next request is negotiated
+from. Every negotiated answer carries `Vary: accept-language, cookie`.
+
+Direction comes from `Intl`, through the same function the framework stamps the document with.
+There is no table of directions to keep in step with it.
+
+Copy lives in `src/locales/*.ts`, ten catalogues typed against English's keys. A message that
+inflects after a numeral declares its CLDR forms and `count` — the RAW number — selects one;
+`{n}` is the figure in the reader's own digits. A language that does not inflect says one string,
+and five of them do not. Never reintroduce a `key`/`keys` pair.
+
+**Logical properties only** — `ms-`/`me-`,
 `ps-`/`pe-`, `start-`/`end-`, `text-start`/`text-end`, `border-s`/`border-e`. The codebase contains
 zero `ml-`/`mr-`/`pl-`/`pr-`/`left-`/`right-`; a physical side needs a written justification like
 the one above the `<dl>` in `contract-panel.component.azeroth`.
@@ -158,6 +206,11 @@ Playwright config and none is needed. Scratch output lands in `.playwright-mcp/`
 
 The loop, for every significant UI change: build/serve → three viewports → both directions →
 inspect → fix → re-check the same cell. Detail: `.claude/skills/visual-qa/`.
+
+**Walk a PRODUCTION build, not the dev session.** They now share one route table, one renderer and
+one origin, but they are not the same: the dev session ignores the page cache and renders static
+pages live, and it registers `/_image` by hand where production mounts it over the built client.
+`npm run build && npm start --workspace server` is what a reader gets.
 
 ## Testing workflow
 

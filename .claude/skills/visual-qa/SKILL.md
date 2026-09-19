@@ -18,16 +18,18 @@ Change  →  Build/serve  →  Playwright  →  1440×900 · 1024×768 · 390×8
 
 ## Serving the app
 
-The app is already served in production mode on **http://localhost:3003** for most of this repo's
-history; check before starting another:
+Check for a running instance before starting a competing one:
 
 ```sh
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3003/
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/
 ```
 
-If nothing answers, either run the dev pair (`npm run dev` → client on **3001**, proxying `/api`
-to **3000**) or build and start production (`npm run build && npm start --workspace server`,
-honouring `PORT`). Prefer the already-running instance over starting a competing one.
+If nothing answers, build and start **production** — `npm run build && npm start --workspace server`,
+honouring `PORT`. That is what a reader gets, and it is not what the dev session gives you: the
+dev session ignores the page cache, renders static pages live, and registers `/_image` itself.
+
+`npm run dev` serves the same pages from ONE process on **3000** — the server half runs vite inside
+itself. There is no second port and no proxy.
 
 ## Viewports
 
