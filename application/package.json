@@ -18,24 +18,23 @@
         "test:stores": "vitest run tests/stores.spec.ts tests/wallet.spec.ts"
     },
     "dependencies": {
-        "@azerothjs/http": "2.0.0-beta.2",
-        "@azerothjs/kit": "2.0.0-beta.2",
-        "@azerothjs/schema": "2.0.0-beta.2",
+        "@azerothjs/http": "2.1.0",
+        "@azerothjs/kit": "2.1.0",
         "@fontsource-variable/vazirmatn": "^5.3.0",
-        "azerothjs": "2.0.0-beta.2",
+        "azerothjs": "2.1.0",
         "lucide": "^1.41.0"
     },
     "devDependencies": {
-        "@azerothjs/cli": "2.0.0-beta.2",
-        "@azerothjs/compiler": "2.0.0-beta.2",
-        "@azerothjs/devtools": "2.0.0-beta.2",
-        "@azerothjs/language-server": "2.0.0-beta.2",
-        "@azerothjs/testing": "2.0.0-beta.2",
-        "@azerothjs/typescript-plugin": "2.0.0-beta.2",
+        "@azerothjs/cli": "2.1.0",
+        "@azerothjs/compiler": "2.1.0",
+        "@azerothjs/devtools": "2.1.0",
+        "@azerothjs/language-server": "2.1.0",
+        "@azerothjs/testing": "2.1.0",
+        "@azerothjs/typescript-plugin": "2.1.0",
         "@tailwindcss/vite": "^4.0.0",
         "happy-dom": "^20.14.0",
         "tailwindcss": "^4.0.0",
-        "typescript": "^7.0.2",
+        "typescript": "^6.0.3",
         "vite": "^8.2.2",
         "vitest": "^5.0.0"
     }
