@@ -194,7 +194,6 @@ export default component AddressPage()
             fixes where the line starts, and each card printed its label against one edge and its
             number against the other in a mirrored layout. */}
         <Show when={ account.data() } let={ shown }>
-        { () =>
             <div class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                 <div class="panel px-4 py-3">
                     <dt class="text-[13px] text-muted">{ locale.t('address.balance') }</dt>
@@ -220,7 +219,6 @@ export default component AddressPage()
                     <dd class="mt-0.5 text-[16px] font-bold sm:text-[17px]"><span class="amount">{ formatAmount(shown.flow.fees, decimals) }</span></dd>
                 </div>
             </div>
-        }
         </Show>
 
         <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label={ locale.t('address.activity') }>
@@ -235,7 +233,7 @@ export default component AddressPage()
             >
                 { locale.t('address.tab.transactions') }
                 <Show when={ account.data() } let={ shown }>
-                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(shown.txCount) }</span> }
+                    <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(shown.txCount) }</span>
                 </Show>
             </button>
             <button
@@ -249,7 +247,7 @@ export default component AddressPage()
             >
                 { locale.t('address.tab.transfers') }
                 <Show when={ account.data() } let={ shown }>
-                { () => <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(shown.transferCount) }</span> }
+                    <span class="ms-1.5 text-[13px] tabular-nums opacity-70">{ locale.n(shown.transferCount) }</span>
                 </Show>
             </button>
             {/* Only where there is code to show. On an ordinary account the tab would open onto an
@@ -301,7 +299,6 @@ export default component AddressPage()
                     single page, and an unguarded panel around nothing is an empty bordered strip
                     under the ledger. */}
                 <Show when={ txs.data() } let={ sent }>
-                { () =>
                     <Show when={ sent.pages > 1 }>
                     { () =>
                         <div class="panel">
@@ -309,7 +306,6 @@ export default component AddressPage()
                         </div>
                     }
                     </Show>
-                }
                 </Show>
             </div>
         </Show>
@@ -365,7 +361,7 @@ export default component AddressPage()
                     <EmptyState icon="token" title={ locale.t('address.transfers.empty.title') } hint={ locale.t('address.transfers.empty.hint') } />
                 </Show>
                 <Show when={ transfers.data() } let={ shown }>
-                { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } /> }
+                    <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } />
                 </Show>
             </section>
         </Show>

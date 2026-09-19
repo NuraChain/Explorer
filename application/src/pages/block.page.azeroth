@@ -84,7 +84,6 @@ export default component BlockPage()
         </Show>
 
         <Show when={ detail.data() } let={ shown }>
-        { () =>
             <>
                 <header class="flex flex-wrap items-center gap-3">
                     <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-raised text-nur">
@@ -202,7 +201,6 @@ export default component BlockPage()
                     </Show>
                 </section>
             </>
-        }
         </Show>
     </div>
 }

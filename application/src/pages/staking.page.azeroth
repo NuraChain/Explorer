@@ -108,7 +108,6 @@ export default component StakingPage()
         </Show>
 
         <Show when={ live } let={ shown }>
-        { () =>
             <div class="flex flex-col gap-4">
                 {/* What staking COSTS, as the module itself states it. The unbonding period is
                     first because it is the only irreversible thing on this page. */}
@@ -158,16 +157,20 @@ export default component StakingPage()
                     </Show>
                 </section>
 
-                {/* Mounted only with an account behind it - see the note in my-stake. */}
-                <Show when={ wallet.account() !== '' && summary !== undefined && validators.data() !== undefined }>
-                { () =>
-                    <MyStake
-                        address={ wallet.account() }
-                        overview={ shown }
-                        chain={ summary!.chain }
-                        validators={ validators.data()!.rows }
-                    />
-                }
+                {/* Mounted only with an account behind it - see the note in my-stake. The set is
+                    bound by the outer <Show> and the account tested inside it, rather than both
+                    in one `when`: a condition that tests the set cannot also hand the branch the
+                    set it tested, and reading it again under a `!` is a second read that can
+                    observe a null while the branch is mounted. */}
+                <Show when={ validators.data() } let={ roster }>
+                    <Show when={ wallet.account() !== '' && summary !== undefined }>
+                        <MyStake
+                            address={ wallet.account() }
+                            overview={ shown }
+                            chain={ summary!.chain }
+                            validators={ roster.rows }
+                        />
+                    </Show>
                 </Show>
 
                 {/* Said once, at the top: everything below can be read, and nothing on it can be
@@ -292,15 +295,14 @@ export default component StakingPage()
                     </Show>
 
                     <Show when={ validators.data() } let={ shown }>
-                    { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => { page = next; open = ''; } } /> }
+                        <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => { page = next; open = ''; } } />
                     </Show>
                 </section>
 
                 <Show when={ validators.data() } let={ shown }>
-                { () => <p class="text-[13px] text-muted">{ locale.t('staking.total', { count: locale.n(shown.total) }) }</p> }
+                    <p class="text-[13px] text-muted">{ locale.t('staking.total', { count: locale.n(shown.total) }) }</p>
                 </Show>
             </div>
-        }
         </Show>
     </div>
 }

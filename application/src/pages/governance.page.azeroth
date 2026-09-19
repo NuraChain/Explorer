@@ -102,7 +102,6 @@ export default component GovernancePage()
         </Show>
 
         <Show when={ live } let={ shown }>
-        { () =>
             <div class="flex flex-col gap-4">
                 {/* What passing takes on this chain, as the module itself states it. */}
                 <section class="panel overflow-hidden">
@@ -257,15 +256,14 @@ export default component GovernancePage()
                     </Show>
 
                     <Show when={ proposals.data() } let={ shown }>
-                    { () => <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } /> }
+                        <Pagination page={ shown.page } pages={ shown.pages } onChange={ (next) => page = next } />
                     </Show>
                 </section>
 
                 <Show when={ proposals.data() } let={ shown }>
-                { () => <p class="text-[13px] text-muted">{ locale.t('governance.total', { count: locale.n(shown.total) }) }</p> }
+                    <p class="text-[13px] text-muted">{ locale.t('governance.total', { count: locale.n(shown.total) }) }</p>
                 </Show>
             </div>
-        }
         </Show>
     </div>
 }

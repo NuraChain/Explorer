@@ -84,7 +84,6 @@ export default component TransactionPage()
         </Show>
 
         <Show when={ detail.data() } let={ shown }>
-        { () =>
             <div class="flex flex-col gap-5">
                 <header class="flex flex-wrap items-center gap-3">
                     <span class={ shown.transaction.status === 'reverted'
@@ -219,7 +218,6 @@ export default component TransactionPage()
                     </section>
                 </Show>
             </div>
-        }
         </Show>
     </div>
 }
