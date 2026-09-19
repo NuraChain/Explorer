@@ -1064,9 +1064,9 @@ export interface AppOptions extends ApiDeps
     /**
      * The built client + SSR renderer (production); omit in dev - the kit's session mounts them.
      *
-     * `manifest` and `locales` are not among the options a caller supplies: the first is
-     * projected from the api this function just registered, so the embedded copy and the served
-     * one cannot disagree, and the second is one list for the whole process.
+     * `manifest`, `locales` and `images` are not among the options a caller supplies: the first
+     * is projected from the api this function just registered, so the embedded copy and the
+     * served one cannot disagree, and the other two are one decision for the whole process.
      */
     pages?: PagesOptions;
 }
@@ -1079,7 +1079,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  * nothing is built. Exactly one of the two, which is what `KitOptions` itself demands - a plain
  * `Omit` over that union would collapse it into a shape satisfying neither arm.
  */
-export type PagesOptions = DistributiveOmit<KitOptions, 'manifest' | 'locales'>;
+export type PagesOptions = DistributiveOmit<KitOptions, 'manifest' | 'locales' | 'images'>;
 
 export function buildApp(options: AppOptions): App
 {
@@ -1096,7 +1096,19 @@ export function buildApp(options: AppOptions): App
         mountPages(app, {
             ...options.pages,
             manifest: manifestOf(api),
-            locales: LOCALES
+            locales: LOCALES,
+            /*
+             * `GET /_image` over the built client, registered ahead of the asset fallback.
+             *
+             * No adapter, so no transcode: the framework ships no codec and this app adds no
+             * dependency for one. What the endpoint buys without it is still the whole reason
+             * to have it - one url per device width off a bounded ladder, so a phone is not
+             * handed a 970-pixel creative, and a content-addressed key that lets the answer
+             * promise a year of immutability without ever serving a stale transform. An
+             * adapter is one interface with one method if a deployment ever sells a creative
+             * heavy enough to want it.
+             */
+            images: true
         });
     }
 

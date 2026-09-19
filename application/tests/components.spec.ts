@@ -465,19 +465,26 @@ describe('AdSlot', () =>
         const theme = useTheme();
         const paired: Sponsor = { ...ACME, creativeLight: { wide: '/sponsors/acme-light.png' } };
 
+        // The wide creative goes through the image endpoint, so the assertion is on the SOURCE
+        // the endpoint was asked for rather than on the `src` attribute: the url it mints carries
+        // the snapped width and the quality, and asserting the whole of it would pin the
+        // framework's device ladder in this file.
+        const sourceOf = (element: HTMLImageElement): string | null =>
+            new URL(element.getAttribute('src') ?? '', 'http://local').searchParams.get('src');
+
         theme.setTheme('light');
         const light = renderTest(() => AdSlot({ sponsor: paired }) as Rendered);
-        expect(light.container.querySelector('img')!.getAttribute('src')).toBe('/sponsors/acme-light.png');
+        expect(sourceOf(light.container.querySelector('img')!)).toBe('/sponsors/acme-light.png');
         light.unmount();
 
         // No light pair means the one set serves both, rather than nothing being shown at all.
         const only = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);
-        expect(only.container.querySelector('img')!.getAttribute('src')).toBe('/sponsors/acme-970x90.png');
+        expect(sourceOf(only.container.querySelector('img')!)).toBe('/sponsors/acme-970x90.png');
         only.unmount();
 
         theme.setTheme('dark');
         const dark = renderTest(() => AdSlot({ sponsor: paired }) as Rendered);
-        expect(dark.container.querySelector('img')!.getAttribute('src')).toBe('/sponsors/acme-970x90.png');
+        expect(sourceOf(dark.container.querySelector('img')!)).toBe('/sponsors/acme-970x90.png');
         dark.unmount();
         theme.setTheme('dark');
     });
@@ -492,8 +499,17 @@ describe('AdSlot', () =>
         const source = paired.container.querySelector('source')!;
         expect(source.getAttribute('srcset')).toBe('/n.png');
         expect(source.getAttribute('media')).toBe('(max-width: 639px)');
-        // The wide one stays the img, so a desktop and anything without picture support get it.
-        expect(paired.container.querySelector('img')!.getAttribute('src')).toBe('/w.png');
+        // The wide one stays the img, so a desktop and anything without picture support get it -
+        // through the image endpoint, with the box reserved from the unit's own pixels so the
+        // slot cannot shift when the creative lands.
+        const wide = paired.container.querySelector('img')!;
+        expect(new URL(wide.getAttribute('src') ?? '', 'http://local').pathname).toBe('/_image');
+        expect(new URL(wide.getAttribute('src') ?? '', 'http://local').searchParams.get('src')).toBe('/w.png');
+        expect(wide.getAttribute('width')).toBe('970');
+        expect(wide.getAttribute('height')).toBe('90');
+        // One candidate per device width, so a phone falling through to this arm is not handed
+        // the desktop file.
+        expect(wide.getAttribute('srcset')).toContain('/_image');
         paired.unmount();
 
         const alone = renderTest(() => AdSlot({ sponsor: ACME }) as Rendered);

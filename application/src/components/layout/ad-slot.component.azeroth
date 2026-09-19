@@ -1,7 +1,19 @@
+import { Image } from 'azerothjs';
+
 import type { Sponsor } from '../../sponsors.ts';
 
 import { useLocale } from '../../stores/locale.store.ts';
 import { useTheme } from '../../stores/theme.store.ts';
+
+/**
+ * The wide unit's own pixels, which are what the endpoint snaps a width against and what reserves
+ * the box before a byte of the creative arrives.
+ *
+ * 970x90 is the largest of the two wide units `sponsors.ts` accepts; a 728x90 committed instead
+ * is drawn at its own proportions by `object-contain` inside the same reserved height.
+ */
+const AD_WIDTH = 970;
+const AD_HEIGHT = 90;
 
 // An advertising slot.
 //
@@ -64,15 +76,26 @@ export default component AdSlot(props: {
                     <Show when={ art.narrow }>
                     { () => <source media="(max-width: 639px)" srcset={ art.narrow ?? '' } /> }
                     </Show>
-                    {/* `object-contain`, so a creative cut to any of the standard units sits in
-                        the slot at its own proportions rather than stretched to fill it. */}
-                    <img
-                        class="max-h-full max-w-full object-contain"
-                        src={ art.wide }
-                        alt={ ad.alt }
-                        loading={ props.eager === true ? 'eager' : 'lazy' }
-                        decoding="async"
-                    />
+                    {/* The wide creative goes through the image endpoint: one src per device width
+                        off the framework's ladder, so a phone that falls through to this arm is
+                        not handed a 970-pixel file, and a content-addressed url that can promise a
+                        year of immutability without ever serving a stale transform.
+
+                        It stays inside the `picture`, because `<Image>` answers RESOLUTION and the
+                        `source` above answers ART DIRECTION - a different picture, not a smaller
+                        one - and the two are different questions. `object-contain`, so a creative
+                        cut to any of the standard units sits in the slot at its own proportions
+                        rather than stretched to fill it. */}
+                    { Image({
+                        src: () => art.wide,
+                        alt: () => ad.alt,
+                        width: AD_WIDTH,
+                        height: AD_HEIGHT,
+                        sizes: '(max-width: 639px) 100vw, 970px',
+                        class: 'max-h-full max-w-full object-contain',
+                        loading: props.eager === true ? 'eager' : 'lazy',
+                        optimize: true
+                    }) }
                 </picture>
             </a>
         </aside>

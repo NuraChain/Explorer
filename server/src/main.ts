@@ -1,13 +1,12 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { pipeline, requestId, securityHeaders, rateLimit, logRequests, loadConfig, num, oneOf, str } from '@azerothjs/http';
+import { manifestOf } from '@azerothjs/http/api';
 import { serve, handleShutdownSignals } from '@azerothjs/http/node';
-import type { KitErrorObserver, PageRenderer, PageRoute } from '@azerothjs/kit';
+import { imageHandler, type KitErrorObserver, type PageRenderer, type PageRoute } from '@azerothjs/kit';
 import { SSR_SOURCE_ENTRY } from '@azerothjs/kit/dev/entry';
 import { createLogger, teeSink, terminalSink } from '@azerothjs/logger';
 import { fileSink } from '@azerothjs/logger/node';
-
-import { manifestOf } from '@azerothjs/http/api';
 
 import { buildApp, createApi, registerApi, LOCALES } from './app.ts';
 import { CachedChain, loadCacheOptions } from './chain/cache.ts';
@@ -116,7 +115,16 @@ const session = await kitDev?.devPages({
     root: fileURLToPath(new URL('../../application/', import.meta.url)),
     entry: SSR_SOURCE_ENTRY,
     pages: { manifest: manifestOf(api), locales: LOCALES, onError: pageError },
-    routes: (target) => registerApi(target, api, deps),
+    routes: (target) =>
+    {
+        /*
+         * The image endpoint, by hand, because a dev session serves no built client and
+         * `images: true` is a mount error there. Rooted at `public/` rather than at `dist/`,
+         * which is where the creatives live before a build copies them.
+         */
+        target.get('/_image', imageHandler({ root: fileURLToPath(new URL('../../application/public/', import.meta.url)) }));
+        registerApi(target, api, deps);
+    },
     app: { dev: true, observe },
     // The single-instance check resolves `azerothjs` from THIS module rather than from the kit,
     // so a second copy under the server half is refused at startup instead of silently splitting
