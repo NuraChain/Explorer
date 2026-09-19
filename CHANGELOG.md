@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.6.0
+
+### Features
+
+- **AzerothJS to 2.1.0**, every pin in lockstep - the compiled-output contract is versioned, and a
+  bundle built against one version fails to load against another rather than misbehaving deep.
+  TypeScript settles at `^6.0.3`: the declaration said `^7.0.2` and the install had resolved 6.0.3
+  all along, because the compiler's peer is `>=5 <7`
+- **The reader's language is negotiated on the SERVER.** Every visitor was served
+  `<html lang="en" dir="ltr">`, corrected afterwards by a script copied into `index.html` by hand
+  and again by the store once the bundle had run - so a Persian reader got a left-to-right page
+  labelled English on first paint, and a reader with no JavaScript never got past that. The kit
+  decides per request now (the reader's cookie, then `Accept-Language` in preference order, then
+  English) and stamps `lang` and `dir` before the first byte leaves. Every negotiated answer
+  carries `Vary: accept-language, cookie`, and a choice saved under the old storage key is
+  replayed into the cookie once
+- **Pages get their data from route loaders, and the browser draws what it was sent.** Eleven of
+  twelve rows were already `render: 'server'` and it bought almost nothing: a page fetched inside
+  resources that run on mount and never during a server render, so what left this process was a
+  correct shell around a loading skeleton. A loader runs before the render and reaches this app's
+  own api in process - no socket - and the result rides the handoff into the page. A transaction
+  url arrives as the transaction, and a paged list's first screen costs no second request
+- **An unindexed hash is a real 404.** It used to be answered 200 with the shell's generic title,
+  so every mistyped link was a duplicate of the home page in the index. `notFound()` is thrown by
+  the same read that fetches the subject, so the page and its status cannot disagree
+- **Each page declares its own `<head>`.** There was no canonical, no Open Graph, no Twitter card,
+  no structured data, no sitemap and no robots.txt, and the title and description a crawler read
+  were the shell's - the real ones were written from an effect that never ran on a server. Twelve
+  descriptions in ten languages now, one per section, each naming the chain; a transaction carries
+  its hash in its title and a proposal takes the title the chain gave it. `/sitemap.xml` lists the
+  eight sections and nothing else, because a block, a transaction and an address are unbounded
+- **Development runs the production page mount.** `azeroth dev` starts one process on one origin
+  and runs vite inside it, over the same route table and renderer a deploy uses - so locale
+  negotiation, real 404s and the manifest splice are things you can see in dev rather than after a
+  deploy. There is no second port and no proxy
+- **The sponsor creatives go through an image endpoint.** `GET /_image` answers one candidate per
+  device width, content-addressed, with a year of immutability - where a phone falling through to
+  the wide arm used to download a 970-pixel file to draw it at 358. No codec is installed and
+  nothing is transcoded; the framework ships none and this adds no dependency for one
+- **`/docs` is held for an hour**, so a reader arriving in a language no build wrote a file for
+  renders once rather than per request. It is the only cached page, and the commit says why: an
+  in-process loader makes a render a function of the visitor, and an ISR render cannot make that
+  call at all, so every page that reads the chain is uncacheable by construction
+
+### Fixes
+
+- **Arabic said the wrong plural above ten.** The rule was `count === 1 ? singular : plural`,
+  which is English grammar applied to ten languages: Arabic gives 3 to 10 the plural of paucity
+  and takes the singular back at 11, so a block eleven days old read `قبل ١١ أيام` where the
+  language says `قبل ١١ يوم`. Forms are chosen by `Intl.PluralRules` now. The same change lets
+  the five languages that do not inflect after a numeral - Persian, Turkish, Chinese, Hindi and
+  Russian - say one string instead of writing the same sentence twice
+- **A `<Show>` no longer re-reads the value it just checked.** Seventeen branches read
+  `X.data()!` after a `when` had tested it - a second, independent read that can observe a null
+  while the branch is still mounted, with a `!` that is erased at compile time and protects
+  nothing. Each binds the checked value instead
+- **The first paint no longer waits on a network round trip.** The typed client's manifest was
+  fetched with a top-level `await` in the entry module graph; the kit embeds it in every served
+  page and the client reads it synchronously
+- **The Persian headline binds its plural suffix.** `تراکنش ها` carried an ordinary space where
+  Persian uses a zero-width non-joiner - on the largest text on the site, with the stat tile
+  directly below it spelling the same word correctly
+- The home page's title said the product twice: "Nura Chain explorer · Nura Explorer", and in
+  Persian the repeated word is the same word
+
 ## 1.5.2
 
 ### Fixes
