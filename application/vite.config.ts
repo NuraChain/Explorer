@@ -24,6 +24,27 @@ export default defineConfig({
     // serves the pages, the api and HMR. Plugins, `ssr`, `resolve`, `css` and the rest of this
     // file are read by that session as they are.
 
+    build:
+    {
+        /*
+         * The client bundle is about 970 kB raw and 210 kB over the wire, and vite warns above
+         * 500. The number is measured rather than shrugged at: HALF of it is the ten locale
+         * catalogues, which are ~500 kB of source between them and are all imported statically
+         * because `createMessages` needs every one of them in hand, synchronously, before the
+         * first render can hydrate.
+         *
+         * So the warning has nothing left to tell us, and a build that prints one every time is a
+         * build nobody reads. A megabyte is the ratchet instead: it passes today and the next
+         * thing that does not fit has to justify itself.
+         *
+         * The real reduction, when it is worth doing, is loading the nine catalogues a reader is
+         * not using on demand - the active language is known from `<html lang>` before the bundle
+         * runs, so it can be awaited in `main.azeroth` ahead of `bootClient`. That is a change to
+         * the hydration path in ten languages, which is its own piece of work and not this one.
+         */
+        chunkSizeWarningLimit: 1024
+    },
+
     test:
     {
         environment: 'happy-dom'

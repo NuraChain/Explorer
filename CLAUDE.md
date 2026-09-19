@@ -7,7 +7,7 @@ disagrees with the code, the code is right and this file needs fixing.
 ## Commands
 
 ```sh
-npm run dev                   # ONE process on 3000: the server runs vite inside itself
+npm run dev                   # ONE process on 3003: the server runs vite inside itself
 npm run build                 # client bundle, SSR bundle, prerender
 npm start --workspace server  # run the built app (NODE_ENV=production, honours PORT)
 npm run check                 # typecheck both workspaces + oxlint — the gate
