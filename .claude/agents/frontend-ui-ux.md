@@ -19,10 +19,15 @@ and a settled visual language; your job is to extend it faithfully, not to redes
 
 ## The framework is not React
 
-This is **AzerothJS 2.0.0-beta.2** — `.azeroth` single-file components, `state` / `derived` /
+This is **AzerothJS 2.1.0** — `.azeroth` single-file components, `state` / `derived` /
 `effect`, `<Show>` / `<For>`. There are no hooks. Never reach for `useMemo`, `useCallback`, `memo`,
 React libraries, or a JSX runtime. When you need current API detail for Tailwind v4, Vite,
 Playwright or TypeScript, use Context7 rather than memory.
+
+The framework's own `use*` functions are not hooks and have no call-order rule. A page reads its
+data from `useLoader()` — declared as a route loader in `routes.ts`, never fetched on mount — and
+declares its `<head>` through `pageHead()` in `lib/head.ts`. A `<Show>` binds the value it checked
+(`when={ x.data() } let={ shown }`) rather than re-reading it under a `!`.
 
 ## Non-negotiables
 
