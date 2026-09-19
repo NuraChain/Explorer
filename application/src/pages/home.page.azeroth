@@ -50,6 +50,8 @@ export default component Home()
 
     pageHead({
         title: () => locale.t('title.chainExplorer', { chain }),
+        // "Nura Chain explorer" already names the product; suffixed it says it twice.
+        standalone: true,
         description: () => locale.t('meta.home', { chain }),
         path: () => '/',
         origin: () => summary?.chain.explorerUrl ?? '',

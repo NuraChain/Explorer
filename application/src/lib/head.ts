@@ -54,6 +54,16 @@ export interface PageHead
      */
     title: () => string;
 
+    /**
+     * True where the title already names the product, so the brand is not appended to it.
+     *
+     * The home page is the one that does: its title is "<chain> explorer", and suffixed it read
+     * "Nura Chain explorer · Nura Explorer" - the word twice in nine, and worse in Persian, where
+     * the two words are the same. A page named after a record it shows always takes the suffix,
+     * because "Block #12" alone says nothing about where.
+     */
+    standalone?: boolean;
+
     description: () => string;
 
     /** The canonical PATH (`/tx/0x...`), without an origin and without a query. */
@@ -68,9 +78,11 @@ export interface PageHead
      * It arrives on the wire in `stats.chain.explorerUrl` and is empty by default, which is the
      * honest state for a deployment that has not been told its own address: the canonical is
      * emitted RELATIVE, which every engine resolves against the document, and the absolute-only
-     * Open Graph url is omitted rather than guessed. It is not read from the request, because a
-     * page that consults the visitor is one the kit refuses to cache - and three of these pages
-     * are cached on purpose.
+     * Open Graph url is omitted rather than guessed.
+     *
+     * It is deliberately NOT read from the request. A render that consults the visitor is one the
+     * kit answers `private, no-store`, and a canonical is the last thing that should depend on who
+     * asked for the page - two readers must be told the same address for it.
      */
     origin?: () => string;
 
@@ -98,7 +110,12 @@ export function pageHead(head: PageHead): void
         const name = head.title().trim();
         const brand = locale.t('brand.name');
 
-        return name === '' || name === brand ? brand : `${ name } · ${ brand }`;
+        if (name === '')
+        {
+            return brand;
+        }
+
+        return head.standalone === true || name === brand ? name : `${ name } · ${ brand }`;
     };
 
     const description = (): string =>
