@@ -25,16 +25,16 @@
         "@azerothjs/logger": "2.1.0",
         "@azerothjs/schema": "2.1.0",
         "azerothjs": "2.1.0",
-        "viem": "^2.56.3"
+        "viem": "^2.56.5"
     },
     "devDependencies": {
         "@azerothjs/cli": "2.1.0",
         "@azerothjs/devtools": "2.1.0",
         "@azerothjs/ws": "2.1.0",
-        "@types/node": "^26.4.1",
+        "@types/node": "^26.6.1",
         "@vitest/coverage-v8": "^5.0.0",
         "typescript": "^6.0.3",
-        "vite": "^8.2.2",
-        "vitest": "^5.0.0"
+        "vite": "^8.3.0",
+        "vitest": "^5.0.1"
     }
 }
