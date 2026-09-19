@@ -36,6 +36,16 @@ import TransactionsPage from './pages/txs.page.azeroth';
  * through local state - so the loader carries the chain description they are all drawn against
  * and the first screen of the pages that have one, and the list a reader walks through stays a
  * resource.
+ *
+ * NONE of these rows is `render: 'static'` with a `revalidate`, and none can be. The page cache
+ * and the in-process loader are mutually exclusive: an ISR render happens in a WORK UNIT, which
+ * is not a request root, so the api registered on this App is not reachable from it and the
+ * typed client throws. A settled block and a settled transaction looked like the two best
+ * candidates for a cache in the whole app, and both answered 500 the moment they were given one.
+ * They render per request instead, which they can afford - the index is local sqlite, and the
+ * node reads behind it are already held by `server/src/chain/cache.ts`.
+ *
+ * `/docs` is the one page that caches, and only because it asks for nothing.
  */
 export const routes: PageRoute[] = [
     { path: '/', component: Home, render: 'server', loader: () => loadHome() },
@@ -54,6 +64,8 @@ export const routes: PageRoute[] = [
     { path: '/address/:address', component: AddressPage, render: 'server', loader: ({ params }) => loadAddress(params.address ?? '') },
     // The exception the paragraph above describes: this page reads no chain state at all, so it
     // is written once at BUILD time and served as a file. That is also what makes it the page a
-    // reader can still reach when the node behind every other one is unreachable.
-    { path: '/docs', component: DocsPage, render: 'static' }
+    // reader can still reach when the node behind every other one is unreachable. The hour is
+    // for the language: the prerender writes one file per language, and a reader arriving in a
+    // language nobody has asked for yet renders once and is held.
+    { path: '/docs', component: DocsPage, render: 'static', revalidate: 3600 }
 ];
