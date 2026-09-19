@@ -938,39 +938,62 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
 
 export type Api = ReturnType<typeof createApi>;
 
+/**
+ * Every route that is NOT a page: the api, its manifest, and the Etherscan shim.
+ *
+ * Registered on the App a production boot builds AND on the one the kit's dev session serves,
+ * so the two cannot drift - a route added here exists in both. Everything here goes on ahead of
+ * any page mount, because `mountPages` claims `/*path` as its asset fallback and the first
+ * match wins.
+ */
+export function registerApi(app: App, api: Api, deps: ApiDeps): void
+{
+    app.get('/api/healthz', () => json({
+        ok: true,
+        at: new Date().toISOString(),
+        head: deps.store.stats().head
+    }));
+
+    register(app, api);
+
+    // The typed client's runtime half: method + path per route, projected from the SAME
+    // declaration register just installed. A served page embeds it, so hydration costs no round
+    // trip; this endpoint is what a page without the splice falls back to.
+    app.get('/api/_manifest', () => json(manifestOf(api)));
+
+    // The Etherscan-compatible surface, for wallets. It answers on `/api` and `/v2/api` EXACTLY -
+    // no subpath - so it cannot shadow `/api/blocks` and friends above, and a client configured
+    // with either base url reaches the same dispatcher.
+    const etherscan = createEtherscanApi(deps);
+    const compatible = (context: { url: URL }): Promise<Response> => etherscan(context.url.searchParams);
+    app.get('/api', compatible);
+    app.get('/v2/api', compatible);
+}
+
 export interface AppOptions extends ApiDeps
 {
     dev: boolean;
     observe?: RequestObserver;
 
-    /** The built client + SSR renderer (production); omit in dev - vite serves the client. */
+    /**
+     * A prebuilt api, when the caller already holds one.
+     *
+     * `main.ts` builds the ONE api the process serves and hands it here in production and to the
+     * kit's dev session in development, so both halves of the boot read the same governance and
+     * staking holds. The suite leaves it out and this function builds its own.
+     */
+    api?: Api;
+
+    /** The built client + SSR renderer (production); omit in dev - the kit's session mounts them. */
     pages?: KitOptions;
 }
 
 export function buildApp(options: AppOptions): App
 {
     const app = new App({ dev: options.dev, observe: options.observe });
-    const api = createApi(options);
+    const api = options.api ?? createApi(options);
 
-    app.get('/api/healthz', () => json({
-        ok: true,
-        at: new Date().toISOString(),
-        head: options.store.stats().head
-    }));
-
-    register(app, api);
-
-    // The typed client's runtime half: method + path per route, projected from the SAME
-    // declaration register just installed. The browser fetches it once at boot.
-    app.get('/api/_manifest', () => json(manifestOf(api)));
-
-    // The Etherscan-compatible surface, for wallets. It answers on `/api` and `/v2/api` EXACTLY -
-    // no subpath - so it cannot shadow `/api/blocks` and friends above, and a client configured
-    // with either base url reaches the same dispatcher.
-    const etherscan = createEtherscanApi(options);
-    const compatible = (context: { url: URL }): Promise<Response> => etherscan(context.url.searchParams);
-    app.get('/api', compatible);
-    app.get('/v2/api', compatible);
+    registerApi(app, api, options);
 
     // Mounted LAST so nothing shadows /api.
     if (options.pages !== undefined)

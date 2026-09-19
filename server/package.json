@@ -7,7 +7,6 @@
         "node": ">=24"
     },
     "scripts": {
-        "dev": "azeroth dev",
         "check": "azeroth check",
         "test": "vitest run",
         "test:watch": "vitest",
@@ -35,6 +34,7 @@
         "@types/node": "^26.4.1",
         "@vitest/coverage-v8": "^5.0.0",
         "typescript": "^6.0.3",
+        "vite": "^8.2.2",
         "vitest": "^5.0.0"
     }
 }

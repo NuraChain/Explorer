@@ -10,20 +10,12 @@ export default defineConfig({
     {
         noExternal: true
     },
-    server:
-    {
-        // Declared, not inherited: the README and the devtools bridge URL both name these
-        // ports, so they belong in the config rather than in vite's defaults. Vite still
-        // steps to the next free port if this one is taken.
-        port: 3001,
-        proxy:
-        {
-            // The server half of this app. `azeroth dev` runs both halves; this line is
-            // the whole DEV wiring. In production the server serves the built client
-            // itself (one origin) - see server/src/app.ts.
-            '/api': 'http://localhost:3000'
-        }
-    },
+    // Nothing declares a dev server here, and nothing may: `azeroth dev` runs vite INSIDE the
+    // server process through @azerothjs/kit, which owns the port and the HMR socket and refuses
+    // a `server.proxy`, a `base` other than `/`, or a `server.ws` port at startup. One origin
+    // serves the pages, the api and HMR. Plugins, `ssr`, `resolve`, `css` and the rest of this
+    // file are read by that session as they are.
+
     test:
     {
         environment: 'happy-dom'
