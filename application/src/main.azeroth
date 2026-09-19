@@ -1,6 +1,7 @@
 import { bootClient } from '@azerothjs/kit/client';
 
 import App from './App.azeroth';
+import { adoptStoredChoice } from './stores/locale.store.ts';
 
 // Before the app boots, or the panel misses every primitive built during the first render.
 // `import.meta.env.DEV` is replaced with false in a build, so this branch and its import are
@@ -16,3 +17,8 @@ if (import.meta.env.DEV)
 // Markup already on the page is ADOPTED (hydration, loader handoff read back); an empty shell
 // renders normally.
 bootClient(App);
+
+// AFTER the boot, never during it: a language switch mid-mount would fight the markup the server
+// just sent. This only ever fires for a reader who chose a language before the choice became a
+// cookie the server can read.
+adoptStoredChoice();

@@ -1,6 +1,7 @@
 import { App, json, NotFoundError, type RequestObserver } from '@azerothjs/http';
 import { feature, manifestOf, register } from '@azerothjs/http/api';
 import { mountPages, type KitOptions } from '@azerothjs/kit';
+import type { LocaleConfig } from 'azerothjs';
 
 import type { ChainGateway } from './chain/client.ts';
 import {
@@ -939,6 +940,27 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
 export type Api = ReturnType<typeof createApi>;
 
 /**
+ * The languages every page is negotiated over.
+ *
+ * Given these, the kit decides each request's language - the `locale` cookie a reader's choice
+ * writes, then `Accept-Language` in preference order, then English - and stamps `<html lang>` and
+ * `<html dir>` on the response before a single byte of JavaScript runs. That is what a crawler
+ * reads and what lays a Persian page out right-to-left on its first paint.
+ *
+ * `routing` stays at its default, which keeps ONE url per page and decides per request. A
+ * prefixed url per language is what search engines want, and it would change every address this
+ * explorer has ever shared: a transaction link is pasted into a chat, an issue and a support
+ * thread, and putting a redirect in front of all of them is a decision to take on purpose rather
+ * than to inherit from a framework option.
+ *
+ * `tests/locales.spec.ts` in the application half pins this list equal to the browser's own.
+ */
+export const LOCALES: LocaleConfig = {
+    supported: ['en', 'fa', 'ar', 'es', 'pt', 'hi', 'zh', 'ru', 'fr', 'tr'],
+    default: 'en'
+};
+
+/**
  * Every route that is NOT a page: the api, its manifest, and the Etherscan shim.
  *
  * Registered on the App a production boot builds AND on the one the kit's dev session serves,
@@ -984,9 +1006,25 @@ export interface AppOptions extends ApiDeps
      */
     api?: Api;
 
-    /** The built client + SSR renderer (production); omit in dev - the kit's session mounts them. */
-    pages?: KitOptions;
+    /**
+     * The built client + SSR renderer (production); omit in dev - the kit's session mounts them.
+     *
+     * `manifest` and `locales` are not among the options a caller supplies: the first is
+     * projected from the api this function just registered, so the embedded copy and the served
+     * one cannot disagree, and the second is one list for the whole process.
+     */
+    pages?: PagesOptions;
 }
+
+/** `Omit` over a union keeps only the keys every arm shares; this keeps each arm whole. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/**
+ * The client this process serves pages for: the built directory, or the shell html as TEXT where
+ * nothing is built. Exactly one of the two, which is what `KitOptions` itself demands - a plain
+ * `Omit` over that union would collapse it into a shape satisfying neither arm.
+ */
+export type PagesOptions = DistributiveOmit<KitOptions, 'manifest' | 'locales'>;
 
 export function buildApp(options: AppOptions): App
 {
@@ -995,10 +1033,16 @@ export function buildApp(options: AppOptions): App
 
     registerApi(app, api, options);
 
-    // Mounted LAST so nothing shadows /api.
+    // Mounted LAST so nothing shadows /api. The kit serves `/assets` itself, with the year of
+    // immutability vite's content-hashed names earn, so nothing here registers that pattern - a
+    // second registration of one pattern is a `Route conflict` at boot.
     if (options.pages !== undefined)
     {
-        mountPages(app, options.pages);
+        mountPages(app, {
+            ...options.pages,
+            manifest: manifestOf(api),
+            locales: LOCALES
+        });
     }
 
     return app;

@@ -7,7 +7,7 @@
 // Those are the failures this file is for: they render perfectly, and they are wrong.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 
-import { LOCALES, LOCALE_DIR, LOCALE_LABEL, LOCALE_TAG, useLocale, type Locale } from '../src/stores/locale.store.ts';
+import { LOCALES, LOCALE_LABEL, LOCALE_TAG, directionOf, useLocale, type Locale } from '../src/stores/locale.store.ts';
 import { en, type Dictionary, type MessageKey } from '../src/locales/en.ts';
 import { fa } from '../src/locales/fa.ts';
 import { ar } from '../src/locales/ar.ts';
@@ -108,7 +108,7 @@ describe('the catalog', () =>
     {
         for (const locale of LOCALES)
         {
-            expect(['ltr', 'rtl']).toContain(LOCALE_DIR[locale]);
+            expect(['ltr', 'rtl']).toContain(directionOf(locale));
             expect(LOCALE_TAG[locale]).toMatch(/^[a-z]{2}(-[A-Za-z]+)*$/);
             expect(LOCALE_LABEL[locale].trim().length).toBeGreaterThan(0);
         }
@@ -116,7 +116,7 @@ describe('the catalog', () =>
 
     it('marks exactly the right-to-left scripts as rtl', () =>
     {
-        const rtl = LOCALES.filter((locale) => LOCALE_DIR[locale] === 'rtl');
+        const rtl = LOCALES.filter((locale) => directionOf(locale) === 'rtl');
         expect(rtl.sort()).toEqual(['ar', 'fa']);
     });
 
@@ -142,7 +142,7 @@ describe('the catalog', () =>
         }
     });
 
-    it.each(LOCALES.filter((locale) => LOCALE_DIR[locale] === 'rtl'))(
+    it.each(LOCALES.filter((locale) => directionOf(locale) === 'rtl'))(
         '%s is written in its own script rather than transliterated', (locale) =>
         {
             const arabicScript = /[؀-ۿ]/;
@@ -235,10 +235,13 @@ describe('the locale store', () =>
         expect(document.documentElement.dir).toBe('ltr');
     });
 
-    it('persists the choice, so a reload keeps the reader\'s language', () =>
+    it('persists the choice where the SERVER reads it, so a reload is a render and not a repair', () =>
     {
         locale.setLocale('tr');
-        expect(localStorage.getItem('nura.locale')).toBe('tr');
+        // A cookie, not local storage. The next request has to arrive already knowing the
+        // language, or its first paint is in the wrong one and gets corrected after hydration -
+        // which is exactly what this store used to do. `locale` is the name mountPages reads.
+        expect(document.cookie).toContain('locale=tr');
     });
 
     it('prints counts in the reader\'s own digits', () =>

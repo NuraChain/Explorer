@@ -7,7 +7,9 @@ import { SSR_SOURCE_ENTRY } from '@azerothjs/kit/dev/entry';
 import { createLogger, teeSink, terminalSink } from '@azerothjs/logger';
 import { fileSink } from '@azerothjs/logger/node';
 
-import { buildApp, createApi, registerApi } from './app.ts';
+import { manifestOf } from '@azerothjs/http/api';
+
+import { buildApp, createApi, registerApi, LOCALES } from './app.ts';
 import { CachedChain, loadCacheOptions } from './chain/cache.ts';
 import { ChainReader, loadChainEnv } from './chain/client.ts';
 import { loadCosmosEnv } from './chain/cosmos.ts';
@@ -113,7 +115,7 @@ const kitDev = isProduction ? undefined : await import('@azerothjs/kit/dev');
 const session = await kitDev?.devPages({
     root: fileURLToPath(new URL('../../application/', import.meta.url)),
     entry: SSR_SOURCE_ENTRY,
-    pages: { onError: pageError },
+    pages: { manifest: manifestOf(api), locales: LOCALES, onError: pageError },
     routes: (target) => registerApi(target, api, deps),
     app: { dev: true, observe },
     // The single-instance check resolves `azerothjs` from THIS module rather than from the kit,

@@ -1,4 +1,4 @@
-import { createStore, createSignal, type Getter } from 'azerothjs';
+import { createStore, localeDirection, setLocale as setDocumentLocale, useLocale as useDocumentLocale, type Getter } from 'azerothjs';
 
 import { elapsed, formatChange, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes, scaleDuration } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
@@ -38,18 +38,14 @@ export const LOCALE_LABEL: Record<Locale, string> = {
     tr: 'Türkçe'
 };
 
-export const LOCALE_DIR: Record<Locale, 'ltr' | 'rtl'> = {
-    en: 'ltr',
-    fa: 'rtl',
-    ar: 'rtl',
-    es: 'ltr',
-    pt: 'ltr',
-    hi: 'ltr',
-    zh: 'ltr',
-    ru: 'ltr',
-    fr: 'ltr',
-    tr: 'ltr'
-};
+/**
+ * The direction a given language reads in.
+ *
+ * `Intl` decides, through the same function the framework uses to stamp `<html dir>`, so the
+ * document and anything inside it can never disagree about a language - which a hand-kept table
+ * beside the framework's own could, and would, the first time one of them gained a language.
+ */
+export const directionOf = (locale: Locale): 'ltr' | 'rtl' => localeDirection(locale);
 
 /**
  * The BCP 47 tag handed to Intl. `fa-IR` gives Persian digits and the Jalali calendar; `ar-EG`
@@ -94,48 +90,12 @@ const CHAIN_NAMES: Record<Locale, Record<string, string>> = {
     tr: {}
 };
 
-const STORAGE_KEY = 'nura.locale';
+/** The key a reader's choice lived under before the server could read it. See {@link adoptStoredChoice}. */
+const LEGACY_KEY = 'nura.locale';
 
 function isLocale(value: string | null): value is Locale
 {
     return value !== null && (LOCALES as string[]).includes(value);
-}
-
-/**
- * The stored choice, then the browser's preference, then English. The navigator check means a
- * Persian-speaking first visit lands in Persian without having to find the switch.
- */
-function initial(): Locale
-{
-    if (typeof document === 'undefined')
-    {
-        return 'en';
-    }
-    try
-    {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (isLocale(stored))
-        {
-            return stored;
-        }
-    }
-    catch
-    {
-        // A blocked localStorage is not a reason to fail to render.
-    }
-    // In PREFERENCE ORDER, not "is it anywhere in the list": a reader whose languages are
-    // ['en-US', 'fa'] has asked for English first, and answering in Persian because Persian
-    // appears at all gets that exactly backwards. Matches on the language subtag, so fa-IR,
-    // fa-AF and bare fa all resolve.
-    for (const tag of navigator.languages ?? [])
-    {
-        const language = tag.toLowerCase().split('-')[0];
-        if (isLocale(language ?? null))
-        {
-            return language as Locale;
-        }
-    }
-    return 'en';
 }
 
 /** Fills `{name}` placeholders. An unknown name is left alone rather than printed as blank. */
@@ -202,43 +162,39 @@ export interface LocaleApi
     bytes(value: number): string;
 }
 
+/**
+ * The reader's language, as the FRAMEWORK holds it.
+ *
+ * There is no detection here any more, and that is the point. The server negotiates every
+ * request - the reader's `locale` cookie first, then `Accept-Language` in preference order, then
+ * English - and stamps the answer on `<html lang>` and `<html dir>` before the first byte leaves.
+ * This store reads that stamp, so the hydrating page agrees with the served markup by
+ * construction rather than by correcting it a frame later, and a crawler or a reader with no
+ * JavaScript gets a correctly labelled, correctly mirrored document.
+ *
+ * `setLocale` writes the cookie the NEXT request is negotiated from, which is what makes a
+ * language switch survive a reload as a server render rather than as a repair.
+ */
 export const useLocale = createStore((): LocaleApi =>
 {
-    const [locale, setSignal] = createSignal<Locale>(initial());
+    const stamped = useDocumentLocale();
 
-    const apply = (next: Locale): void =>
+    // The document can only hold a tag the server negotiated, which is one of ours - but this
+    // file owns the dictionary, so an unknown tag falls back rather than indexing it.
+    const locale = (): Locale =>
     {
-        if (typeof document === 'undefined')
-        {
-            return;
-        }
-        // Both on the ROOT: `dir` drives every logical property in the stylesheet, and `lang`
-        // picks the font stack and tells a screen reader which language it is reading.
-        document.documentElement.lang = next;
-        document.documentElement.dir = LOCALE_DIR[next];
-        try
-        {
-            localStorage.setItem(STORAGE_KEY, next);
-        }
-        catch
-        {
-            // Nothing to do: the language still applies for this session.
-        }
-    };
+        const tag = stamped();
 
-    apply(locale());
+        return isLocale(tag) ? tag : 'en';
+    };
 
     const t = (key: MessageKey, vars?: Record<string, string | number>): string =>
         interpolate(CATALOG[locale()][key], vars);
 
     return {
         locale,
-        dir: () => LOCALE_DIR[locale()],
-        setLocale: (next) =>
-        {
-            setSignal(next);
-            apply(next);
-        },
+        dir: () => localeDirection(locale()),
+        setLocale: (next) => setDocumentLocale(next),
         t,
         n: (value, fractionDigits) => formatCount(value, LOCALE_TAG[locale()], fractionDigits),
         change: (ratio) => formatChange(ratio, LOCALE_TAG[locale()]),
@@ -279,3 +235,38 @@ export const useLocale = createStore((): LocaleApi =>
         }
     };
 });
+
+/**
+ * A choice remembered before the cookie existed still counts, once.
+ *
+ * Readers who picked a language under the old store have it in `localStorage`, where no server
+ * can see it - so on their next visit the page would arrive in whatever their browser asks for
+ * and silently forget what they chose. This reads that key one last time, replays it through
+ * `setLocale` (which writes the cookie), and removes it.
+ *
+ * Called from `main.azeroth` AFTER the app boots, never during it: switching mid-mount would
+ * fight the markup the server just sent.
+ */
+export function adoptStoredChoice(): void
+{
+    try
+    {
+        const saved = localStorage.getItem(LEGACY_KEY);
+
+        if (saved === null)
+        {
+            return;
+        }
+
+        localStorage.removeItem(LEGACY_KEY);
+
+        if (isLocale(saved) && saved !== useLocale().locale())
+        {
+            setDocumentLocale(saved);
+        }
+    }
+    catch
+    {
+        // A blocked store costs the remembered choice, never the page.
+    }
+}

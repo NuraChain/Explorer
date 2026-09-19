@@ -1,10 +1,11 @@
 // The one file that crosses into the server half - and it crosses with TYPES only. The value
 // import below is client-safe schemas; `typeof api` is erased at build, so no handler, store,
-// or server dependency can reach the browser bundle. The client's runtime half is the served
-// manifest: method + path per route, projected from the SAME declaration the server registered,
-// fetched once at boot. '/api' matches the dev proxy and the production mount.
+// or server dependency can reach the browser bundle. The client's runtime half is the MANIFEST:
+// method + path per route, projected from the SAME declaration the server registered, embedded
+// in every served page by the kit and read back synchronously. '/api' is one origin's mount, in
+// development as in production.
 
-import { createClient, type Manifest } from '@azerothjs/http/api/shared';
+import { createClient, readManifest, type Manifest } from '@azerothjs/http/api/shared';
 
 import type { Api } from '../../server/src/app.ts';
 
@@ -64,30 +65,24 @@ export type {
 } from '../../server/src/schemas.ts';
 
 /**
- * The manifest, or an empty one.
+ * The manifest, read from the document the server sent.
  *
- * This is a TOP-LEVEL await, so a throw here would take the whole module graph down and paint
- * nothing at all - a blank page for one failed request at boot. An empty manifest instead lets
- * every page render and fail at its own call, where each one already has a designed error state.
+ * `mountPages` embeds it as an inert JSON script tag, so `readManifest()` is a synchronous read
+ * of markup that is already on the page. That is what replaced a top-level `await fetch()` - a
+ * network round trip in the entry module graph, which every first paint waited on.
  *
- * During SSR there is no document: pages fetch in `mount { }`, which runs only in the browser,
- * so no call ever happens server-side.
+ * The fetch is the fallback for a page that carries no splice, and an unreachable one degrades
+ * to `{}` rather than throwing: a failed boot request costs one page its data instead of taking
+ * the whole module graph down and painting nothing at all.
+ *
+ * The SSR pass gets an empty manifest and needs none. The server's manifest comes from the
+ * registration itself, hung on the request, and a loader's call dispatches in process through
+ * that; this module-level value is the browser's.
  */
-async function loadManifest(): Promise<Manifest>
-{
-    if (typeof document === 'undefined')
-    {
-        return {};
-    }
-    try
-    {
-        const response = await fetch('/api/_manifest');
-        return response.ok ? await response.json() as Manifest : {};
-    }
-    catch
-    {
-        return {};
-    }
-}
+const manifest: Manifest = typeof document === 'undefined'
+    ? {}
+    : readManifest() ?? await fetch('/api/_manifest')
+        .then((response) => response.json() as Promise<Manifest>)
+        .catch(() => ({}));
 
-export const client = createClient<Api>(await loadManifest(), { baseUrl: '/api' });
+export const client = createClient<Api>(manifest, { baseUrl: '/api' });
