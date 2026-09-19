@@ -1,4 +1,4 @@
-import { App, json, NotFoundError, type RequestObserver } from '@azerothjs/http';
+import { App, json, text, NotFoundError, type RequestObserver } from '@azerothjs/http';
 import { feature, manifestOf, register } from '@azerothjs/http/api';
 import { mountPages, type KitOptions } from '@azerothjs/kit';
 import type { LocaleConfig } from 'azerothjs';
@@ -990,6 +990,61 @@ export function registerApi(app: App, api: Api, deps: ApiDeps): void
     const compatible = (context: { url: URL }): Promise<Response> => etherscan(context.url.searchParams);
     app.get('/api', compatible);
     app.get('/v2/api', compatible);
+
+    registerSeo(app, deps.chain.env.explorerUrl);
+}
+
+/** The sections a crawler is invited to walk, in the order the navigation lists them. */
+const SITEMAP_PATHS = ['/', '/blocks', '/txs', '/accounts', '/charts', '/governance', '/staking', '/docs'] as const;
+
+/**
+ * The two files a crawler asks for before it asks for a page.
+ *
+ * Both are generated rather than committed under `public/`: the origin they have to name is
+ * `EXPLORER_URL`, which is a per-DEPLOYMENT value, and a file written at build time would name
+ * whoever built it. Where no origin is configured there is no honest absolute url to write, so
+ * the sitemap is a 404 and robots simply omits the line - a sitemap pointing at the wrong host
+ * is worse than none, because a crawler acts on it.
+ *
+ * The sitemap lists the SECTIONS and nothing else. A block, a transaction and an address are
+ * each unbounded - millions of rows, growing every few seconds - and enumerating them would be
+ * a file nobody can serve and a crawl budget nobody can afford. They are reached by link and by
+ * search, which is how a reader reaches them too.
+ */
+function registerSeo(app: App, explorerUrl: string): void
+{
+    const origin = explorerUrl.replace(/\/+$/, '');
+
+    app.get('/robots.txt', () => text(
+        origin === ''
+            ? 'User-agent: *\nAllow: /\n'
+            : `User-agent: *\nAllow: /\n\nSitemap: ${ origin }/sitemap.xml\n`,
+        {
+            headers: {
+                'content-type': 'text/plain; charset=utf-8',
+                'cache-control': 'public, max-age=3600'
+            }
+        }));
+
+    app.get('/sitemap.xml', () =>
+    {
+        if (origin === '')
+        {
+            throw new NotFoundError('No EXPLORER_URL is configured, so this deployment cannot name its own pages.');
+        }
+
+        const urls = SITEMAP_PATHS
+            .map((path) => `    <url><loc>${ origin }${ path }</loc></url>`)
+            .join('\n');
+
+        return text(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${ urls }\n</urlset>\n`, {
+            headers: {
+                'content-type': 'application/xml; charset=utf-8',
+                // Crawlers re-read this often; an hour keeps it fresh without rebuilding per hit.
+                'cache-control': 'public, max-age=3600'
+            }
+        });
+    });
 }
 
 export interface AppOptions extends ApiDeps

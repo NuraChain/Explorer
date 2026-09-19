@@ -3,8 +3,8 @@ import { Link, useLoader } from 'azerothjs';
 import { client, type Proposal, type ProposalFilter } from '../api.ts';
 import { formatAmount } from '../lib/format.ts';
 import { PROPOSAL_ICON, PROPOSAL_TONE, ratio } from '../lib/governance.ts';
+import { pageHead } from '../lib/head.ts';
 import type { ChainData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
@@ -65,7 +65,18 @@ export default component GovernancePage()
             { date: locale.dateTime(row.votingEndTime) });
     };
 
-    useTitle(() => locale.t('governance.title'));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('governance.title'),
+        description: () => locale.t('meta.governance', { chain: chainName() }),
+        path: () => '/governance',
+        origin: () => summary?.chain.explorerUrl ?? ''
+    });
 
     <div class="flex flex-col gap-4">
         <div>

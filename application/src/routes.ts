@@ -41,9 +41,7 @@ export const routes: PageRoute[] = [
     { path: '/', component: Home, render: 'server', loader: () => loadHome() },
     { path: '/accounts', component: AccountsPage, render: 'server', loader: () => loadChain() },
     { path: '/charts', component: ChartsPage, render: 'server', loader: () => loadChain() },
-    // No loader: this page names no amount, so it needs no chain description, and its list is
-    // paged in the browser like every other list here.
-    { path: '/blocks', component: BlocksPage, render: 'server' },
+    { path: '/blocks', component: BlocksPage, render: 'server', loader: () => loadChain() },
     { path: '/block/:number', component: BlockPage, render: 'server', loader: ({ params }) => loadBlock(params.number ?? '') },
     { path: '/governance', component: GovernancePage, render: 'server', loader: () => loadChain() },
     // One module, one numbering: a proposal id is the chain's own, so the path carries nothing else.

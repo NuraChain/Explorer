@@ -1,6 +1,6 @@
 import { Link } from 'azerothjs';
 
-import { useDescription, useTitle } from '../lib/title.ts';
+import { pageHead } from '../lib/head.ts';
 import { useLocale } from '../stores/locale.store.ts';
 import type { MessageKey } from '../locales/en.ts';
 
@@ -123,10 +123,13 @@ export default component DocsPage()
 {
     const locale = useLocale();
 
-    useTitle(() => locale.t('docs.title'));
+    pageHead({
+        title: () => locale.t('docs.title'),
+        description: () => locale.t('docs.lede'),
+        path: () => '/docs'
+    });
     // The only page that sets one. Every other page here IS chain state, and a description
     // written at build time would describe a height that has since moved.
-    useDescription(() => locale.t('docs.lede'));
 
     <div class="flex flex-col gap-8">
         <header class="max-w-3xl">

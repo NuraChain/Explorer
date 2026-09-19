@@ -2,8 +2,8 @@ import { useLoader } from 'azerothjs';
 
 import { client, type ChartSeries, type ChartSeriesKey, type ChartUnit, type StatFigure } from '../api.ts';
 import { formatGwei, formatValue } from '../lib/format.ts';
+import { pageHead } from '../lib/head.ts';
 import type { ChainData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 import type { MessageKey } from '../locales/en.ts';
 
@@ -167,7 +167,18 @@ export default component ChartsPage()
         ];
     })();
 
-    useTitle(() => locale.t('charts.title'));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('charts.title'),
+        description: () => locale.t('meta.charts', { chain: chainName() }),
+        path: () => '/charts',
+        origin: () => summary?.chain.explorerUrl ?? ''
+    });
 
     <div class="flex flex-col gap-6">
         <div class="flex flex-wrap items-end justify-between gap-3">

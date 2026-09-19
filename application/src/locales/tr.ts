@@ -567,6 +567,25 @@ export const tr: Dictionary = {
     'docs.help.body': 'Proje açıkta geliştiriliyor. Kodu okuyun ya da GitHub’da bir konu açın; ya da her sayfanın altında bağlantısı verilen topluluk kanallarından birinde sorun.',
     'docs.help.repository': 'GitHub’daki proje',
 
+    // --- Page descriptions ---------------------------------------------------------------
+    // What a search result and a shared link say about each page, one sentence each. The chain
+    // name is a parameter because it is configuration, not copy - this explorer runs against
+    // whatever node it was pointed at. Kept under about 160 characters, which is where every
+    // engine around here truncates.
+    'meta.home': '{chain} üzerinde blok, işlem ve adres arayın. Her blok, işlem ve transfer burada dizinlenir; değerin nereye gittiğini izleyebilirsiniz.',
+    'meta.blocks': '{chain} üzerindeki her blok sırayla, en yenisinden: yüksekliği, yaşı, taşıdığı işlemler ve harcadıkları gaz.',
+    'meta.block': '{chain} üzerinde #{number} numaralı blok: özeti, öneren doğrulayıcı, harcanan gaz, ve taşıdığı her işlem.',
+    'meta.txs': '{chain} tarafından sonuçlandırılmış her işlem, en yenisinden: gönderen, alıcı, taşınan değer ve ödenen ücret.',
+    'meta.tx': '{chain} üzerinde {short} işlemi: gönderen, alıcı, değer, ücret, durum, ve çağrının gerçekten yaptığı transferler.',
+    'meta.txTitle': 'İşlem {short}',
+    'meta.address': '{chain} üzerinde {short} adresi: bakiyesi, gönderdiği ve aldığı işlemler, token transferleri, ve varsa üzerindeki sözleşme.',
+    'meta.accounts': 'En çok {chain} tutan hesaplar, yerel bakiyeye göre sıralı ve dizinden değil doğrudan düğümden okunur.',
+    'meta.charts': '{chain} dizininin zaman içindeki toplamı: bir hafta, bir ay veya bir çeyrek boyunca işlemler, bloklar, adresler, ücretler, gaz ve sözleşme etkinliği.',
+    'meta.governance': '{chain} önerileri: her biri ne yapardı, oylaması nerede duruyor, kimler oy verdi, ve geçmesi için daha ne gerekiyor.',
+    'meta.proposal': '{chain} üzerinde {id} numaralı öneri: ne yapardı, oylaması nerede duruyor, kimler oy verdi, ve geçmesi için daha ne gerekiyor.',
+    'meta.staking': '{chain} ağını güvenceye alan doğrulayıcılar: her biri ne kadar bağladı, ne komisyon alıyor, ve birine yetki vermek ne değerde.',
+    'meta.notFound': 'Burada bununla eşleşen bir blok, işlem veya adres yok. Herhangi bir sayfanın üstündeki alandan {chain} içinde arayın.',
+
     // --- Page titles --------------------------------------------------------------------------
     'title.chainExplorer': '{chain} gezgini',
     'title.chainFallback': 'Zincir'

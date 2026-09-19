@@ -597,6 +597,25 @@ export const en = {
     'docs.help.body': 'The project is developed in the open. Read the code or open an issue on GitHub, or ask in one of the community channels linked at the foot of every page.',
     'docs.help.repository': 'The project on GitHub',
 
+    // --- Page descriptions ---------------------------------------------------------------
+    // What a search result and a shared link say about each page, one sentence each. The chain
+    // name is a parameter because it is configuration, not copy - this explorer runs against
+    // whatever node it was pointed at. Kept under about 160 characters, which is where every
+    // engine around here truncates.
+    'meta.home': 'Search blocks, transactions and addresses on {chain}. Every block, transaction and transfer is indexed here, so you can follow where value moved.',
+    'meta.blocks': 'Every block on {chain} in order, newest first, with its height, its age, the transactions it carried and the gas they spent.',
+    'meta.block': 'Block #{number} on {chain}: its hash, the validator that proposed it, the gas it spent, and every transaction it carried.',
+    'meta.txs': 'Every transaction {chain} has settled, newest first, with its sender, its recipient, the value it moved and the fee it paid.',
+    'meta.tx': 'Transaction {short} on {chain}: sender, recipient, value, fee, status, and the transfers the call actually made.',
+    'meta.txTitle': 'Transaction {short}',
+    'meta.address': 'Address {short} on {chain}: its balance, the transactions it sent and received, its token transfers, and the contract it holds if it holds one.',
+    'meta.accounts': 'The accounts holding the most {chain}, ranked by native balance and read live from the node rather than from an index.',
+    'meta.charts': 'The {chain} index added up over time: transactions, blocks, addresses, fees, gas and contract activity, across a week, a month or a quarter.',
+    'meta.governance': 'Proposals on {chain}: what each one would do, where its vote stands, who has voted, and what it still needs to pass.',
+    'meta.proposal': 'Proposal {id} on {chain}: what it would do, where its vote stands, who has voted, and what it still needs to pass.',
+    'meta.staking': 'The validators securing {chain}: what each has bonded, what it charges in commission, and what delegating to one is worth.',
+    'meta.notFound': 'No block, transaction or address here matches that. Search {chain} from the field at the top of any page.',
+
     // --- Page titles --------------------------------------------------------------------------
     'title.chainExplorer': '{chain} explorer',
     'title.chainFallback': 'Chain'

@@ -3,7 +3,7 @@ import { createResource, useLoader, useParams } from 'azerothjs';
 import { client, type AddressDirection, type Transfer } from '../api.ts';
 import { formatAmount, formatValue } from '../lib/format.ts';
 import type { AddressData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
+import { breadcrumbs, pageHead } from '../lib/head.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
@@ -141,7 +141,23 @@ export default component AddressPage()
     const way = (row: Transfer): keyof typeof FACE =>
         row.to === address ? 'in' : row.from === address ? 'out' : 'asset';
 
-    useTitle(() => locale.t('address.title', { short: address.slice(0, 10) }));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('address.title', { short: address.slice(0, 10) }),
+        description: () => locale.t('meta.address', { short: address.slice(0, 10), chain: chainName() }),
+        path: () => `/address/${ address }`,
+        origin: () => summary?.chain.explorerUrl ?? '',
+        jsonLd: () => breadcrumbs((summary?.chain.explorerUrl ?? '').replace(/\/+$/, ''), [
+            { name: locale.t('brand.name'), path: '/' },
+            { name: locale.t('accounts.title'), path: '/accounts' },
+            { name: locale.t('address.title', { short: address.slice(0, 10) }), path: `/address/${ address }` }
+        ])
+    });
 
     <div class="flex flex-col gap-4 sm:gap-5">
         <header class="panel px-4 py-4 sm:px-5">

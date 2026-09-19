@@ -3,8 +3,8 @@ import { useLoader } from 'azerothjs';
 import { client, type ValidatorFilter } from '../api.ts';
 import { formatAmount } from '../lib/format.ts';
 import { commission, commissionMax, validatorIcon, validatorState, validatorTone, votingPower } from '../lib/staking.ts';
+import { pageHead } from '../lib/head.ts';
 import type { ChainData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 import { useWallet } from '../stores/wallet.store.ts';
 
@@ -69,7 +69,18 @@ export default component StakingPage()
         open = '';
     };
 
-    useTitle(() => locale.t('staking.title'));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('staking.title'),
+        description: () => locale.t('meta.staking', { chain: chainName() }),
+        path: () => '/staking',
+        origin: () => summary?.chain.explorerUrl ?? ''
+    });
 
     <div class="flex flex-col gap-4">
         <div class="flex flex-wrap items-start justify-between gap-3">

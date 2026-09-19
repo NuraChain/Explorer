@@ -3,7 +3,7 @@ import { createResource, Link, useLoader, useParams } from 'azerothjs';
 import { client } from '../api.ts';
 import { formatGwei, formatValue, gasShare } from '../lib/format.ts';
 import type { BlockData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
+import { breadcrumbs, pageHead } from '../lib/head.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
@@ -57,7 +57,23 @@ export default component BlockPage()
     derived symbol = summary?.chain.symbol ?? '';
     derived decimals = summary?.chain.decimals ?? 18;
 
-    useTitle(() => locale.t('block.title', { number: params()['number'] ?? '' }));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('block.title', { number: params()['number'] ?? '' }),
+        description: () => locale.t('meta.block', { number: params()['number'] ?? '', chain: chainName() }),
+        path: () => `/block/${ params()['number'] ?? '' }`,
+        origin: () => summary?.chain.explorerUrl ?? '',
+        jsonLd: () => breadcrumbs((summary?.chain.explorerUrl ?? '').replace(/\/+$/, ''), [
+            { name: locale.t('brand.name'), path: '/' },
+            { name: locale.t('blocks.title'), path: '/blocks' },
+            { name: locale.t('block.title', { number: params()['number'] ?? '' }), path: `/block/${ params()['number'] ?? '' }` }
+        ])
+    });
 
     <div class="flex flex-col gap-5">
         <Show when={ loaded.error() !== null || detail.error() }>

@@ -1,8 +1,9 @@
-import { Link } from 'azerothjs';
+import { Link, useLoader } from 'azerothjs';
 
 import { client, type BlockFilter } from '../api.ts';
 import { gasShare } from '../lib/format.ts';
-import { useTitle } from '../lib/title.ts';
+import { pageHead } from '../lib/head.ts';
+import type { ChainData } from '../lib/loaders.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import FilterGroup from '../components/ui/filter-group.component.azeroth';
@@ -15,6 +16,11 @@ import Skeleton from '../components/ui/skeleton.component.azeroth';
 export default component BlocksPage()
 {
     const locale = useLocale();
+
+    const loaded = useLoader<ChainData>();
+
+    // The chain description the page's head names. It arrives with the document; see routes.ts.
+    derived summary = loaded.data()?.stats;
 
     state page = 1;
     state content: BlockFilter = 'all';
@@ -35,7 +41,18 @@ export default component BlocksPage()
         page = 1;
     };
 
-    useTitle(() => locale.t('blocks.title'));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('blocks.title'),
+        description: () => locale.t('meta.blocks', { chain: chainName() }),
+        path: () => '/blocks',
+        origin: () => summary?.chain.explorerUrl ?? ''
+    });
 
     <div class="flex flex-col gap-4">
         <div class="flex flex-wrap items-center justify-between gap-3">

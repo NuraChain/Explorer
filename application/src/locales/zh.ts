@@ -566,6 +566,25 @@ export const zh: Dictionary = {
     'docs.help.body': '这个项目是公开开发的。你可以在 GitHub 上阅读代码或提交问题，也可以到每个页面底部所链接的社区频道里提问。',
     'docs.help.repository': 'GitHub 上的项目',
 
+    // --- Page descriptions ---------------------------------------------------------------
+    // What a search result and a shared link say about each page, one sentence each. The chain
+    // name is a parameter because it is configuration, not copy - this explorer runs against
+    // whatever node it was pointed at. Kept under about 160 characters, which is where every
+    // engine around here truncates.
+    'meta.home': '在 {chain} 上搜索区块、交易和地址。每个区块、每笔交易和每次转账都在这里被索引，让你清楚追踪价值流向了哪里。',
+    'meta.blocks': '{chain} 的每个区块，按从新到旧排列，附带高度、生成时间、所含交易以及它们消耗的燃料。',
+    'meta.block': '{chain} 上的区块 #{number}：它的哈希、提议它的验证者、消耗的燃料，以及它所包含的每一笔交易。',
+    'meta.txs': '{chain} 已结算的每一笔交易，从最新开始，附带发送方、接收方、转移的价值和支付的手续费。',
+    'meta.tx': '{chain} 上的交易 {short}：发送方、接收方、价值、手续费、状态，以及这次调用真正完成的转账。',
+    'meta.txTitle': '交易 {short}',
+    'meta.address': '{chain} 上的地址 {short}：余额、收发过的交易、代币转账，以及它所承载的合约（如果有）。',
+    'meta.accounts': '持有 {chain} 最多的账户，按原生余额排序，直接从节点实时读取而非取自索引。',
+    'meta.charts': '{chain} 索引随时间的累计：一周、一月或一季内的交易、区块、地址、手续费、燃料与合约活动。',
+    'meta.governance': '{chain} 的提案：每项提案要做什么、投票进展如何、谁已投票，以及还差什么才能通过。',
+    'meta.proposal': '{chain} 上的提案 {id}：它要做什么、投票进展如何、谁已投票，以及还差什么才能通过。',
+    'meta.staking': '保障 {chain} 安全的验证者：各自质押了多少、收取多少佣金，以及委托给他们值多少。',
+    'meta.notFound': '这里没有与之匹配的区块、交易或地址。请从任意页面顶部的输入框搜索 {chain}。',
+
     // --- Page titles --------------------------------------------------------------------------
     'title.chainExplorer': '{chain} 区块浏览器',
     'title.chainFallback': '链'

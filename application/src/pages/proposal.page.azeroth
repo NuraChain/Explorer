@@ -4,7 +4,7 @@ import { client, type ProposalDetail, type Vote } from '../api.ts';
 import { formatAmount } from '../lib/format.ts';
 import { isActionable, PROPOSAL_ICON, PROPOSAL_TONE, ratio } from '../lib/governance.ts';
 import type { ProposalData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
+import { breadcrumbs, pageHead } from '../lib/head.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
@@ -99,7 +99,25 @@ export default component ProposalPage()
     const weightOf = (row: Vote): string =>
         locale.t('governance.share', { percent: locale.n(ratio(row.weight), 1) });
 
-    useTitle(() => locale.t('governance.proposal.title'));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        // The proposal's OWN title, which is the thing a reader searched for and the one string
+        // on this page the chain wrote rather than the catalogue.
+        title: () => (proposal.title === '' ? locale.t('governance.proposal.title') : proposal.title),
+        description: () => locale.t('meta.proposal', { id: params()['id'] ?? '', chain: chainName() }),
+        path: () => `/governance/${ params()['id'] ?? '' }`,
+        origin: () => summary?.chain.explorerUrl ?? '',
+        jsonLd: () => breadcrumbs((summary?.chain.explorerUrl ?? '').replace(/\/+$/, ''), [
+            { name: locale.t('brand.name'), path: '/' },
+            { name: locale.t('governance.title'), path: '/governance' },
+            { name: proposal.title === '' ? locale.t('governance.proposal.title') : proposal.title, path: `/governance/${ params()['id'] ?? '' }` }
+        ])
+    });
 
     <div class="flex flex-col gap-5">
         <Show when={ loaded.error() !== null || detail.error() }>

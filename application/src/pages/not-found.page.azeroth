@@ -1,6 +1,6 @@
 import { Link } from 'azerothjs';
 
-import { useTitle } from '../lib/title.ts';
+import { pageHead } from '../lib/head.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import Icon from '../icons/icon.component.azeroth';
@@ -14,7 +14,15 @@ export default component NotFoundPage()
 {
     const locale = useLocale();
 
-    useTitle(() => locale.t('notFound.title'));
+    pageHead({
+        title: () => locale.t('notFound.title'),
+        description: () => locale.t('meta.notFound', { chain: locale.t('title.chainFallback') }),
+        path: () => '/',
+        // A 404 body is not a page: indexing it puts a "not found" result in front of somebody
+        // searching for what they were actually looking for. `follow` because the links on it -
+        // the search field and the sections - are real and worth crawling.
+        robots: 'noindex, follow'
+    });
 
     <div class="panel px-4 py-14 text-center sm:px-6">
         <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-raised text-faint">

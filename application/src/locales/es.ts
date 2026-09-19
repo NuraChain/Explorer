@@ -565,6 +565,25 @@ export const es: Dictionary = {
     'docs.help.body': 'El proyecto se desarrolla a la vista de todos. Lee el código o abre una incidencia en GitHub, o pregunta en alguno de los canales de la comunidad enlazados al pie de cada página.',
     'docs.help.repository': 'El proyecto en GitHub',
 
+    // --- Page descriptions ---------------------------------------------------------------
+    // What a search result and a shared link say about each page, one sentence each. The chain
+    // name is a parameter because it is configuration, not copy - this explorer runs against
+    // whatever node it was pointed at. Kept under about 160 characters, which is where every
+    // engine around here truncates.
+    'meta.home': 'Busca bloques, transacciones y direcciones en {chain}. Cada bloque, transacción y transferencia está indexado aquí, para que veas dónde se movió el valor.',
+    'meta.blocks': 'Cada bloque de {chain} en orden, del más reciente, con su altura, su antigüedad, las transacciones que llevó y el gas que gastaron.',
+    'meta.block': 'Bloque #{number} en {chain}: su hash, el validador que lo propuso, el gas gastado, y cada transacción que llevó.',
+    'meta.txs': 'Cada transacción que {chain} ha liquidado, de la más reciente, con su emisor, su destinatario, el valor que movió y la comisión que pagó.',
+    'meta.tx': 'Transacción {short} en {chain}: emisor, destinatario, valor, comisión, estado, y las transferencias que la llamada hizo realmente.',
+    'meta.txTitle': 'Transacción {short}',
+    'meta.address': 'Dirección {short} en {chain}: su saldo, las transacciones que envió y recibió, sus transferencias de tokens, y el contrato que contiene si contiene alguno.',
+    'meta.accounts': 'Las cuentas que más {chain} tienen, ordenadas por saldo nativo y leídas en vivo desde el nodo, no desde un índice.',
+    'meta.charts': 'El índice de {chain} sumado en el tiempo: transacciones, bloques, direcciones, comisiones, gas y actividad de contratos, en una semana, un mes o un trimestre.',
+    'meta.governance': 'Propuestas en {chain}: qué haría cada una, cómo va su votación, quién ha votado, y qué le falta para aprobarse.',
+    'meta.proposal': 'Propuesta {id} en {chain}: qué haría, cómo va su votación, quién ha votado, y qué le falta para aprobarse.',
+    'meta.staking': 'Los validadores que aseguran {chain}: cuánto ha bloqueado cada uno, qué cobra de comisión, y cuánto vale delegarle.',
+    'meta.notFound': 'Ningún bloque, transacción o dirección de aquí coincide con eso. Busca en {chain} desde el campo de arriba de cualquier página.',
+
     // --- Page titles --------------------------------------------------------------------------
     'title.chainExplorer': 'Explorador de {chain}',
     'title.chainFallback': 'Cadena'

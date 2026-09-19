@@ -2,8 +2,8 @@ import { useLoader } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatValue } from '../lib/format.ts';
+import { pageHead } from '../lib/head.ts';
 import type { ChainData } from '../lib/loaders.ts';
-import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
 import HashLink from '../components/chain/hash-link.component.azeroth';
@@ -66,7 +66,18 @@ export default component AccountsPage()
     derived symbol = summary?.chain.symbol ?? '';
     derived decimals = summary?.chain.decimals ?? 18;
 
-    useTitle(() => locale.t('accounts.title'));
+    // Every description names the chain, and the chain is configuration rather than copy -
+    // this explorer runs against whatever node it was pointed at. A neutral word stands in
+    // for the one render before the loader's answer is in hand.
+    const chainName = (): string =>
+        (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
+
+    pageHead({
+        title: () => locale.t('accounts.title'),
+        description: () => locale.t('meta.accounts', { chain: chainName() }),
+        path: () => '/accounts',
+        origin: () => summary?.chain.explorerUrl ?? ''
+    });
 
     <div class="flex flex-col gap-4">
         <div>
