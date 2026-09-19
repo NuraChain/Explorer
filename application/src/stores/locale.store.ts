@@ -1,4 +1,4 @@
-import { createStore, localeDirection, setLocale as setDocumentLocale, useLocale as useDocumentLocale, type Getter } from 'azerothjs';
+import { createMessages, createStore, localeDirection, setLocale as setDocumentLocale, useLocale as useDocumentLocale, type Getter } from 'azerothjs';
 
 import { elapsed, formatChange, formatCompact, formatCount, formatDate, formatDateTime, scaleBytes, scaleDuration } from '../lib/format.ts';
 import { en, type MessageKey } from '../locales/en.ts';
@@ -11,7 +11,6 @@ import { zh } from '../locales/zh.ts';
 import { ru } from '../locales/ru.ts';
 import { fr } from '../locales/fr.ts';
 import { tr } from '../locales/tr.ts';
-import type { Dictionary } from '../locales/en.ts';
 
 // The reader's language, and everything that follows from it: the dictionary, the writing
 // direction, and the digits numbers and dates are printed in.
@@ -64,7 +63,20 @@ export const LOCALE_TAG: Record<Locale, string> = {
     tr: 'tr-TR'
 };
 
-const CATALOG: Record<Locale, Dictionary> = { en, fa, ar, es, pt, hi, zh, ru, fr, tr };
+/**
+ * The translator every `t()` call goes through.
+ *
+ * English first, because the first catalogue is the reference: its keys are the key type, so a
+ * language that forgets one or invents one is a build error, and a key somehow missing at runtime
+ * falls back to English rather than rendering blank.
+ *
+ * What this replaced is a lookup and a hand-rolled `{name}` substitution, which were fine, and a
+ * `count === 1 ? singular : plural` rule at two call sites, which was not: it is right for
+ * English and wrong for Arabic, where 3 to 10 take one form and 11 upward takes another. The
+ * form is chosen by `Intl.PluralRules` from the reader's own language now, and a language that
+ * does not inflect after a numeral simply declares one string.
+ */
+const translate = createMessages({ en, fa, ar, es, pt, hi, zh, ru, fr, tr });
 
 /**
  * Chain names cannot live in the dictionary: they arrive from the deployment's own configuration,
@@ -96,20 +108,6 @@ const LEGACY_KEY = 'nura.locale';
 function isLocale(value: string | null): value is Locale
 {
     return value !== null && (LOCALES as string[]).includes(value);
-}
-
-/** Fills `{name}` placeholders. An unknown name is left alone rather than printed as blank. */
-function interpolate(template: string, vars?: Record<string, string | number>): string
-{
-    if (vars === undefined)
-    {
-        return template;
-    }
-    return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
-    {
-        const value = vars[name];
-        return value === undefined ? whole : String(value);
-    });
 }
 
 export interface LocaleApi
@@ -188,8 +186,7 @@ export const useLocale = createStore((): LocaleApi =>
         return isLocale(tag) ? tag : 'en';
     };
 
-    const t = (key: MessageKey, vars?: Record<string, string | number>): string =>
-        interpolate(CATALOG[locale()][key], vars);
+    const t = (key: MessageKey, vars?: Record<string, string | number>): string => translate(key, vars);
 
     return {
         locale,
@@ -209,20 +206,22 @@ export const useLocale = createStore((): LocaleApi =>
             {
                 return t('time.justNow');
             }
-            // The plural key is the singular one with an 's'; a language that does not inflect
-            // after a numeral (Persian, Turkish, Chinese, Hindi) defines both as the same string,
-            // so this picks a form where it matters without the caller knowing about plurals.
-            const key = (count === 1 ? `time.${ unit }` : `time.${ unit }s`) as MessageKey;
-            return t(key, { count: formatCount(count, LOCALE_TAG[locale()]) });
+            // Two variables, one number: `count` is RAW, because that is what the plural rules
+            // select on, and `n` is the same figure in the reader's own digits, because that is
+            // what gets printed. A formatted `count` would be a string, and a string selects
+            // nothing.
+            return t(`time.${ unit }` as MessageKey, { count, n: formatCount(count, LOCALE_TAG[locale()]) });
         },
         duration: (seconds) =>
         {
             const { unit, count } = scaleDuration(seconds);
-            // Singular and plural picked by count, exactly as `ago` above does it.
-            const key = (count === 1 ? `duration.${ unit }` : `duration.${ unit }s`) as MessageKey;
-            // The decimal appears only where the span did not divide evenly: a voting period of
-            // two days is `2 days`, not `2.0 days`.
-            return t(key, { count: formatCount(count, LOCALE_TAG[locale()], Number.isInteger(count) ? 0 : 1) });
+            // Raw and formatted, exactly as `ago` above does it. The decimal appears only where
+            // the span did not divide evenly: a voting period of two days is `2 days`, not
+            // `2.0 days`.
+            return t(`duration.${ unit }` as MessageKey, {
+                count,
+                n: formatCount(count, LOCALE_TAG[locale()], Number.isInteger(count) ? 0 : 1)
+            });
         },
         bytes: (value) =>
         {

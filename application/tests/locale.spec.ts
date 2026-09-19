@@ -7,6 +7,8 @@
 // Those are the failures this file is for: they render perfectly, and they are wrong.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 
+import type { Message } from 'azerothjs';
+
 import { LOCALES, LOCALE_LABEL, LOCALE_TAG, directionOf, useLocale, type Locale } from '../src/stores/locale.store.ts';
 import { en, type Dictionary, type MessageKey } from '../src/locales/en.ts';
 import { fa } from '../src/locales/fa.ts';
@@ -21,6 +23,39 @@ import { tr } from '../src/locales/tr.ts';
 
 const CATALOG: Record<Locale, Dictionary> = { en, fa, ar, es, pt, hi, zh, ru, fr, tr };
 const KEYS = Object.keys(en) as MessageKey[];
+
+/**
+ * Every string a message can render as.
+ *
+ * A message is one string where the language does not inflect after a numeral, and a set of CLDR
+ * forms where it does. Asserting over the forms rather than over the message is what keeps these
+ * checks honest: `String(message)` on a plural object is `[object Object]`, which passes a
+ * non-blank test and a placeholder test while saying nothing at all.
+ */
+const formsOf = (message: Message): string[] =>
+    (typeof message === 'string' ? [message] : Object.values(message).filter((form): form is string => form !== undefined));
+
+/**
+ * The plural categories a language uses FOR THE COUNTS THESE MESSAGES CARRY.
+ *
+ * Not `resolvedOptions().pluralCategories`, which lists every category the language has: French,
+ * Spanish and Portuguese all declare `many`, and it is selected at a million and above. These
+ * messages count seconds, minutes, hours, days, weeks and months, so a `many` form for them would
+ * be a sentence no reader can reach. Nought to a thousand is the range they actually span.
+ */
+const categoriesOf = (locale: Locale): Set<string> =>
+{
+    const rules = new Intl.PluralRules(LOCALE_TAG[locale]);
+
+    return new Set(Array.from({ length: 1000 }, (_unused, n) => rules.select(n)));
+};
+
+/** The messages whose form is chosen by a count. */
+const COUNTED: MessageKey[] = [
+    'time.second', 'time.minute', 'time.hour', 'time.day',
+    'duration.second', 'duration.minute', 'duration.hour', 'duration.day',
+    'duration.week', 'duration.month'
+];
 
 // Every spy this file installs is undone here, whatever the test did with it.
 afterEach(() =>
@@ -63,7 +98,7 @@ describe('the catalog', () =>
     {
         const blank = KEYS
             .filter((key) => !SLOTS.includes(key))
-            .filter((key) => String(CATALOG[locale][key]).trim() === '');
+            .filter((key) => formsOf(CATALOG[locale][key]).some((form) => form.trim() === ''));
         expect(blank).toEqual([]);
     });
 
@@ -89,13 +124,19 @@ describe('the catalog', () =>
     {
         // `{count}` dropped in translation prints nothing where a number belongs; `{cuont}`
         // prints the brace literally. Both survive a typecheck.
-        const placeholders = (text: string): string[] => (text.match(/\{(\w+)\}/g) ?? []).sort();
+        // The NAMES used, not how many times each appears: English says `{n}` once per plural
+        // form and Persian says it once, because Persian has one form. The names must match; the
+        // arity is the language's business.
+        const placeholders = (text: string): string[] =>
+            [...new Set(text.match(/\{(\w+)\}/g) ?? [])].sort();
 
         const wrong: string[] = [];
         for (const key of KEYS)
         {
-            const expected = placeholders(String(en[key]));
-            const actual = placeholders(String(CATALOG[locale][key]));
+            // Every form, not just the first: a plural whose `few` dropped `{n}` prints a bare
+            // sentence for exactly the counts that reach it, which is the hardest kind to notice.
+            const expected = placeholders(formsOf(en[key]).join(' '));
+            const actual = placeholders(formsOf(CATALOG[locale][key]).join(' '));
             if (JSON.stringify(expected) !== JSON.stringify(actual))
             {
                 wrong.push(`${ key }: expected ${ expected.join(',') || 'none' }, got ${ actual.join(',') || 'none' }`);
@@ -136,7 +177,8 @@ describe('the catalog', () =>
         // overwhelming majority differs rather than that every entry does.
         for (const locale of LOCALES.filter((entry) => entry !== 'en'))
         {
-            const same = KEYS.filter((key) => CATALOG[locale][key] === en[key]);
+            const same = KEYS.filter((key) =>
+                JSON.stringify(formsOf(CATALOG[locale][key])) === JSON.stringify(formsOf(en[key])));
             expect(same.length / KEYS.length, `${ locale } is ${ Math.round(100 * same.length / KEYS.length) }% English`)
                 .toBeLessThan(0.25);
         }
@@ -146,21 +188,54 @@ describe('the catalog', () =>
         '%s is written in its own script rather than transliterated', (locale) =>
         {
             const arabicScript = /[؀-ۿ]/;
-            const written = KEYS.filter((key) => arabicScript.test(String(CATALOG[locale][key])));
+            const written = KEYS.filter((key) => arabicScript.test(formsOf(CATALOG[locale][key]).join(' ')));
             expect(written.length / KEYS.length).toBeGreaterThan(0.7);
         });
 
-    it('keeps the plural partner of every "duration" key that takes a count', () =>
+    it('declares every plural form the reader\'s own language uses', () =>
     {
-        // `duration()` picks `duration.week` or `duration.weeks` by count the same way. Six units
-        // and not four: a chain parameter is two weeks on one network and five minutes on a
-        // devnet, and neither reads correctly in the units `elapsed` stops at.
-        for (const unit of ['second', 'minute', 'hour', 'day', 'week', 'month'])
+        // The rule this replaced was `count === 1 ? singular : plural`, which is English grammar
+        // applied to ten languages. Arabic gives three forms to 1, to 3-10 and to 11-99, so
+        // `١٥ ثوانٍ` was wrong; Russian, Persian, Turkish, Chinese and Hindi do not inflect after
+        // a numeral at all, and saying the same sentence twice claimed a distinction they do not
+        // make. A message is a plain string where the language does not inflect, and where it
+        // does it must cover every category `Intl` will ask it for - a missing one falls back to
+        // `other` silently, which is how the old defect looked from outside.
+        for (const key of COUNTED)
         {
             for (const locale of LOCALES)
             {
+                const message = CATALOG[locale][key];
+
+                if (typeof message === 'string')
+                {
+                    continue;
+                }
+
+                for (const category of categoriesOf(locale))
+                {
+                    expect(message, `${ locale } ${ key } has no ${ category }`).toHaveProperty(category);
+                }
+            }
+        }
+    });
+
+    it('counts a span in six units and a moment in four', () =>
+    {
+        // Six and not four: a chain parameter is two weeks on one network and five minutes on a
+        // devnet, and neither reads correctly in the units `elapsed` stops at. Four and no more
+        // for a moment: `elapsed` rolls everything past a month up into days rather than
+        // inventing a wording that would have to be pluralised in ten languages.
+        for (const locale of LOCALES)
+        {
+            for (const unit of ['second', 'minute', 'hour', 'day', 'week', 'month'])
+            {
                 expect(CATALOG[locale], `${ locale } duration.${ unit }`).toHaveProperty(`duration.${ unit }`);
-                expect(CATALOG[locale], `${ locale } duration.${ unit }s`).toHaveProperty(`duration.${ unit }s`);
+            }
+
+            for (const unit of ['second', 'minute', 'hour', 'day'])
+            {
+                expect(CATALOG[locale], `${ locale } time.${ unit }`).toHaveProperty(`time.${ unit }`);
             }
         }
     });
@@ -171,26 +246,11 @@ describe('the catalog', () =>
         const ago: Partial<Record<Locale, string>> = { en: 'ago', fa: 'پیش', tr: 'önce', fr: 'il y a', es: 'hace', pt: 'há', ar: 'قبل', zh: '前', hi: 'पहले' };
         for (const [locale, word] of Object.entries(ago) as Array<[Locale, string]>)
         {
-            expect(String(CATALOG[locale]['time.days']), `${ locale } time.days`).toContain(word);
-            expect(String(CATALOG[locale]['duration.days']), `${ locale } duration.days`).not.toContain(word);
+            expect(formsOf(CATALOG[locale]['time.day']).join(' '), `${ locale } time.day`).toContain(word);
+            expect(formsOf(CATALOG[locale]['duration.day']).join(' '), `${ locale } duration.day`).not.toContain(word);
         }
     });
 
-    it('keeps the plural partner of every "time" key that takes a count', () =>
-    {
-        // `ago()` picks `time.hour` or `time.hours` by count without asking the caller. A missing
-        // plural key renders undefined for every value except one. Four units and no more:
-        // `elapsed` rolls everything past a month up into days rather than inventing a "months"
-        // wording that would have to be pluralised in ten languages.
-        for (const unit of ['second', 'minute', 'hour', 'day'])
-        {
-            for (const locale of LOCALES)
-            {
-                expect(CATALOG[locale], `${ locale } time.${ unit }`).toHaveProperty(`time.${ unit }`);
-                expect(CATALOG[locale], `${ locale } time.${ unit }s`).toHaveProperty(`time.${ unit }s`);
-            }
-        }
-    });
 });
 
 describe('the locale store', () =>
@@ -269,6 +329,38 @@ describe('the locale store', () =>
         expect(written).toContain('روز');
         expect(written).not.toContain('پیش');
         expect(written).toMatch(/[۰-۹]/);
+    });
+
+    it('picks the Arabic form the count actually calls for, not the English one', () =>
+    {
+        // The defect this pins. Arabic gives 3 to 10 the plural of paucity and takes the singular
+        // back at 11, so the old `count === 1 ? singular : plural` rule was right for 1, right
+        // for 3 to 10, and wrong for every count from 11 upward - `١٥ ثوانٍ` where the language
+        // says `١٥ ثانية`. `Intl.PluralRules` decides now.
+        locale.setLocale('ar');
+
+        const singular = 'ثانية';
+        const paucity = 'ثوانٍ';
+
+        expect(locale.duration(1)).toContain(singular);
+        expect(locale.duration(5)).toContain(paucity);
+        // The one the two-form rule could not say.
+        expect(locale.duration(15)).toContain(singular);
+        expect(locale.duration(15)).not.toContain(paucity);
+    });
+
+    it('says a count once in a language that does not inflect after a numeral', () =>
+    {
+        // Persian, Turkish, Chinese, Hindi and Russian take one form however many there are, and
+        // their catalogues declare one string rather than the same sentence twice.
+        locale.setLocale('fa');
+        const one = locale.duration(86_400);
+        const many = locale.duration(432_000);
+
+        expect(one).toContain('روز');
+        expect(many).toContain('روز');
+        // Same wording, different figure - which is the whole claim.
+        expect(one.replace(/[۰-۹.٫]/gu, '')).toBe(many.replace(/[۰-۹.٫]/gu, ''));
     });
 
     it('words the unbonding warning around the period rather than around the word "days"', () =>

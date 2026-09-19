@@ -1,9 +1,10 @@
 // The source dictionary. Every string a reader can see is declared here once, and `Dictionary`
-// is inferred from it - a locale that omits a key or invents one fails the typecheck rather than
+// is built from its KEYS - a locale that omits one or invents one fails the typecheck rather than
 // falling back silently at runtime.
 //
 // Keys are grouped by where the string appears, because that is how they are searched for when a
-// screen is being changed. Placeholders are `{name}`; see `interpolate` in ../lib/i18n.ts.
+// screen is being changed. Placeholders are `{name}`, filled by the framework's own translator;
+// a message that inflects declares its CLDR forms instead of a string, and `count` selects one.
 //
 // What is NOT here, deliberately: token symbols, addresses and hashes. Those are identifiers, and
 // translating them would make the explorer disagree with the chain it is reading. The product name
@@ -12,6 +13,8 @@
 //
 // Chain names are neither: they are configuration, so they are localized by `chainName` in
 // ../stores/locale.store.ts, a lookup that leaves an unrecognised name exactly as configured.
+import type { Message } from 'azerothjs';
+
 export const en = {
     // --- Brand --------------------------------------------------------------------------------
     // Three slots for the same reason the hero has four: the accented word does not sit in the
@@ -334,32 +337,20 @@ export const en = {
 
     // --- Time and units -----------------------------------------------------------------------
     'time.justNow': 'just now',
-    'time.second': '{count} second ago',
-    'time.seconds': '{count} seconds ago',
-    'time.minute': '{count} minute ago',
-    'time.minutes': '{count} minutes ago',
-    'time.hour': '{count} hour ago',
-    'time.hours': '{count} hours ago',
-    'time.day': '{count} day ago',
-    'time.days': '{count} days ago',
-
+    'time.second': { one: '{n} second ago', other: '{n} seconds ago' },
+    'time.minute': { one: '{n} minute ago', other: '{n} minutes ago' },
+    'time.hour': { one: '{n} hour ago', other: '{n} hours ago' },
+    'time.day': { one: '{n} day ago', other: '{n} days ago' },
     // A LENGTH of time, not a moment in one: a chain's voting period is "2 days", never
     // "2 days ago", so these cannot share the keys above. Six units rather than the four
     // `elapsed` needs, because the same parameter is two weeks on one network and five
     // minutes on a devnet, and `{count} days` states the second as "0.0".
-    'duration.second': '{count} second',
-    'duration.seconds': '{count} seconds',
-    'duration.minute': '{count} minute',
-    'duration.minutes': '{count} minutes',
-    'duration.hour': '{count} hour',
-    'duration.hours': '{count} hours',
-    'duration.day': '{count} day',
-    'duration.days': '{count} days',
-    'duration.week': '{count} week',
-    'duration.weeks': '{count} weeks',
-    'duration.month': '{count} month',
-    'duration.months': '{count} months',
-
+    'duration.second': { one: '{n} second', other: '{n} seconds' },
+    'duration.minute': { one: '{n} minute', other: '{n} minutes' },
+    'duration.hour': { one: '{n} hour', other: '{n} hours' },
+    'duration.day': { one: '{n} day', other: '{n} days' },
+    'duration.week': { one: '{n} week', other: '{n} weeks' },
+    'duration.month': { one: '{n} month', other: '{n} months' },
     'unit.bytes': '{count} B',
     'unit.kilobytes': '{count} KB',
     'unit.gwei': '{amount} gwei',
@@ -621,8 +612,17 @@ export const en = {
     'title.chainFallback': 'Chain'
 };
 
-/** The shape every locale must satisfy. Inferred, so adding a key here makes the others fail. */
-export type Dictionary = typeof en;
+/**
+ * The shape every locale must satisfy: English's KEYS, each answered by a message.
+ *
+ * Mapped over `Message` rather than inferred as `typeof en`, because the two are not the same
+ * shape per key and must not be. English says `{ one, other }` where it inflects after a numeral;
+ * Persian, Turkish, Chinese, Hindi and Russian do not inflect there at all and say one string.
+ * Pinning every language to English's own arity would force five of them to write the same
+ * sentence twice and claim a distinction their grammar does not make. The KEYS still line up, so
+ * adding one here still fails the others.
+ */
+export type Dictionary = { readonly [K in keyof typeof en]: Message };
 
 /** Every key the UI may ask for. */
 export type MessageKey = keyof Dictionary;
