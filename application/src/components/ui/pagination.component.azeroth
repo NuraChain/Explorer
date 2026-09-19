@@ -46,7 +46,12 @@ export default component Pagination(props: {
     const stepClass = 'flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-line text-muted transition-colors duration-150 hover:border-nur hover:text-text disabled:pointer-events-none disabled:opacity-40';
 
     <Show when={ props.pages > 1 }>
-        <nav class="flex items-center justify-center gap-1.5 border-t border-line px-3 py-3 sm:gap-2 sm:px-4" aria-label={ locale.t('pagination.label') }>
+        {/* Wraps rather than overflows. Nine controls at 36px with a gap between them is 10px
+            wider than a 375px viewport once the page numbers are set in Persian, which is a
+            notch larger than Latin by design - so the row pushed the whole document sideways on
+            a phone, in the two languages least likely to be checked. Wrapping costs a second
+            line where it happens and nothing where it does not. */}
+        <nav class="flex flex-wrap items-center justify-center gap-1.5 border-t border-line px-3 py-3 sm:gap-2 sm:px-4" aria-label={ locale.t('pagination.label') }>
             <button
                 class={ stepClass }
                 type="button"
