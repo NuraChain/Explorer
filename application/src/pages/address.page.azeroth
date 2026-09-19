@@ -1,7 +1,8 @@
-import { useParams } from 'azerothjs';
+import { createResource, useLoader, useParams } from 'azerothjs';
 
 import { client, type AddressDirection, type Transfer } from '../api.ts';
 import { formatAmount, formatValue } from '../lib/format.ts';
+import type { AddressData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -63,9 +64,29 @@ export default component AddressPage()
     // source value, so the resources re-ran and fetched `/api/address/` on the way out - two
     // guaranteed 404s and two red console errors per departure. `false` means "do not fetch",
     // the same guard block.page.azeroth puts on its own param.
-    resource stats = () => client.stats.summary();
-    resource account = (value: string) => client.address.summary({ params: { address: value } })
-        with { source: address === '' ? false : address };
+    // The account and the chain description arrive WITH the document - `routes.ts` declares the
+    // loader, and its result rides the handoff into this render. The three lists below stay in
+    // the browser: each is paged, filtered or opened on demand.
+    const loaded = useLoader<AddressData>();
+
+    derived summary = loaded.data()?.stats;
+
+    // Seeded from the loader, so the identity and balance the document already carries cost no
+    // second request; the source still follows the address, because a client-side navigation to
+    // another account has to re-ask.
+    /*
+     * `createResource` rather than the `resource` keyword, for `initialValue` alone.
+     *
+     * The seed is what makes the handoff worth having: the resource starts SETTLED on what the
+     * server already sent, so the first screen costs no request and hydration draws it without
+     * asking again. The keyword's `with { }` clause accepts only `source` and `name` - the
+     * runtime option exists and is documented, the keyword just cannot reach it - so this one
+     * declaration is written out longhand. See framework-bugs.md #21.
+     */
+    const account = createResource(
+        () => (address === '' ? false : address),
+        (value: string) => client.address.summary({ params: { address: value } }),
+        { initialValue: loaded.data()?.account, name: 'account' });
     resource txs = (key: string) =>
     {
         const [value = '', at = '1', way = 'all'] = key.split('|');
@@ -92,8 +113,8 @@ export default component AddressPage()
     resource contract = (value: string) => client.address.contract({ params: { address: value } })
         with { source: active === 'contract' && address !== '' ? address : false };
 
-    derived symbol = stats.data()?.chain.symbol ?? '';
-    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
 
     const pick = (next: 'flow' | 'transfers' | 'contract'): void =>
     {
@@ -234,8 +255,8 @@ export default component AddressPage()
 
         {/* Both, or neither: the panel offers calls, and a call needs the chain id the wallet has
             to be on before one is sent. */}
-        <Show when={ active === 'contract' && contract.data() !== undefined && stats.data() !== undefined }>
-        { () => <ContractPanel detail={ contract.data()! } chain={ stats.data()!.chain } /> }
+        <Show when={ active === 'contract' && contract.data() !== undefined && summary !== undefined }>
+        { () => <ContractPanel detail={ contract.data()! } chain={ summary!.chain } /> }
         </Show>
 
         <Show when={ active === 'flow' }>

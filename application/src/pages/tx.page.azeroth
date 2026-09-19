@@ -1,7 +1,8 @@
-import { Link, useParams } from 'azerothjs';
+import { createResource, Link, useLoader, useParams } from 'azerothjs';
 
 import { client } from '../api.ts';
 import { formatAmount, formatGwei, formatValue } from '../lib/format.ts';
+import type { TransactionData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -18,22 +19,46 @@ export default component TransactionPage()
 
     state page = 1;
 
-    resource stats = () => client.stats.summary();
-    // The page is part of the key: the transfers a transaction emitted are paged, and one call to
-    // a distributor emits a log per recipient - a receipt can carry hundreds.
-    resource detail = (key: string) =>
-    {
-        const [hash = '', at = '1'] = key.split('|');
-        return client.txs.one({ params: { hash }, query: { page: Number(at), limit: 25 } });
-    } with { source: params()['hash'] === undefined ? false : `${ params()['hash'] }|${ page }` };
+    // The transaction and the chain description arrive WITH the document - `routes.ts` declares
+    // the loader, and its result rides the handoff into this render. This is the page a shared
+    // link lands on more often than any other, and it used to reach one as an empty shell.
+    const loaded = useLoader<TransactionData>();
 
-    derived symbol = stats.data()?.chain.symbol ?? '';
-    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived summary = loaded.data()?.stats;
+
+    /*
+     * The same read, for the pages of the transfer list the loader did not fetch. The page is
+     * part of the key: the transfers a transaction emitted are paged, and one call to a
+     * distributor emits a log per recipient - a receipt can carry hundreds.
+     *
+     * Seeded from the loader, so the first page costs no request; the source is `false` while the
+     * loader failed, because the answer would be the same 404 the page is already rendering.
+     */
+    /*
+     * `createResource` rather than the `resource` keyword, for `initialValue` alone.
+     *
+     * The seed is what makes the handoff worth having: the resource starts SETTLED on what the
+     * server already sent, so the first screen costs no request and hydration draws it without
+     * asking again. The keyword's `with { }` clause accepts only `source` and `name` - the
+     * runtime option exists and is documented, the keyword just cannot reach it - so this one
+     * declaration is written out longhand. See framework-bugs.md #21.
+     */
+    const detail = createResource(
+        () => (loaded.error() !== null || params()['hash'] === undefined ? false : `${ params()['hash'] }|${ page }`),
+        (key: string) =>
+        {
+            const [hash = '', at = '1'] = key.split('|');
+            return client.txs.one({ params: { hash }, query: { page: Number(at), limit: 25 } });
+        },
+        { initialValue: loaded.data()?.detail, name: 'detail' });
+
+    derived symbol = summary?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
 
     useTitle(() => locale.t('tx.title'));
 
     <div class="flex flex-col gap-5">
-        <Show when={ detail.error() }>
+        <Show when={ loaded.error() !== null || detail.error() }>
             <div class="panel px-6 py-12 text-center">
                 <h1 class="text-[18px] font-bold">{ locale.t('tx.missing.title') }</h1>
                 <p class="mt-2 text-[15px] text-muted">{ locale.t('tx.missing.hint') }</p>

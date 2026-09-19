@@ -1,8 +1,9 @@
-import { Link } from 'azerothjs';
+import { Link, useLoader } from 'azerothjs';
 
 import { client, type Proposal, type ProposalFilter } from '../api.ts';
 import { formatAmount } from '../lib/format.ts';
 import { PROPOSAL_ICON, PROPOSAL_TONE, ratio } from '../lib/governance.ts';
+import type { ChainData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -26,10 +27,15 @@ export default component GovernancePage()
 {
     const locale = useLocale();
 
+    const loaded = useLoader<ChainData>();
+
+    // The chain description the page is drawn against - the symbol and decimals every
+    // amount is formatted with. It arrives with the document; see routes.ts.
+    derived summary = loaded.data()?.stats;
+
     state page = 1;
     state status: ProposalFilter = 'all';
 
-    resource stats = () => client.stats.summary();
     resource overview = () => client.governance.overview();
 
     resource proposals = (key: string) =>
@@ -38,8 +44,8 @@ export default component GovernancePage()
         return client.governance.list({ query: { page: Number(at), limit: 25, status: narrowed as ProposalFilter } });
     } with { source: `${ page }|${ status }` };
 
-    derived decimals = stats.data()?.chain.decimals ?? 18;
-    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
     derived params = overview.data()?.params ?? null;
 
     const narrow = (next: string): void =>
@@ -153,13 +159,13 @@ export default component GovernancePage()
 
                     {/* Making one is offered from here, where the reader can see what it will cost
                         and what it has to clear - and only where a wallet can actually send it. */}
-                    <Show when={ stats.data() !== undefined && params !== null && overview.data()!.writable }>
+                    <Show when={ summary !== undefined && params !== null && overview.data()!.writable }>
                     { () =>
                         <NewProposal
                             precompile={ overview.data()!.precompile }
                             calls={ overview.data()!.calls }
                             params={ params! }
-                            chain={ stats.data()!.chain }
+                            chain={ summary!.chain }
                             onSent={ () => { overview.refetch(); proposals.refetch(); } }
                         />
                     }

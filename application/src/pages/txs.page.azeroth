@@ -1,5 +1,8 @@
+import { useLoader } from 'azerothjs';
+
 import { client, type TxStatusFilter } from '../api.ts';
 import { formatValue } from '../lib/format.ts';
+import type { ChainData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -15,10 +18,15 @@ export default component TransactionsPage()
 {
     const locale = useLocale();
 
+    const loaded = useLoader<ChainData>();
+
+    // The chain description the page is drawn against - the symbol and decimals every
+    // amount is formatted with. It arrives with the document; see routes.ts.
+    derived summary = loaded.data()?.stats;
+
     state page = 1;
     state status: TxStatusFilter = 'all';
 
-    resource stats = () => client.stats.summary();
     // Both in the source key, because they are one question: page 4 of the reverted transactions
     // is a different list from page 4 of all of them, and a resource keyed on the page alone
     // would serve the second while the control said the first.
@@ -28,8 +36,8 @@ export default component TransactionsPage()
         return client.txs.list({ query: { page: Number(at), limit: 25, status: narrowed as TxStatusFilter } });
     } with { source: `${ page }|${ status }` };
 
-    derived symbol = stats.data()?.chain.symbol ?? '';
-    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
 
     // Back to the first page, always: page 7 of everything is usually past the end of one status,
     // and landing on a blank list reads as a filter that found nothing rather than one that moved.

@@ -1,6 +1,9 @@
+import { useLoader } from 'azerothjs';
+
 import { client, type ValidatorFilter } from '../api.ts';
 import { formatAmount } from '../lib/format.ts';
 import { commission, commissionMax, validatorIcon, validatorState, validatorTone, votingPower } from '../lib/staking.ts';
+import type { ChainData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 import { useWallet } from '../stores/wallet.store.ts';
@@ -28,13 +31,18 @@ import Tooltip from '../components/ui/tooltip.component.azeroth';
 export default component StakingPage()
 {
     const locale = useLocale();
+
+    const loaded = useLoader<ChainData>();
+
+    // The chain description the page is drawn against - the symbol and decimals every
+    // amount is formatted with. It arrives with the document; see routes.ts.
+    derived summary = loaded.data()?.stats;
     const wallet = useWallet();
 
     state page = 1;
     state status: ValidatorFilter = 'active';
     state open = '';
 
-    resource stats = () => client.stats.summary();
     resource overview = () => client.staking.overview();
 
     resource validators = (key: string) =>
@@ -43,8 +51,8 @@ export default component StakingPage()
         return client.staking.list({ query: { page: Number(at), limit: 25, status: narrowed as ValidatorFilter } });
     } with { source: `${ page }|${ status }` };
 
-    derived decimals = stats.data()?.chain.decimals ?? 18;
-    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
     derived params = overview.data()?.params ?? null;
     derived bonded = overview.data()?.pool?.bondedTokens ?? null;
 
@@ -69,8 +77,8 @@ export default component StakingPage()
                 <h1 class="text-[22px] font-bold tracking-tight">{ locale.t('staking.title') }</h1>
                 <p class="mt-1 max-w-2xl text-[14px] leading-relaxed text-muted">{ locale.t('staking.hint') }</p>
             </div>
-            <Show when={ stats.data() !== undefined && overview.data()?.writable === true }>
-            { () => <WalletConnect chain={ stats.data()!.chain } compact /> }
+            <Show when={ summary !== undefined && overview.data()?.writable === true }>
+            { () => <WalletConnect chain={ summary!.chain } compact /> }
             </Show>
         </div>
 
@@ -134,12 +142,12 @@ export default component StakingPage()
                 </section>
 
                 {/* Mounted only with an account behind it - see the note in my-stake. */}
-                <Show when={ wallet.account() !== '' && stats.data() !== undefined && validators.data() !== undefined }>
+                <Show when={ wallet.account() !== '' && summary !== undefined && validators.data() !== undefined }>
                 { () =>
                     <MyStake
                         address={ wallet.account() }
                         overview={ overview.data()! }
-                        chain={ stats.data()!.chain }
+                        chain={ summary!.chain }
                         validators={ validators.data()!.rows }
                     />
                 }
@@ -238,12 +246,12 @@ export default component StakingPage()
                                     </Show>
                                 </div>
 
-                                <Show when={ open === entry.row.operatorAddress && stats.data() !== undefined }>
+                                <Show when={ open === entry.row.operatorAddress && summary !== undefined }>
                                 { () =>
                                     <StakeActions
                                         validator={ entry.row }
                                         overview={ overview.data()! }
-                                        chain={ stats.data()!.chain }
+                                        chain={ summary!.chain }
                                         delegation={ null }
                                         rewards="0"
                                         validators={ validators.data()!.rows }

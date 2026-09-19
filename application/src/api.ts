@@ -5,9 +5,13 @@
 // in every served page by the kit and read back synchronously. '/api' is one origin's mount, in
 // development as in production.
 
-import { createClient, readManifest, type Manifest } from '@azerothjs/http/api/shared';
+import { ApiError, createClient, readManifest, type Manifest } from '@azerothjs/http/api/shared';
 
 import type { Api } from '../../server/src/app.ts';
+
+// Re-exported so a call site imports its error from the same module as the client that throws
+// it, rather than reaching into the framework for a type it already has in hand.
+export { ApiError };
 
 export type {
     Account,

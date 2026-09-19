@@ -1,5 +1,8 @@
+import { useLoader } from 'azerothjs';
+
 import { client } from '../api.ts';
 import { formatValue } from '../lib/format.ts';
+import type { ChainData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -19,6 +22,12 @@ import Skeleton from '../components/ui/skeleton.component.azeroth';
 export default component AccountsPage()
 {
     const locale = useLocale();
+
+    const loaded = useLoader<ChainData>();
+
+    // The chain description the page is drawn against - the symbol and decimals every
+    // amount is formatted with. It arrives with the document; see routes.ts.
+    derived summary = loaded.data()?.stats;
 
     state page = 1;
     state term = '';
@@ -40,7 +49,6 @@ export default component AccountsPage()
         return () => clearTimeout(timer);
     }
 
-    resource stats = () => client.stats.summary();
     // Both in the source key: page 3 of the addresses containing 'dead' is a different list from
     // page 3 of the whole ranking.
     resource accounts = (key: string) =>
@@ -55,8 +63,8 @@ export default component AccountsPage()
         return () => clearInterval(timer);
     }
 
-    derived symbol = stats.data()?.chain.symbol ?? '';
-    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
 
     useTitle(() => locale.t('accounts.title'));
 

@@ -1,8 +1,9 @@
-import { useParams } from 'azerothjs';
+import { createResource, useLoader, useParams } from 'azerothjs';
 
 import { client, type ProposalDetail, type Vote } from '../api.ts';
 import { formatAmount } from '../lib/format.ts';
 import { isActionable, PROPOSAL_ICON, PROPOSAL_TONE, ratio } from '../lib/governance.ts';
+import type { ProposalData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 
@@ -62,17 +63,37 @@ export default component ProposalPage()
 
     state page = 1;
 
-    resource stats = () => client.stats.summary();
-    resource detail = (key: string) =>
-    {
-        const [id = '', at = '1'] = key.split('|');
-        return client.governance.one({ params: { id }, query: { page: Number(at), limit: 25 } });
-    } with { source: params()['id'] !== undefined ? `${ params()['id'] }|${ page }` : false };
+    // The proposal and the chain description arrive WITH the document - `routes.ts` declares the
+    // loader, and its result rides the handoff into this render.
+    const loaded = useLoader<ProposalData>();
+
+    derived summary = loaded.data()?.stats;
+
+    // The same read, for the pages of the vote list the loader did not fetch. Seeded from the
+    // loader, so the first page costs no request; `false` while the loader failed, because the
+    // answer would be the same 404 the page is already rendering.
+    /*
+     * `createResource` rather than the `resource` keyword, for `initialValue` alone.
+     *
+     * The seed is what makes the handoff worth having: the resource starts SETTLED on what the
+     * server already sent, so the first screen costs no request and hydration draws it without
+     * asking again. The keyword's `with { }` clause accepts only `source` and `name` - the
+     * runtime option exists and is documented, the keyword just cannot reach it - so this one
+     * declaration is written out longhand. See framework-bugs.md #21.
+     */
+    const detail = createResource(
+        () => (loaded.error() === null && params()['id'] !== undefined ? `${ params()['id'] }|${ page }` : false),
+        (key: string) =>
+        {
+            const [id = '', at = '1'] = key.split('|');
+            return client.governance.one({ params: { id }, query: { page: Number(at), limit: 25 } });
+        },
+        { initialValue: loaded.data()?.detail, name: 'detail' });
 
     derived shown = detail.data() ?? NO_DETAIL;
     derived proposal = shown.proposal;
-    derived decimals = stats.data()?.chain.decimals ?? 18;
-    derived symbol = stats.data()?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
 
     /** A vote's weight is a share of the voter's own power, in the module's eighteen-place fixed point. */
     const weightOf = (row: Vote): string =>
@@ -81,7 +102,7 @@ export default component ProposalPage()
     useTitle(() => locale.t('governance.proposal.title'));
 
     <div class="flex flex-col gap-5">
-        <Show when={ detail.error() }>
+        <Show when={ loaded.error() !== null || detail.error() }>
             <div class="panel px-6 py-12 text-center">
                 <h1 class="text-[18px] font-bold">{ locale.t('governance.proposal.missing.title') }</h1>
                 <p class="mt-2 text-[15px] text-muted">{ locale.t('governance.proposal.missing.hint') }</p>
@@ -146,11 +167,11 @@ export default component ProposalPage()
                 <Show when={ !shown.writable && isActionable(proposal.status) }>
                     <p class="panel px-4 py-3 text-[13px] text-muted">{ locale.t('governance.readonly') }</p>
                 </Show>
-                <Show when={ shown.writable && isActionable(proposal.status) && stats.data() !== undefined }>
+                <Show when={ shown.writable && isActionable(proposal.status) && summary !== undefined }>
                 { () =>
                     <ProposalActions
                         detail={ shown }
-                        chain={ stats.data()!.chain }
+                        chain={ summary!.chain }
                         onSent={ () => detail.refetch() }
                     />
                 }

@@ -1,5 +1,8 @@
+import { useLoader } from 'azerothjs';
+
 import { client, type ChartSeries, type ChartSeriesKey, type ChartUnit, type StatFigure } from '../api.ts';
 import { formatGwei, formatValue } from '../lib/format.ts';
+import type { ChainData } from '../lib/loaders.ts';
 import { useTitle } from '../lib/title.ts';
 import { useLocale } from '../stores/locale.store.ts';
 import type { MessageKey } from '../locales/en.ts';
@@ -48,14 +51,19 @@ export default component ChartsPage()
 {
     const locale = useLocale();
 
+    const loaded = useLoader<ChainData>();
+
+    // The chain description the page is drawn against - the symbol and decimals every
+    // amount is formatted with. It arrives with the document; see routes.ts.
+    derived summary = loaded.data()?.stats;
+
     state days = '30';
 
-    resource stats = () => client.stats.summary();
     resource charts = (at: string) => client.stats.charts({ query: { days: Number(at) } })
         with { source: days };
 
-    derived symbol = stats.data()?.chain.symbol ?? '';
-    derived decimals = stats.data()?.chain.decimals ?? 18;
+    derived symbol = summary?.chain.symbol ?? '';
+    derived decimals = summary?.chain.decimals ?? 18;
 
     /**
      * One value, printed for its UNIT and never for its key.
