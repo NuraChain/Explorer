@@ -50,6 +50,20 @@ CREATE TABLE IF NOT EXISTS blocks (
     tx_count INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_blocks_ts ON blocks (timestamp DESC);
+-- The charts aggregation, which is the only query here whose cost grows with the whole chain.
+--
+-- COVERING, and that is the entire point: idx_blocks_ts already finds the right rows for a
+-- windowed rollup, and then the query fetches size, gas_used and gas_limit out of each one. At
+-- three-second blocks a thirty-day window is ~864,000 of those fetches - most of the table, a
+-- page at a time - and node:sqlite is SYNCHRONOUS, so the whole event loop waits for it. On a
+-- million-block chain that was seven to ten seconds during which the server answered nothing at
+-- all: a request for /api/healthz issued in the middle of one took 7.3 seconds. With the four
+-- columns in the index the rollup never reads the table.
+CREATE INDEX IF NOT EXISTS idx_blocks_daily ON blocks (timestamp, size, gas_used, gas_limit);
+-- The other half of the same stall. totals() counts distinct addresses by unioning every address
+-- column in the database, and miner is one per block - so it read a million rows to learn that
+-- this chain has two validators. Every other arm of that union was already covered.
+CREATE INDEX IF NOT EXISTS idx_blocks_miner ON blocks (miner);
 CREATE TABLE IF NOT EXISTS transactions (
     hash TEXT PRIMARY KEY,
     block_number INTEGER NOT NULL,

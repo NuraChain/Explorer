@@ -365,10 +365,21 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
     let rankedAccounts: { at: number; rows: TopAccount[] } | null = null;
     const RANKED_TTL_MS = 10_000;
 
-    // The charts, per window length. Short enough that a reader refreshing sees the day move, long
-    // enough that a page with thirteen series on it is one scan of the index rather than thirteen.
+    /*
+     * The charts, per window length.
+     *
+     * Five minutes, not thirty seconds. This payload is thirteen series of DAILY buckets plus a
+     * rolling twenty-four-hour figure: nothing in it can visibly move in half a minute, so the
+     * old window bought no freshness a reader could see and paid for it thirteen series at a
+     * time. What it cost was the whole server - `node:sqlite` is synchronous, so the rebuild
+     * blocked the event loop, and on a million-block chain a request for any other page issued
+     * during one waited the full seven to ten seconds with it.
+     *
+     * The indexes in `chain/store.ts` are what made the rebuild cheap; this is what makes it
+     * rare. Both were needed: a cheap query run constantly is still a queue.
+     */
     const chartsCache = new Map<number, { at: number; payload: ChartsSummary }>();
-    const CHARTS_TTL_MS = 30_000;
+    const CHARTS_TTL_MS = 300_000;
 
     /** A day index back into the instant it started, which is what a chart point is labelled by. */
     const dayStart = (day: number): string => new Date(day * DAY_SECONDS * 1000).toISOString();
