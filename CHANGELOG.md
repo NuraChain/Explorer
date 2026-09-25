@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.6.1
+
+### Fixes
+
+- **Every icon is rendered from one vector, `public/icon.svg`** - the header's own mark, `layers`
+  on `--nur`. The set was cut from a raster that was never committed, drawn in colours the page
+  does not use, and not square: 487 by 461 inside a 512 canvas. Tabs take the SVG, with a
+  16/32/48 `.ico` behind it whose 16px frame is drawn larger so the three layers stay apart. The
+  iOS icon is opaque and square, because iOS paints alpha black and rounds the corners itself.
+  Android gets a separate maskable icon with the glyph inside the safe circle, and the social card
+  uses that opaque cut
+- **The statistics rollup no longer freezes the server.** Two queries read the whole `blocks`
+  table on every cache miss, and `node:sqlite` is synchronous, so each rebuild stalled every other
+  request for seconds. Two covering indexes remove the reads, and the charts window goes from
+  thirty seconds to five minutes
+- **The pager wraps** instead of widening the page. In Persian its nine controls came to 385px,
+  which scrolled every paged list sideways on a 390px phone
+- **`<Show let>` branches read their value directly.** Wrapping them in a render callback declared
+  a name the body could not see, so a page threw once its data landed and fell back to the shell's
+  title
+- Development serves on 3003 again, and the bundle-size warning threshold moves to a megabyte
+
 ## 1.6.0
 
 ### Features
