@@ -14,10 +14,14 @@
              behind it would draw a visible seam on every load. -->
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F8FA"/>
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#080B12"/>
-        <!-- Three consumers, three formats: the .ico holds 16/32/48 for tabs, iOS reads only
-             apple-touch-icon (it ignores .ico entirely), and Android takes the 192/512 pair
-             through the manifest. All four are cut from brand/icon-source.png. -->
-        <link rel="icon" href="/favicon.ico" sizes="any"/>
+        <!-- Every icon is rendered from public/icon.svg - the header's mark, `layers` on --nur -
+             never resampled from another PNG. Modern tabs take the SVG; the .ico (16/32/48) is
+             the fallback, and its `sizes` must not be "any" or Chrome prefers it over the SVG.
+             Its 16px frame uses a bigger glyph so the three layers stay apart. iOS reads only
+             apple-touch-icon, which is opaque and square because iOS paints alpha black and
+             rounds the corners itself; Android takes the manifest's pair plus a maskable one. -->
+        <link rel="icon" href="/favicon.ico" sizes="32x32"/>
+        <link rel="icon" href="/icon.svg" type="image/svg+xml"/>
         <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
         <link rel="manifest" href="/site.webmanifest"/>
         <link rel="stylesheet" href="/src/styles.css"/>

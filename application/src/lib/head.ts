@@ -34,13 +34,14 @@ const TERRITORY: Record<Locale, string> = {
 /**
  * The picture a shared link renders as.
  *
- * The square app icon, and a `summary` card rather than `summary_large_image` to match it.
+ * The square app icon - the opaque maskable cut, because networks flatten transparent corners to
+ * black or white as they please - and a `summary` card rather than `summary_large_image` to match it.
  * A large card is 1.91:1 and pillarboxes or crops anything else, and declaring one with no
  * wide image renders a grey box - which looks more broken than a plain card with a small
  * icon beside the text. A deployment that wants the large card commits a 1200x630 image and
  * changes these four lines together.
  */
-const SOCIAL_IMAGE = { path: '/icon-512.png', width: 512, height: 512, card: 'summary' } as const;
+const SOCIAL_IMAGE = { path: '/icon-maskable-512.png', width: 512, height: 512, card: 'summary' } as const;
 
 /** Meta descriptions are truncated by every engine around here; the catalogue keeps them short. */
 const DESCRIPTION_LIMIT = 200;
