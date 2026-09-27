@@ -21,7 +21,7 @@
         "@azerothjs/kit": "2.1.0",
         "@fontsource-variable/vazirmatn": "^5.3.0",
         "azerothjs": "2.1.0",
-        "lucide": "^1.46.0"
+        "lucide": "^1.47.0"
     },
     "devDependencies": {
         "@azerothjs/cli": "2.1.0",
