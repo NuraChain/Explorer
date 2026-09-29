@@ -172,8 +172,8 @@ export default component TransactionPage()
                                         </span>
                                     </Show>
                                 }
-                             let={ to }>
-                            <HashLink value={ to } to={ `/address/${ to }` } lead={ 16 } tail={ 10 } copy />
+                                let={ to }>
+                                <HashLink value={ to } to={ `/address/${ to }` } lead={ 16 } tail={ 10 } copy />
                             </Show>
                         </dd>
                     </div>
@@ -272,7 +272,7 @@ export default component TransactionPage()
                         </h2>
                         <ul class="divide-y divide-line">
                             <For each={ shown.transfers } key={ (row) => `${ row.txHash }-${ row.logIndex }` } let={ row }>
-                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                                     <Icon name="token" size={ 16 } class="text-nur" />
                                     <div class="min-w-0 flex-1 text-[13px] text-muted">
                                         <HashLink value={ row.from } to={ `/address/${ row.from }` } tone="muted" lead={ 8 } tail={ 6 } />
