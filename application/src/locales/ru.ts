@@ -114,6 +114,8 @@ export const ru: Dictionary = {
     'tx.feeDetail': '{gas} газа по {price}',
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
+    'tx.input': 'Входные данные',
+    'tx.input.raw': 'Сырые calldata',
     'tx.created': 'создан',
     'tx.transfers': 'Переводов токенов: {count}',
     'tx.token': 'токен',

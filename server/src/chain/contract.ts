@@ -1,4 +1,5 @@
 import { EVENT_BY_TOPIC, FUNCTION_BY_SELECTOR, selectorOf, type KnownEvent, type KnownFunction } from './signatures.ts';
+import { decodeReturn } from './values.ts';
 
 // What can be read off a contract's bytecode, with nothing but `eth_getCode`.
 //
@@ -390,6 +391,48 @@ export function describeFunctions(selectors: readonly string[]): DescribedFuncti
             ? left.signature.localeCompare(right.signature)
             : left.selector.localeCompare(right.selector);
     });
+}
+
+/** One transaction's calldata, read back through the signature table. */
+export interface DescribedCall
+{
+    selector: string;
+
+    /** '' when the table does not know the selector, or its arguments do not decode as it says. */
+    signature: string;
+    name: string;
+    args: Array<{ type: string; value: string }>;
+    data: string;
+}
+
+/**
+ * Calldata -> the function it named and the arguments it passed.
+ *
+ * A known selector whose bytes do NOT decode as its signature is reported unknown rather than
+ * named: that is either a four-byte collision with a function this table has never seen or data
+ * the contract would refuse too, and a name the arguments cannot back is a guess.
+ */
+export function describeCall(data: string): DescribedCall
+{
+    const selector = data.slice(0, 10).toLowerCase();
+    const known = FUNCTION_BY_SELECTOR.get(selector);
+    if (known !== undefined)
+    {
+        try
+        {
+            // Counted as well as decoded: an empty tail decodes to NO values rather than throwing.
+            const args = decodeReturn(known.inputs, `0x${ data.slice(10) }`);
+            if (args.length === known.inputs.length)
+            {
+                return { selector, signature: known.signature, name: known.name, args, data };
+            }
+        }
+        catch
+        {
+            // Falls through to the unknown answer below.
+        }
+    }
+    return { selector, signature: '', name: '', args: [], data };
 }
 
 export function describeEvents(topics: readonly string[]): KnownEvent[]

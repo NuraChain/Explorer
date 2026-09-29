@@ -1,12 +1,13 @@
 // The API and the index it reads, against a STUBBED chain - deterministic, no network, and the
 // only way to exercise the paths a live node will not reproduce on demand (a reorg, a receipt the
 // node never returned, an address with more rows than one page).
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { toFunctionSelector } from 'viem';
 
 import { buildApp } from '../src/app.ts';
 import { analyze, describeFunctions, detectStandards } from '../src/chain/contract.ts';
 import { encodeCall } from '../src/chain/values.ts';
+import { FUNCTION_BY_SELECTOR, selectorOf } from '../src/chain/signatures.ts';
 import { syncOnce } from '../src/chain/indexer.ts';
 import { IndexStore, TRANSFER_TOPIC } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
@@ -79,6 +80,7 @@ interface ChainStub
     code?: Record<string, string>;
     balance?: (address: string) => Promise<bigint>;
     call?: (address: string, data: string) => Promise<string>;
+    input?: (hash: string) => Promise<string>;
 }
 
 /** A chain the test drives directly: `chain.blocks` IS the canonical chain. */
@@ -97,7 +99,8 @@ function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): ChainGate
         code: async address => codeAt(address),
         storageAt: async () => `0x${ '0'.repeat(64) }`,
         // Silence by default: a getter that answers is stubbed only where that IS the subject.
-        call: stub.call ?? (async () => '0x')
+        call: stub.call ?? (async () => '0x'),
+        input: stub.input ?? (async () => '0x')
     };
 }
 
@@ -553,6 +556,58 @@ describe('the API over the index', () =>
         const second = await at('limit=2&page=2');
         expect(second.transfers.map((row) => row.logIndex)).toEqual([2]);
         expect(second.total).toBe(3);
+    });
+
+    it('decodes what a contract call called, and renders without it when the node does not answer', async () =>
+    {
+        const data = encodeCall(FUNCTION_BY_SELECTOR.get(selectorOf('transfer(address,uint256)'))!, [BOB, '5']);
+        const carrier = block(3, '0xb2', '0xb3');
+        carrier.transactions[0]!.inputSize = (data.length - 2) / 2;
+        const hash = carrier.transactions[0]!.hash;
+        const read = async (input: (hash: string) => Promise<string>): Promise<Response> =>
+        {
+            const { store, chain } = await indexed([...CHAIN, carrier], { input });
+            return buildApp({ dev: false, store, chain }).handle(new Request(`http://local/api/txs/${ hash }`));
+        };
+
+        const decoded = (await (await read(async () => data)).json()) as TransactionDetail;
+        expect(decoded.call).toMatchObject({ name: 'transfer', args: [{ type: 'address' }, { type: 'uint256', value: '5' }], data });
+
+        const down = await read(async () =>
+        {
+            throw new Error('node down');
+        });
+        expect(down.status).toBe(200);
+        expect(((await down.json()) as TransactionDetail).call).toBeNull();
+
+        // A node that never answers costs the section, not the page.
+        vi.useFakeTimers();
+        try
+        {
+            const pending = read(() => new Promise(() => undefined));
+            await vi.advanceTimersByTimeAsync(3_000);
+            expect(((await (await pending).json()) as TransactionDetail).call).toBeNull();
+        }
+        finally
+        {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not ask the node for calldata a plain transfer never carried', async () =>
+    {
+        let asked = 0;
+        const { store, chain } = await indexed(CHAIN, {
+            input: async () =>
+            {
+                asked++;
+                return '0x';
+            }
+        });
+        const request = new Request(`http://local/api/txs/${ CHAIN[0]!.transactions[0]!.hash }`);
+        const detail = (await (await buildApp({ dev: false, store, chain }).handle(request)).json()) as TransactionDetail;
+        expect(detail.call).toBeNull();
+        expect(asked).toBe(0);
     });
 
     it('serves a transaction that emitted nothing as an empty page, not a missing envelope', async () =>

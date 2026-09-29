@@ -39,6 +39,7 @@ function counting(overrides: Partial<ChainGateway> = {}): ChainGateway & { calls
         isContract: answers('isContract', true),
         storageAt: answers('storageAt', `0x${ '0'.repeat(64) }`),
         call: answers('call', '0x01'),
+        input: answers('input', '0xa9059cbb'),
         code: async (address) =>
         {
             tick('code');

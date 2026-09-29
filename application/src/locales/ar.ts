@@ -114,6 +114,8 @@ export const ar: Dictionary = {
     'tx.feeDetail': '{gas} غاز بسعر {price}',
     'tx.nonce': 'نونس',
     'tx.calldata': 'بيانات الاستدعاء {size}',
+    'tx.input': 'بيانات الإدخال',
+    'tx.input.raw': 'بيانات الاستدعاء الخام',
     'tx.created': 'أُنشئ',
     'tx.transfers': '{count} تحويل توكن',
     'tx.token': 'توكن',

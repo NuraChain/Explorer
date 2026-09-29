@@ -11,7 +11,9 @@
 import { describe, it, expect } from 'vitest';
 import { toEventSelector, toFunctionSelector } from 'viem';
 
-import { analyze, describeEvents, describeFunctions, detectStandards } from '../src/chain/contract.ts';
+import { analyze, describeCall, describeEvents, describeFunctions, detectStandards } from '../src/chain/contract.ts';
+import { FUNCTION_BY_SELECTOR, selectorOf } from '../src/chain/signatures.ts';
+import { encodeCall } from '../src/chain/values.ts';
 
 /** A dispatcher comparing calldata against each selector, as solc emits one. */
 function dispatcher(signatures: string[]): string
@@ -310,5 +312,47 @@ describe('property: analysis over arbitrary bytecode', () =>
             }
             expect(detectStandards(analyze(`0x${ hex }`).selectors)).toEqual([]);
         }
+    });
+});
+
+describe('describeCall: calldata read back through the table', () =>
+{
+    const RECIPIENT = '0x00000000000000000000000000000000000000bb';
+    const calldata = (signature: string, args: string[]): string =>
+        encodeCall(FUNCTION_BY_SELECTOR.get(selectorOf(signature))!, args);
+
+    it('names the function and every argument it was passed', () =>
+    {
+        const data = calldata('transfer(address,uint256)', [RECIPIENT, '115792089237316195423570985008687907853269984665640564039457584007913129639935']);
+        expect(describeCall(data)).toEqual({
+            selector: '0xa9059cbb',
+            signature: 'transfer(address,uint256)',
+            name: 'transfer',
+            args: [
+                { type: 'address', value: expect.stringMatching(new RegExp(`^${ RECIPIENT }$`, 'i')) },
+                // uint256 max: a double would have printed 1.157e77.
+                { type: 'uint256', value: '115792089237316195423570985008687907853269984665640564039457584007913129639935' }
+            ],
+            data
+        });
+    });
+
+    it('decodes a list of structs, as the gov precompile takes its deposit', () =>
+    {
+        const data = calldata('deposit(address,uint64,(string,uint256)[])', [RECIPIENT, '7', '[["anura", "5000"]]']);
+        expect(describeCall(data).args.map((arg) => arg.value.toLowerCase())).toEqual([RECIPIENT, '7', 'anura, 5000']);
+    });
+
+    it('reports a selector the table does not know as unknown, with the bytes intact', () =>
+    {
+        expect(describeCall('0xdeadbeef0001')).toEqual({ selector: '0xdeadbeef', signature: '', name: '', args: [], data: '0xdeadbeef0001' });
+    });
+
+    it('never names a known selector whose arguments do not decode', () =>
+    {
+        const whole = calldata('transfer(address,uint256)', [RECIPIENT, '1']);
+        expect(describeCall(whole.slice(0, 40)).signature).toBe('');
+        // The selector alone: an empty tail decodes to no values at all rather than throwing.
+        expect(describeCall('0xa9059cbb').signature).toBe('');
     });
 });

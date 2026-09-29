@@ -167,7 +167,8 @@ function stubChain(writable = false): ChainGateway
         storageAt: async () => `0x${ '0'.repeat(64) }`,
         // An address with no precompile mounted answers empty WITHOUT reverting.
         call: async (address) =>
-            (address.toLowerCase() === GOV_PRECOMPILE && writable ? `0x${ '0'.repeat(64) }` : '0x')
+            (address.toLowerCase() === GOV_PRECOMPILE && writable ? `0x${ '0'.repeat(64) }` : '0x'),
+        input: async () => '0x'
     };
 }
 

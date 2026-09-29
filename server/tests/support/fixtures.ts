@@ -104,6 +104,7 @@ export interface ChainStub
     code?: Record<string, string>;
     balance?: (address: string) => Promise<bigint>;
     call?: (address: string, data: string) => Promise<string>;
+    input?: (hash: string) => Promise<string>;
     storageAt?: (address: string, slot: string) => Promise<string>;
     tokenMetadata?: (address: string) => Promise<{ name: string; symbol: string; decimals: number } | null>;
     head?: () => Promise<number>;
@@ -128,7 +129,8 @@ export function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): Ch
         isContract: async (address) => codeAt(address) !== '0x',
         code: async (address) => codeAt(address),
         storageAt: stub.storageAt ?? (async () => `0x${ '0'.repeat(64) }`),
-        call: stub.call ?? (async () => '0x')
+        call: stub.call ?? (async () => '0x'),
+        input: stub.input ?? (async () => '0x')
     };
 }
 

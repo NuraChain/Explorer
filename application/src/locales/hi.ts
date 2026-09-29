@@ -114,6 +114,8 @@ export const hi: Dictionary = {
     'tx.feeDetail': '{price} की दर से {gas} गैस',
     'tx.nonce': 'नॉन्स',
     'tx.calldata': 'कॉलडेटा {size}',
+    'tx.input': 'इनपुट डेटा',
+    'tx.input.raw': 'कच्चा कॉलडेटा',
     'tx.created': 'बनाया गया',
     'tx.transfers': '{count} टोकन ट्रांसफ़र',
     'tx.token': 'टोकन',

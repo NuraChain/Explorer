@@ -189,6 +189,61 @@ export default component TransactionPage()
                     </div>
                 </dl>
 
+                {/* Named through the signature table only - there is no verified ABI behind this
+                    page, so an argument has its type and never a parameter name, and an amount is
+                    the raw integer because nothing here knows which token's decimals it counts. */}
+                <Show when={ shown.call } let={ call }>
+                    <section class="panel overflow-hidden">
+                        <h2 class="flex items-center gap-2 border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">
+                            <Icon name="contract" size={ 15 } /> { locale.t('tx.input') }
+                        </h2>
+                        <p class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
+                            <span class="data text-[13px] text-muted">{ call.selector }</span>
+                            <Show when={ call.signature !== '' } fallback={ <span class="text-[14px] text-muted">{ locale.t('contract.unnamed') }</span> }>
+                                <span class="hash min-w-0 flex-1 text-[14px]">
+                                    <span class="font-semibold">{ call.name }</span>(<span class="text-muted">{ call.args.map((arg) => arg.type).join(', ') }</span>)
+                                </span>
+                            </Show>
+                        </p>
+                        <Show when={ call.args.length > 0 }>
+                            <dl class="divide-y divide-line border-t border-line">
+                                <For each={ call.args.map((arg, at) => ({ ...arg, at })) } key={ (arg) => String(arg.at) } let={ arg }>
+                                    <div class="flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-baseline sm:gap-x-3">
+                                        <dt class="text-[13px] text-muted sm:w-40 sm:shrink-0"><span class="data">{ arg.type }</span></dt>
+                                        <dd class="min-w-0 text-[14px] sm:flex-1">
+                                            {/* Capped on a wrapper, not on the `amount` inside it:
+                                                a `bytes` argument can be kilobytes, and `amount`
+                                                on a block would pin it to the wrong edge in RTL. */}
+                                            {/* A `string` is whatever its sender typed, in any
+                                                script: it takes the reader's font and its own
+                                                direction, where every other type is chain data in
+                                                the monospace isolate. */}
+                                            <Show
+                                                when={ arg.type === 'address' }
+                                                fallback={
+                                                    <div class="max-h-48 overflow-y-auto">
+                                                        <Show when={ arg.type.startsWith('string') } fallback={ <span class="amount">{ arg.value }</span> }>
+                                                            <bdi class="break-words">{ arg.value }</bdi>
+                                                        </Show>
+                                                    </div>
+                                                }
+                                            >
+                                                <HashLink value={ arg.value } to={ `/address/${ arg.value }` } lead={ 16 } tail={ 10 } copy />
+                                            </Show>
+                                        </dd>
+                                    </div>
+                                </For>
+                            </dl>
+                        </Show>
+                        <details class="border-t border-line">
+                            <summary class="cursor-pointer px-4 py-3 text-[13px] text-muted transition-colors duration-150 marker:text-nur hover:text-text">
+                                { locale.t('tx.input.raw') }
+                            </summary>
+                            <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 pb-3 text-[12px] leading-relaxed text-muted">{ call.data }</pre>
+                        </details>
+                    </section>
+                </Show>
+
                 <Show when={ shown.total > 0 }>
                     <section class="panel overflow-hidden">
                         <h2 class="border-b border-line px-4 py-3 text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">

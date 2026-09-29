@@ -113,6 +113,8 @@ export const zh: Dictionary = {
     'tx.feeDetail': '{gas} Gas，单价 {price}',
     'tx.nonce': 'Nonce',
     'tx.calldata': '调用数据 {size}',
+    'tx.input': '输入数据',
+    'tx.input.raw': '原始调用数据',
     'tx.created': '已创建',
     'tx.transfers': '{count} 笔代币转账',
     'tx.token': '代币',

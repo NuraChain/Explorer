@@ -229,6 +229,7 @@ export class CachedChain implements ChainGateway
     readonly #words: TtlCache<string>;
     readonly #calls: TtlCache<string>;
     readonly #tokens: TtlCache<TokenMeta>;
+    readonly #inputs: TtlCache<string>;
 
     #head: { value: number; until: number } | null = null;
     #headInflight: Promise<number> | null = null;
@@ -245,6 +246,7 @@ export class CachedChain implements ChainGateway
         this.#words = new TtlCache<string>(max);
         this.#calls = new TtlCache<string>(max);
         this.#tokens = new TtlCache<TokenMeta>(max);
+        this.#inputs = new TtlCache<string>(max);
     }
 
     /** Per-cache hit counters, so a deployment can see whether the spans are doing anything. */
@@ -256,6 +258,7 @@ export class CachedChain implements ChainGateway
             storage: this.#words.stats(),
             calls: this.#calls.stats(),
             tokens: this.#tokens.stats(),
+            inputs: this.#inputs.stats(),
             scalars: this.#scalars.stats()
         };
     }
@@ -270,6 +273,7 @@ export class CachedChain implements ChainGateway
         this.#words.clear();
         this.#calls.clear();
         this.#tokens.clear();
+        this.#inputs.clear();
     }
 
     public async head(): Promise<number>
@@ -384,6 +388,17 @@ export class CachedChain implements ChainGateway
         // `null` is cached too: "this contract answers none of the ERC-20 getters" is an answer,
         // and it is the one that cost three failed calls to learn.
         return this.#tokens.read(address.toLowerCase(), this.#options.tokenMs, () => this.#inner.tokenMetadata(address));
+    }
+
+    public async input(hash: string): Promise<string>
+    {
+        if (this.#options.enabled !== true || this.#options.codeMs <= 0)
+        {
+            return this.#inner.input(hash);
+        }
+        // Held as long as bytecode: a transaction's hash is taken over its calldata, so the same
+        // hash can never answer with different bytes.
+        return this.#inputs.read(hash.toLowerCase(), this.#options.codeMs, () => this.#inner.input(hash));
     }
 
     /**

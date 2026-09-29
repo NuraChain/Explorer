@@ -118,6 +118,8 @@ export const fa: Dictionary = {
     'tx.feeDetail': '{gas} گس با نرخ {price}',
     'tx.nonce': 'نانس',
     'tx.calldata': 'دادهٔ فراخوانی {size}',
+    'tx.input': 'دادهٔ ورودی',
+    'tx.input.raw': 'دادهٔ خام فراخوانی',
     'tx.created': 'ایجادشده',
     'tx.transfers': '{count} انتقال توکن',
     'tx.token': 'توکن',

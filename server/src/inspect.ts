@@ -1,12 +1,12 @@
 import { BadRequestError } from '@azerothjs/http';
 
 import type { ChainGateway } from './chain/client.ts';
-import { analyze, describeEvents, describeFunctions, detectStandards } from './chain/contract.ts';
+import { analyze, describeCall, describeEvents, describeFunctions, detectStandards } from './chain/contract.ts';
 import { FUNCTION_BY_SELECTOR, READABLE_CALLS, selectorOf, type KnownFunction } from './chain/signatures.ts';
-import { normalize, type IndexStore } from './chain/store.ts';
+import { normalize, type IndexStore, type TransactionRow } from './chain/store.ts';
 import { ArgumentError, decodeReturn, encodeCall } from './chain/values.ts';
 import { iso } from './present.ts';
-import type { ContractCallResult, ContractDetail, ContractRead, ProxyKind } from './schemas.ts';
+import type { ContractCallResult, ContractDetail, ContractRead, DecodedCall, ProxyKind } from './schemas.ts';
 
 // One contract, described from the node and the index together.
 //
@@ -33,6 +33,9 @@ const PROXIABLE_SLOT = '0xc5f16f0fcc639fa48a6947836d9850f504798523bf8c9a3a87d587
 
 /** How many getters may be called for one page. A contract cannot make this unbounded. */
 const MAX_READS = 24;
+
+/** How long the transaction page waits on the node for calldata before rendering without it. */
+const CALLDATA_TIMEOUT_MS = 3_000;
 
 /** The low 20 bytes of a storage word, or null when the slot is empty. */
 function addressInWord(word: string): string | null
@@ -286,4 +289,37 @@ export async function inspectContract({ store, chain }: InspectDeps, target: str
         fromImplementation,
         creation: deployment
     };
+}
+
+/**
+ * What an indexed transaction called, or null for a plain transfer, a deployment, or a node that
+ * does not answer in time.
+ *
+ * Bounded and never thrown: the rest of the transaction page is answered from the index alone,
+ * and a node that is down or slow must cost the reader this one section, not the page.
+ */
+export async function readTransactionCall(chain: ChainGateway, row: TransactionRow): Promise<DecodedCall | null>
+{
+    if (row.to_addr === null || row.input_size < 4)
+    {
+        return null;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) =>
+    {
+        timer = setTimeout(() => resolve(null), CALLDATA_TIMEOUT_MS);
+    });
+    try
+    {
+        const input = await Promise.race([chain.input(row.hash), late]);
+        return input === null ? null : describeCall(input);
+    }
+    catch
+    {
+        return null;
+    }
+    finally
+    {
+        clearTimeout(timer);
+    }
 }

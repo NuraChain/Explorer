@@ -112,6 +112,8 @@ export const pt: Dictionary = {
     'tx.feeDetail': '{gas} de gás a {price}',
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
+    'tx.input': 'Dados de entrada',
+    'tx.input.raw': 'Calldata bruto',
     'tx.created': 'criado',
     'tx.transfers': '{count} transferências de tokens',
     'tx.token': 'token',

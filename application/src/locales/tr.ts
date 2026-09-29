@@ -114,6 +114,8 @@ export const tr: Dictionary = {
     'tx.feeDetail': '{price} fiyatla {gas} gaz',
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
+    'tx.input': 'Girdi verisi',
+    'tx.input.raw': 'Ham calldata',
     'tx.created': 'oluşturuldu',
     'tx.transfers': '{count} token transferi',
     'tx.token': 'token',

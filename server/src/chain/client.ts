@@ -125,6 +125,9 @@ export interface ChainGateway
 
     /** A read-only call, answered as the raw abi-encoded return data. */
     call(address: string, data: string): Promise<string>;
+
+    /** A mined transaction's calldata. The index keeps only its size, so the one page that shows it asks. */
+    input(hash: string): Promise<string>;
 }
 
 /** One indexed block: the header, its transactions, and the receipt for each. */
@@ -276,6 +279,12 @@ export class ChainReader implements ChainGateway
             data: data as `0x${ string }`
         });
         return result.data ?? '0x';
+    }
+
+    public async input(hash: string): Promise<string>
+    {
+        const transaction = await this.#client.getTransaction({ hash: hash as `0x${ string }` });
+        return transaction.input;
     }
 
     /**

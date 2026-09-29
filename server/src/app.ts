@@ -35,7 +35,7 @@ import {
 } from './chain/staking.ts';
 import { normalize, silentDay, type DailyStats, type IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
-import { calldataFor, inspectContract, readContract } from './inspect.ts';
+import { calldataFor, inspectContract, readContract, readTransactionCall } from './inspect.ts';
 import {
     classify,
     iso,
@@ -603,7 +603,7 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
                 return { rows: rows.map(presentTransaction), total, page, pages: pageCount(total, limit) };
             }),
 
-            one: routes.get('/:hash', { query: pageQuery, output: transactionDetail }, ({ params, query }) =>
+            one: routes.get('/:hash', { query: pageQuery, output: transactionDetail }, async ({ params, query }) =>
             {
                 const found = store.transactionByHash(params.hash);
                 if (found === null)
@@ -614,6 +614,7 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
                 const { rows, total } = store.transfersOfTransaction(found.hash, limit, offset);
                 return {
                     transaction: presentTransaction(found),
+                    call: await readTransactionCall(chain, found),
                     transfers: withTokens(rows),
                     total,
                     page,

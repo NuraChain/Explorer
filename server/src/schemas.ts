@@ -305,7 +305,28 @@ export type BlockDetail = Infer<typeof blockDetail>;
  * per recipient, and an airdrop's receipt carries hundreds of them. Shipping the lot turns a
  * detail page into a download and prints a list nobody can read to the end of.
  */
-export const transactionDetail = object({ transaction, transfers: array(transfer), total: number(), page: number(), pages: number() });
+/**
+ * A transaction's calldata, named through the signature table. `signature` is '' when the table
+ * does not know the selector; `data` is the raw calldata either way.
+ */
+export const decodedCall = object({
+    selector: string(),
+    signature: string(),
+    name: string(),
+    args: array(object({ type: string(), value: string() })),
+    data: string()
+});
+export type DecodedCall = Infer<typeof decodedCall>;
+
+/** `call` is null for a plain transfer, a deployment, or while the node does not answer. */
+export const transactionDetail = object({
+    transaction,
+    call: decodedCall.nullable(),
+    transfers: array(transfer),
+    total: number(),
+    page: number(),
+    pages: number()
+});
 export type TransactionDetail = Infer<typeof transactionDetail>;
 
 // --- Governance ------------------------------------------------------------------------------

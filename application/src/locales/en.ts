@@ -129,6 +129,8 @@ export const en = {
     'tx.feeDetail': '{gas} gas at {price}',
     'tx.nonce': 'Nonce',
     'tx.calldata': 'calldata {size}',
+    'tx.input': 'Input data',
+    'tx.input.raw': 'Raw calldata',
     'tx.created': 'created',
     'tx.transfers': '{count} token transfers',
     'tx.token': 'token',
