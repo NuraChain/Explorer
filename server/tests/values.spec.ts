@@ -24,7 +24,8 @@ function fn(inputs: string[], outputs: string[] = []): KnownFunction
         name: 'f',
         inputs,
         outputs,
-        mutability: 'nonpayable'
+        mutability: 'nonpayable',
+        parameters: inputs.map(parseType)
     };
 }
 

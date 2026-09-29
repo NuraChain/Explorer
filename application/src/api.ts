@@ -43,6 +43,7 @@ export type {
     ChainInfo,
     ContractDetail,
     ContractFunction,
+    DecodedCall,
     SearchResult,
     StatFigure,
     BondStatus,

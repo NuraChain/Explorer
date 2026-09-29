@@ -215,6 +215,8 @@ export const contractFunction = object({
     signature: string(),
     name: string(),
     inputs: array(string()),
+    /** Each input's name, '' where no contract the table was written from agrees on one. */
+    names: array(string()),
     /** What it answers with. Empty means it returns nothing - or that nobody has declared it. */
     outputs: array(string()),
     mutability: enumOf(MUTABILITY)
@@ -313,7 +315,14 @@ export const decodedCall = object({
     selector: string(),
     signature: string(),
     name: string(),
-    args: array(object({ type: string(), value: string() })),
+    args: array(object({
+        /** '' where the table carries no name for it. */
+        name: string(),
+        type: string(),
+        value: string(),
+        /** A named struct, one field per row; empty for anything else. */
+        fields: array(object({ name: string(), type: string(), value: string() }))
+    })),
     data: string()
 });
 export type DecodedCall = Infer<typeof decodedCall>;

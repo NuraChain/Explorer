@@ -328,10 +328,11 @@ describe('describeCall: calldata read back through the table', () =>
             selector: '0xa9059cbb',
             signature: 'transfer(address,uint256)',
             name: 'transfer',
+            // No names: ERC-20 codebases disagree on them, so the table carries none.
             args: [
-                { type: 'address', value: expect.stringMatching(new RegExp(`^${ RECIPIENT }$`, 'i')) },
+                { name: '', type: 'address', value: expect.stringMatching(new RegExp(`^${ RECIPIENT }$`, 'i')), fields: [] },
                 // uint256 max: a double would have printed 1.157e77.
-                { type: 'uint256', value: '115792089237316195423570985008687907853269984665640564039457584007913129639935' }
+                { name: '', type: 'uint256', value: '115792089237316195423570985008687907853269984665640564039457584007913129639935', fields: [] }
             ],
             data
         });
@@ -343,7 +344,13 @@ describe('describeCall: calldata read back through the table', () =>
         expect(describeCall(data).args.map((arg) => arg.value.toLowerCase())).toEqual([RECIPIENT, '7', 'anura, 5000']);
     });
 
-    it('decodes the createMarket an OLDER live factory still answers', () =>
+    it('names each argument where the contracts it was written from agree on a name', () =>
+    {
+        const data = calldata('confirmResolution(uint256,uint256)', ['4', '0']);
+        expect(describeCall(data).args.map(({ name, value }) => [name, value])).toEqual([['marketId', '4'], ['winningOutcome', '0']]);
+    });
+
+    it('decodes the createMarket an OLDER live factory still answers, struct spelled out', () =>
     {
         // 0x356c31e1: the MarketParams before category ids, from contracts@8672590. The factory at
         // 0x33fe315c... is that build, and its calls stayed unreadable until the table knew it.
@@ -352,7 +359,25 @@ describe('describeCall: calldata read back through the table', () =>
         const call = describeCall(data);
         expect(call).toMatchObject({ selector: '0x356c31e1', name: 'createMarket' });
         expect(call.args).toHaveLength(1);
-        expect(call.args[0]!.value).toContain('Will it rain?, , weather');
+        expect(call.args[0]!.name).toBe('params');
+        expect(call.args[0]!.fields.map(({ name, value }) => [name, value])).toEqual([
+            ['title', 'Will it rain?'],
+            ['description', ''],
+            ['category', 'weather'],
+            ['imageURI', ''],
+            ['creator', expect.stringMatching(new RegExp(`^${ RECIPIENT }$`, 'i'))],
+            ['lockTime', '10'],
+            ['resolveTime', '20'],
+            ['feeBps', '100'],
+            ['protocolFeeShareBps', '0'],
+            ['outcomeNames', 'yes, no']
+        ]);
+    });
+
+    it('leaves a list of structs as one line rather than spelling out every element', () =>
+    {
+        const data = calldata('deposit(address,uint64,(string,uint256)[])', [RECIPIENT, '7', '[["anura", "5000"]]']);
+        expect(describeCall(data).args.every((arg) => arg.fields.length === 0)).toBe(true);
     });
 
     it('reports a selector the table does not know as unknown, with the bytes intact', () =>

@@ -62,7 +62,10 @@ export default component ContractCall(props: {
 
     // Carrying its own position, because a list of bare types has nothing else to key a row by:
     // `transferFrom(address,address,uint256)` has two identical ones.
-    derived fields = props.entry.inputs.map((type, at) => ({ type, at }));
+    derived fields = props.entry.inputs.map((type, at) => ({ type, name: props.entry.names[at] ?? '', at }));
+
+    /** The parameter list as the source spells it - `address to` where a name is known. */
+    derived parameters = fields.map((field) => (field.name === '' ? field.type : `${ field.type } ${ field.name }`)).join(', ');
 
     const set = (at: number, value: string): void =>
     {
@@ -151,7 +154,7 @@ export default component ContractCall(props: {
         >
             <span class="data w-24 shrink-0 text-[13px] text-muted">{ props.entry.selector }</span>
             <span class="hash min-w-0 flex-1 text-[14px]">
-                <span class="font-semibold">{ props.entry.name }</span>(<span class="text-muted">{ props.entry.inputs.join(', ') }</span>)
+                <span class="font-semibold">{ props.entry.name }</span>(<span class="text-muted">{ parameters }</span>)
             </span>
             <Badge tone={ MUTABILITY_TONE[props.entry.mutability] ?? 'neutral' }>
                 { locale.t(`contract.mutability.${ props.entry.mutability }`) }
@@ -163,9 +166,11 @@ export default component ContractCall(props: {
             <div class="flex flex-col gap-2.5 border-t border-line bg-raised px-4 py-3">
                 <For each={ fields } key={ (field) => String(field.at) } let={ field }>
                     <div class="flex flex-col gap-1">
-                        <span class="data text-[12px] text-muted">{ field.type }</span>
+                        <span class="data text-[12px] text-muted">
+                            <Show when={ field.name !== '' }><span class="text-text">{ field.name }</span> </Show>{ field.type }
+                        </span>
                         <Input
-                            label={ `${ props.entry.name } - ${ field.type }` }
+                            label={ field.name === '' ? `${ props.entry.name } - ${ field.type }` : `${ props.entry.name } - ${ field.name } (${ field.type })` }
                             placeholder={ field.type }
                             size="sm"
                             value={ args[field.at] ?? '' }

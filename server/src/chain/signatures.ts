@@ -1,6 +1,6 @@
-import { toEventSelector, toFunctionSelector } from 'viem';
+import { parseAbiParameters, toEventSelector, toFunctionSelector, type AbiParameter } from 'viem';
 
-import { splitTypes } from './values.ts';
+import { bareType, parseType, splitTypes } from './values.ts';
 
 // The dictionary that gives a 4-byte selector back its name.
 //
@@ -42,6 +42,12 @@ export interface KnownFunction
      */
     outputs: string[];
     mutability: Mutability;
+
+    /**
+     * The inputs again, WITH their names where the table carries them (see {@link FUNCTIONS});
+     * a parameter with no `name` is one nobody could name without guessing.
+     */
+    parameters: AbiParameter[];
 }
 
 export interface KnownEvent
@@ -61,8 +67,14 @@ export interface KnownEvent
  * cannot be offered at all, because there would be no way to say what came back.
  *
  * The third column is comma-separated, exactly as a signature's arguments are; '' returns nothing.
+ *
+ * The optional fourth is the parameter list WITH names, struct fields included, written from the
+ * ABIs of the Nura contracts repo. A selector only gets one where every contract there that
+ * declares it spells the names the same way: `transfer` is `to` in one codebase and `recipient`
+ * in the next, and naming a reader's argument after either would be a guess. It must describe
+ * the same types as the signature - the import throws on one that does not.
  */
-const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
+const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string, string?]> = [
     // --- ERC-20 -----------------------------------------------------------------------------
     ['name()', 'view', 'string'],
     ['symbol()', 'view', 'string'],
@@ -72,58 +84,58 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['transfer(address,uint256)', 'nonpayable', 'bool'],
     ['transferFrom(address,address,uint256)', 'nonpayable', 'bool'],
     ['approve(address,uint256)', 'nonpayable', 'bool'],
-    ['allowance(address,address)', 'view', 'uint256'],
+    ['allowance(address,address)', 'view', 'uint256', 'address owner, address spender'],
     ['increaseAllowance(address,uint256)', 'nonpayable', 'bool'],
     ['decreaseAllowance(address,uint256)', 'nonpayable', 'bool'],
-    ['mint(address,uint256)', 'nonpayable', ''],
+    ['mint(address,uint256)', 'nonpayable', '', 'address to, uint256 amount'],
     ['burn(uint256)', 'nonpayable', ''],
-    ['burnFrom(address,uint256)', 'nonpayable', ''],
+    ['burnFrom(address,uint256)', 'nonpayable', '', 'address account, uint256 value'],
     ['cap()', 'view', 'uint256'],
     // BNB-chain's BEP-20 addition; it appears on a great many EVM tokens.
     ['getOwner()', 'view', 'address'],
 
     // --- EIP-2612 (permit) ------------------------------------------------------------------
-    ['permit(address,address,uint256,uint256,uint8,bytes32,bytes32)', 'nonpayable', ''],
-    ['nonces(address)', 'view', 'uint256'],
+    ['permit(address,address,uint256,uint256,uint8,bytes32,bytes32)', 'nonpayable', '', 'address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s'],
+    ['nonces(address)', 'view', 'uint256', 'address owner'],
     ['DOMAIN_SEPARATOR()', 'view', 'bytes32'],
     ['eip712Domain()', 'view', 'bytes1,string,string,uint256,address,bytes32,uint256[]'],
 
     // --- ERC-165 ----------------------------------------------------------------------------
-    ['supportsInterface(bytes4)', 'view', 'bool'],
+    ['supportsInterface(bytes4)', 'view', 'bool', 'bytes4 interfaceId'],
 
     // --- ERC-721 ----------------------------------------------------------------------------
     ['ownerOf(uint256)', 'view', 'address'],
-    ['safeTransferFrom(address,address,uint256)', 'nonpayable', ''],
-    ['safeTransferFrom(address,address,uint256,bytes)', 'nonpayable', ''],
-    ['setApprovalForAll(address,bool)', 'nonpayable', ''],
-    ['getApproved(uint256)', 'view', 'address'],
+    ['safeTransferFrom(address,address,uint256)', 'nonpayable', '', 'address from, address to, uint256 tokenId'],
+    ['safeTransferFrom(address,address,uint256,bytes)', 'nonpayable', '', 'address from, address to, uint256 tokenId, bytes data'],
+    ['setApprovalForAll(address,bool)', 'nonpayable', '', 'address operator, bool approved'],
+    ['getApproved(uint256)', 'view', 'address', 'uint256 tokenId'],
     ['isApprovedForAll(address,address)', 'view', 'bool'],
-    ['tokenURI(uint256)', 'view', 'string'],
-    ['tokenOfOwnerByIndex(address,uint256)', 'view', 'uint256'],
-    ['tokenByIndex(uint256)', 'view', 'uint256'],
+    ['tokenURI(uint256)', 'view', 'string', 'uint256 tokenId'],
+    ['tokenOfOwnerByIndex(address,uint256)', 'view', 'uint256', 'address owner, uint256 index'],
+    ['tokenByIndex(uint256)', 'view', 'uint256', 'uint256 index'],
     ['safeMint(address,uint256)', 'nonpayable', ''],
     ['safeMint(address,string)', 'nonpayable', ''],
 
     // --- ERC-1155 ---------------------------------------------------------------------------
-    ['balanceOf(address,uint256)', 'view', 'uint256'],
-    ['balanceOfBatch(address[],uint256[])', 'view', 'uint256[]'],
-    ['safeTransferFrom(address,address,uint256,uint256,bytes)', 'nonpayable', ''],
-    ['safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)', 'nonpayable', ''],
+    ['balanceOf(address,uint256)', 'view', 'uint256', 'address account, uint256 id'],
+    ['balanceOfBatch(address[],uint256[])', 'view', 'uint256[]', 'address[] accounts, uint256[] ids'],
+    ['safeTransferFrom(address,address,uint256,uint256,bytes)', 'nonpayable', '', 'address from, address to, uint256 id, uint256 value, bytes data'],
+    ['safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)', 'nonpayable', '', 'address from, address to, uint256[] ids, uint256[] values, bytes data'],
     ['uri(uint256)', 'view', 'string'],
 
     // --- Ownable ----------------------------------------------------------------------------
     ['owner()', 'view', 'address'],
-    ['transferOwnership(address)', 'nonpayable', ''],
+    ['transferOwnership(address)', 'nonpayable', '', 'address newOwner'],
     ['renounceOwnership()', 'nonpayable', ''],
     ['pendingOwner()', 'view', 'address'],
     ['acceptOwnership()', 'nonpayable', ''],
 
     // --- AccessControl ----------------------------------------------------------------------
-    ['hasRole(bytes32,address)', 'view', 'bool'],
-    ['getRoleAdmin(bytes32)', 'view', 'bytes32'],
-    ['grantRole(bytes32,address)', 'nonpayable', ''],
-    ['revokeRole(bytes32,address)', 'nonpayable', ''],
-    ['renounceRole(bytes32,address)', 'nonpayable', ''],
+    ['hasRole(bytes32,address)', 'view', 'bool', 'bytes32 role, address account'],
+    ['getRoleAdmin(bytes32)', 'view', 'bytes32', 'bytes32 role'],
+    ['grantRole(bytes32,address)', 'nonpayable', '', 'bytes32 role, address account'],
+    ['revokeRole(bytes32,address)', 'nonpayable', '', 'bytes32 role, address account'],
+    ['renounceRole(bytes32,address)', 'nonpayable', '', 'bytes32 role, address callerConfirmation'],
     ['DEFAULT_ADMIN_ROLE()', 'view', 'bytes32'],
     ['getRoleMember(bytes32,uint256)', 'view', 'address'],
     ['getRoleMemberCount(bytes32)', 'view', 'uint256'],
@@ -154,12 +166,12 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // --- Proxies and upgrades ---------------------------------------------------------------
     ['implementation()', 'view', 'address'],
     ['upgradeTo(address)', 'nonpayable', ''],
-    ['upgradeToAndCall(address,bytes)', 'payable', ''],
+    ['upgradeToAndCall(address,bytes)', 'payable', '', 'address newImplementation, bytes data'],
     ['admin()', 'view', 'address'],
     ['changeAdmin(address)', 'nonpayable', ''],
     ['proxiableUUID()', 'view', 'bytes32'],
     ['initialize()', 'nonpayable', ''],
-    ['initialize(address)', 'nonpayable', ''],
+    ['initialize(address)', 'nonpayable', '', 'address initialOwner'],
     ['initialize(string,string)', 'nonpayable', ''],
     ['UPGRADE_INTERFACE_VERSION()', 'view', 'string'],
 
@@ -190,7 +202,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['token0()', 'view', 'address'],
     ['token1()', 'view', 'address'],
     ['factory()', 'view', 'address'],
-    ['mint(address)', 'nonpayable', 'uint256'],
+    ['mint(address)', 'nonpayable', 'uint256', 'address recipient'],
     ['burn(address)', 'nonpayable', 'uint256,uint256'],
     ['swap(uint256,uint256,address,bytes)', 'nonpayable', ''],
     ['skim(address)', 'nonpayable', ''],
@@ -249,31 +261,31 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // A pool is created, not deployed: `createPool` deploys it deterministically, and every pool
     // answers `factory()` with the address below. Fee tiers are the factory's table - `enableFeeAmount`
     // writes one and `feeAmountTickSpacing` reads it back.
-    ['createPool(address,address,uint24)', 'nonpayable', 'address'],
-    ['getPool(address,address,uint24)', 'view', 'address'],
-    ['enableFeeAmount(uint24,int24)', 'nonpayable', ''],
-    ['feeAmountTickSpacing(uint24)', 'view', 'int24'],
+    ['createPool(address,address,uint24)', 'nonpayable', 'address', 'address tokenA, address tokenB, uint24 fee'],
+    ['getPool(address,address,uint24)', 'view', 'address', 'address tokenA, address tokenB, uint24 fee'],
+    ['enableFeeAmount(uint24,int24)', 'nonpayable', '', 'uint24 fee, int24 tickSpacing'],
+    ['feeAmountTickSpacing(uint24)', 'view', 'int24', 'uint24 fee'],
     ['parameters()', 'view', 'address,address,address,uint24,int24'],
-    ['setOwner(address)', 'nonpayable', ''],
+    ['setOwner(address)', 'nonpayable', '', 'address owner'],
 
     // --- Uniswap V3 swap router --------------------------------------------------------------
     // The `exact` families take one struct parameter, spelled as a tuple. `exactInput` starts from
     // a known amount in, `exactOutput` reaches a known amount out, and each has a `Single` form
     // that skips the encoded path for one hop.
     ['WETH9()', 'view', 'address'],
-    ['exactInput((bytes,address,uint256,uint256,uint256))', 'payable', 'uint256'],
-    ['exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))', 'payable', 'uint256'],
-    ['exactOutput((bytes,address,uint256,uint256,uint256))', 'payable', 'uint256'],
-    ['exactOutputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))', 'payable', 'uint256'],
+    ['exactInput((bytes,address,uint256,uint256,uint256))', 'payable', 'uint256', '(bytes path, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum) params'],
+    ['exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))', 'payable', 'uint256', '(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params'],
+    ['exactOutput((bytes,address,uint256,uint256,uint256))', 'payable', 'uint256', '(bytes path, address recipient, uint256 deadline, uint256 amountOut, uint256 amountInMaximum) params'],
+    ['exactOutputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))', 'payable', 'uint256', '(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountOut, uint256 amountInMaximum, uint160 sqrtPriceLimitX96) params'],
     ['refundETH()', 'payable', ''],
-    ['unwrapWETH9(uint256,address)', 'payable', ''],
-    ['unwrapWETH9WithFee(uint256,address,uint256,address)', 'payable', ''],
-    ['sweepToken(address,uint256,address)', 'payable', ''],
-    ['sweepTokenWithFee(address,uint256,address,uint256,address)', 'payable', ''],
-    ['selfPermit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
-    ['selfPermitAllowed(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
-    ['selfPermitAllowedIfNecessary(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
-    ['selfPermitIfNecessary(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
+    ['unwrapWETH9(uint256,address)', 'payable', '', 'uint256 amountMinimum, address recipient'],
+    ['unwrapWETH9WithFee(uint256,address,uint256,address)', 'payable', '', 'uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient'],
+    ['sweepToken(address,uint256,address)', 'payable', '', 'address token, uint256 amountMinimum, address recipient'],
+    ['sweepTokenWithFee(address,uint256,address,uint256,address)', 'payable', '', 'address token, uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient'],
+    ['selfPermit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', '', 'address token, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s'],
+    ['selfPermitAllowed(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', '', 'address token, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s'],
+    ['selfPermitAllowedIfNecessary(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', '', 'address token, uint256 nonce, uint256 expiry, uint8 v, bytes32 r, bytes32 s'],
+    ['selfPermitIfNecessary(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', '', 'address token, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s'],
     ['uniswapV3SwapCallback(int256,int256,bytes)', 'nonpayable', ''],
 
     // --- Uniswap V3 non-fungible position manager --------------------------------------------
@@ -281,14 +293,14 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // `decreaseLiquidity` move it, `collect` takes the fees it earned. Each takes one struct, so
     // each is spelled as one tuple parameter.
     ['baseURI()', 'pure', 'string'],
-    ['positions(uint256)', 'view', 'uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128'],
-    ['mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))', 'payable', 'uint256,uint128,uint256,uint256'],
-    ['increaseLiquidity((uint256,uint256,uint256,uint256,uint256,uint256))', 'payable', 'uint128,uint256,uint256'],
-    ['decreaseLiquidity((uint256,uint128,uint256,uint256,uint256))', 'payable', 'uint256,uint256'],
-    ['collect((uint256,address,uint128,uint128))', 'payable', 'uint256,uint256'],
-    ['createAndInitializePoolIfNecessary(address,address,uint24,uint160)', 'payable', 'address'],
-    ['permit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', ''],
-    ['uniswapV3MintCallback(uint256,uint256,bytes)', 'nonpayable', ''],
+    ['positions(uint256)', 'view', 'uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128', 'uint256 tokenId'],
+    ['mint((address,address,uint24,int24,int24,uint256,uint256,uint256,uint256,address,uint256))', 'payable', 'uint256,uint128,uint256,uint256', '(address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address recipient, uint256 deadline) params'],
+    ['increaseLiquidity((uint256,uint256,uint256,uint256,uint256,uint256))', 'payable', 'uint128,uint256,uint256', '(uint256 tokenId, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, uint256 deadline) params'],
+    ['decreaseLiquidity((uint256,uint128,uint256,uint256,uint256))', 'payable', 'uint256,uint256', '(uint256 tokenId, uint128 liquidity, uint256 amount0Min, uint256 amount1Min, uint256 deadline) params'],
+    ['collect((uint256,address,uint128,uint128))', 'payable', 'uint256,uint256', '(uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max) params'],
+    ['createAndInitializePoolIfNecessary(address,address,uint24,uint160)', 'payable', 'address', 'address token0, address token1, uint24 fee, uint160 sqrtPriceX96'],
+    ['permit(address,uint256,uint256,uint8,bytes32,bytes32)', 'payable', '', 'address spender, uint256 tokenId, uint256 deadline, uint8 v, bytes32 r, bytes32 s'],
+    ['uniswapV3MintCallback(uint256,uint256,bytes)', 'nonpayable', '', 'uint256 amount0Owed, uint256 amount1Owed, bytes data'],
 
     // --- Uniswap V3 pool ----------------------------------------------------------------------
     // The contract a V3 deployment has thousands of, and the one a reader is most likely to land
@@ -304,39 +316,39 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['feeGrowthGlobal0X128()', 'view', 'uint256'],
     ['feeGrowthGlobal1X128()', 'view', 'uint256'],
     ['protocolFees()', 'view', 'uint128,uint128'],
-    ['ticks(int24)', 'view', 'uint128,int128,uint256,uint256,int56,uint160,uint32,bool'],
-    ['tickBitmap(int16)', 'view', 'uint256'],
-    ['positions(bytes32)', 'view', 'uint128,uint256,uint256,uint128,uint128'],
-    ['observations(uint256)', 'view', 'uint32,int56,uint160,bool'],
-    ['observe(uint32[])', 'view', 'int56[],uint160[]'],
-    ['snapshotCumulativesInside(int24,int24)', 'view', 'int56,uint160,uint32'],
-    ['initialize(uint160)', 'nonpayable', ''],
+    ['ticks(int24)', 'view', 'uint128,int128,uint256,uint256,int56,uint160,uint32,bool', 'int24 tick'],
+    ['tickBitmap(int16)', 'view', 'uint256', 'int16 wordPosition'],
+    ['positions(bytes32)', 'view', 'uint128,uint256,uint256,uint128,uint128', 'bytes32 key'],
+    ['observations(uint256)', 'view', 'uint32,int56,uint160,bool', 'uint256 index'],
+    ['observe(uint32[])', 'view', 'int56[],uint160[]', 'uint32[] secondsAgos'],
+    ['snapshotCumulativesInside(int24,int24)', 'view', 'int56,uint160,uint32', 'int24 tickLower, int24 tickUpper'],
+    ['initialize(uint160)', 'nonpayable', '', 'uint160 sqrtPriceX96'],
     // The four that move liquidity. Each is a CALLBACK protocol - the pool calls back into the
     // caller for payment - so they are named here and are not usable from a wallet directly; the
     // position manager is what a person actually sends.
-    ['mint(address,int24,int24,uint128,bytes)', 'nonpayable', 'uint256,uint256'],
-    ['burn(int24,int24,uint128)', 'nonpayable', 'uint256,uint256'],
-    ['collect(address,int24,int24,uint128,uint128)', 'nonpayable', 'uint128,uint128'],
-    ['swap(address,bool,int256,uint160,bytes)', 'nonpayable', 'int256,int256'],
-    ['flash(address,uint256,uint256,bytes)', 'nonpayable', ''],
-    ['increaseObservationCardinalityNext(uint16)', 'nonpayable', ''],
-    ['setFeeProtocol(uint8,uint8)', 'nonpayable', ''],
-    ['collectProtocol(address,uint128,uint128)', 'nonpayable', 'uint128,uint128'],
+    ['mint(address,int24,int24,uint128,bytes)', 'nonpayable', 'uint256,uint256', 'address recipient, int24 tickLower, int24 tickUpper, uint128 amount, bytes data'],
+    ['burn(int24,int24,uint128)', 'nonpayable', 'uint256,uint256', 'int24 tickLower, int24 tickUpper, uint128 amount'],
+    ['collect(address,int24,int24,uint128,uint128)', 'nonpayable', 'uint128,uint128', 'address recipient, int24 tickLower, int24 tickUpper, uint128 amount0Requested, uint128 amount1Requested'],
+    ['swap(address,bool,int256,uint160,bytes)', 'nonpayable', 'int256,int256', 'address recipient, bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96, bytes data'],
+    ['flash(address,uint256,uint256,bytes)', 'nonpayable', '', 'address recipient, uint256 amount0, uint256 amount1, bytes data'],
+    ['increaseObservationCardinalityNext(uint16)', 'nonpayable', '', 'uint16 observationCardinalityNext'],
+    ['setFeeProtocol(uint8,uint8)', 'nonpayable', '', 'uint8 feeProtocol0, uint8 feeProtocol1'],
+    ['collectProtocol(address,uint128,uint128)', 'nonpayable', 'uint128,uint128', 'address recipient, uint128 amount0Requested, uint128 amount1Requested'],
 
     // --- Uniswap V3 quoter, tick lens and descriptors -----------------------------------------
     // `quoteExact*` are nonpayable rather than view: the quoter routes a real (zero-amount) swap
     // through a pool to read its price, so the ABI cannot promise it changes nothing.
-    ['quoteExactInput(bytes,uint256)', 'nonpayable', 'uint256,uint160[],uint32[],uint256'],
-    ['quoteExactInputSingle((address,address,uint256,uint24,uint160))', 'nonpayable', 'uint256,uint160,uint32,uint256'],
-    ['quoteExactOutput(bytes,uint256)', 'nonpayable', 'uint256,uint160[],uint32[],uint256'],
-    ['quoteExactOutputSingle((address,address,uint256,uint24,uint160))', 'nonpayable', 'uint256,uint160,uint32,uint256'],
-    ['getPopulatedTicksInWord(address,int16)', 'view', '(int24,int128,uint128)[]'],
-    ['tokenURI(address,uint256)', 'view', 'string'],
-    ['flipRatio(address,address,uint256)', 'view', 'bool'],
-    ['tokenRatioPriority(address,uint256)', 'view', 'int256'],
+    ['quoteExactInput(bytes,uint256)', 'nonpayable', 'uint256,uint160[],uint32[],uint256', 'bytes path, uint256 amountIn'],
+    ['quoteExactInputSingle((address,address,uint256,uint24,uint160))', 'nonpayable', 'uint256,uint160,uint32,uint256', '(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params'],
+    ['quoteExactOutput(bytes,uint256)', 'nonpayable', 'uint256,uint160[],uint32[],uint256', 'bytes path, uint256 amountOut'],
+    ['quoteExactOutputSingle((address,address,uint256,uint24,uint160))', 'nonpayable', 'uint256,uint160,uint32,uint256', '(address tokenIn, address tokenOut, uint256 amount, uint24 fee, uint160 sqrtPriceLimitX96) params'],
+    ['getPopulatedTicksInWord(address,int16)', 'view', '(int24,int128,uint128)[]', 'address pool, int16 tickBitmapIndex'],
+    ['tokenURI(address,uint256)', 'view', 'string', 'address positionManager, uint256 tokenId'],
+    ['flipRatio(address,address,uint256)', 'view', 'bool', 'address token0, address token1, uint256 chainId'],
+    ['tokenRatioPriority(address,uint256)', 'view', 'int256', 'address token, uint256 chainId'],
     ['nativeCurrencyLabel()', 'view', 'string'],
     ['nativeCurrencyLabelBytes()', 'view', 'bytes32'],
-    ['constructTokenURI((uint256,address,address,string,string,uint8,uint8,bool,int24,int24,int24,int24,uint24,address))', 'pure', 'string'],
+    ['constructTokenURI((uint256,address,address,string,string,uint8,uint8,bool,int24,int24,int24,int24,uint24,address))', 'pure', 'string', '(uint256 tokenId, address quoteTokenAddress, address baseTokenAddress, string quoteTokenSymbol, string baseTokenSymbol, uint8 quoteTokenDecimals, uint8 baseTokenDecimals, bool flipRatio, int24 tickLower, int24 tickUpper, int24 tickCurrent, int24 tickSpacing, uint24 fee, address poolAddress) params'],
 
     // --- Solidity libraries -------------------------------------------------------------------
     // A library's selector is NOT hashed the way every other entry in this file is.
@@ -380,8 +392,8 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // recovered by hashing candidate names until keccak agreed with the selector. That is the
     // only way a name gets into this file - a name that does not hash to its selector is not a
     // name, and a plausible-looking one would be worse than the four bytes it replaced.
-    ['rescueERC20(address,address,uint256)', 'nonpayable', ''],
-    ['mintBatch(address[],uint256[])', 'nonpayable', ''],
+    ['rescueERC20(address,address,uint256)', 'nonpayable', '', 'address token, address to, uint256 amount'],
+    ['mintBatch(address[],uint256[])', 'nonpayable', '', 'address[] recipients, uint256[] amounts'],
 
     // --- Governor (OpenZeppelin, and the Bravo shape it kept) ---------------------------------
     // The write half is here for the same reason the read half is: this table is what lets the
@@ -499,47 +511,47 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['MAX_SIGNERS()', 'view', 'uint256'],
     ['defaultFeeBps()', 'view', 'uint16'],
     ['requiredConfirmations()', 'view', 'uint256'],
-    ['marketAt(uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)'],
-    ['marketAddress(uint256)', 'view', 'address'],
+    ['marketAt(uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)', 'uint256 marketId'],
+    ['marketAddress(uint256)', 'view', 'address', 'uint256 marketId'],
     // Which template a market was stamped from: the CPMM one, or the parimutuel pool.
-    ['marketKind(uint256)', 'view', 'uint8'],
-    ['countByStatus(uint8)', 'view', 'uint256'],
-    ['marketsPaged(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['activeMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['marketKind(uint256)', 'view', 'uint8', 'uint256 marketId'],
+    ['countByStatus(uint8)', 'view', 'uint256', 'uint8 status'],
+    ['marketsPaged(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]', 'uint256 offset, uint256 limit'],
+    ['activeMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]', 'uint256 offset, uint256 limit'],
     ['closedMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['resolvedMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['marketsByStatus(uint8,uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
+    ['resolvedMarkets(uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]', 'uint256 offset, uint256 limit'],
+    ['marketsByStatus(uint8,uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]', 'uint8 status, uint256 offset, uint256 limit'],
     // Resolution is an n-of-m the factory keeps itself: the signers confirm an outcome, and the
     // market is only told once `requiredConfirmations()` of them have named the SAME one.
     ['resolutionSigners()', 'view', 'address[]'],
-    ['isResolutionSigner(address)', 'view', 'bool'],
-    ['confirmationCount(uint256,uint256)', 'view', 'uint256'],
-    ['confirmationOf(uint256,address)', 'view', 'uint256'],
-    ['confirmResolution(uint256,uint256)', 'nonpayable', ''],
-    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', 'uint256,address'],
-    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'nonpayable', 'uint256,address'],
+    ['isResolutionSigner(address)', 'view', 'bool', 'address account'],
+    ['confirmationCount(uint256,uint256)', 'view', 'uint256', 'uint256 marketId, uint256 outcome'],
+    ['confirmationOf(uint256,address)', 'view', 'uint256', 'uint256 marketId, address signer'],
+    ['confirmResolution(uint256,uint256)', 'nonpayable', '', 'uint256 marketId, uint256 winningOutcome'],
+    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', 'uint256,address', '(string title, string description, uint32 categoryId, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, string[] outcomeNames) params'],
+    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'nonpayable', 'uint256,address', '(string title, string description, uint32 categoryId, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, string[] outcomeNames) params'],
     ['closeMarket(uint256)', 'nonpayable', ''],
     ['voidMarket(uint256)', 'nonpayable', ''],
     ['pauseMarket(uint256)', 'nonpayable', ''],
     ['unpauseMarket(uint256)', 'nonpayable', ''],
-    ['setResolutionSigners(address[],uint256)', 'nonpayable', ''],
-    ['setDefaultFees(uint16)', 'nonpayable', ''],
-    ['setTreasury(address)', 'nonpayable', ''],
+    ['setResolutionSigners(address[],uint256)', 'nonpayable', '', 'address[] signers, uint256 required'],
+    ['setDefaultFees(uint16)', 'nonpayable', '', 'uint16 feeBps'],
+    ['setTreasury(address)', 'nonpayable', '', 'address treasury'],
     // A market caches the treasury it was stamped with; this pushes the factory's current one on
     // to a market already deployed, which is why it takes an id and not an address.
-    ['repointTreasury(uint256)', 'nonpayable', ''],
-    ['cancelMarket(uint256)', 'nonpayable', ''],
+    ['repointTreasury(uint256)', 'nonpayable', '', 'uint256 marketId'],
+    ['cancelMarket(uint256)', 'nonpayable', '', 'uint256 marketId'],
     // Earlier releases this chain still runs. 0x33fe315c... is the factory from before category
     // ids (contracts@8672590: a string category, and a protocol fee share beside the trade fee);
     // 0xf0af7cb9... came after the ids but still carried the share (@185c433). `closeMarket`,
     // `voidMarket` and the pause pair above are from those releases too. A deployed contract
     // never changes shape, so an entry here stays for as long as a contract that answers it does
     // - however far the source has moved on.
-    ['createMarket((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
-    ['createMarket2((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
-    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
-    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
-    ['setDefaultFees(uint16,uint16)', 'nonpayable', ''],
+    ['createMarket((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address', '(string title, string description, string category, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, uint16 protocolFeeShareBps, string[] outcomeNames) params'],
+    ['createMarket2((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address', '(string title, string description, string category, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, uint16 protocolFeeShareBps, string[] outcomeNames) params'],
+    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address', '(string title, string description, uint32 categoryId, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, uint16 protocolFeeShareBps, string[] outcomeNames) params'],
+    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address', '(string title, string description, uint32 categoryId, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, uint16 protocolFeeShareBps, string[] outcomeNames) params'],
+    ['setDefaultFees(uint16,uint16)', 'nonpayable', '', 'uint16 feeBps, uint16 protocolFeeShareBps'],
     ['defaultProtocolFeeShareBps()', 'view', 'uint16'],
     ['BPS()', 'view', 'uint16'],
 
@@ -549,7 +561,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // addition, the burn an operator performs when the asset leaves for the other side. It is a
     // ROLE-gated burn of somebody else's balance, which is why it is not `burnFrom` - no
     // allowance is involved and none is spent.
-    ['adminBurn(address,uint256)', 'nonpayable', ''],
+    ['adminBurn(address,uint256)', 'nonpayable', '', 'address from, uint256 amount'],
 
     // --- Faucet token (test networks) ---------------------------------------------------------
     // A test-net ERC-20 anybody can draw from. `faucetEnabled` is worth naming because a faucet
@@ -569,18 +581,18 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // pay, and `outstandingLiability` is what it already owes. A campaign whose remaining claims
     // exceed its funded ones is one that will run out, and that is readable from these alone.
     ['SIGNER_ROLE()', 'view', 'bytes32'],
-    ['claimDigest(address,uint256)', 'view', 'bytes32'],
+    ['claimDigest(address,uint256)', 'view', 'bytes32', 'address account, uint256 deadline'],
     ['fund()', 'payable', ''],
     ['fundedClaims()', 'view', 'uint256'],
-    ['getReward(uint256,bytes)', 'nonpayable', ''],
-    ['hasClaimed(address)', 'view', 'bool'],
+    ['getReward(uint256,bytes)', 'nonpayable', '', 'uint256 deadline, bytes signature'],
+    ['hasClaimed(address)', 'view', 'bool', 'address account'],
     ['maxClaims()', 'view', 'uint256'],
     ['outstandingLiability()', 'view', 'uint256'],
     ['remainingClaims()', 'view', 'uint256'],
     ['rewardAmount()', 'view', 'uint256'],
-    ['setRewardAmount(uint256)', 'nonpayable', ''],
+    ['setRewardAmount(uint256)', 'nonpayable', '', 'uint256 newAmount'],
     ['totalClaims()', 'view', 'uint256'],
-    ['withdraw(address,uint256)', 'nonpayable', ''],
+    ['withdraw(address,uint256)', 'nonpayable', '', 'address to, uint256 amount'],
 
     // --- Collateralised NFT vault -------------------------------------------------------------
     // An ERC-721 where every token is a claim on a fixed amount of one ERC-20 held by the vault.
@@ -592,22 +604,22 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // figure in it is separately readable.
     ['availableBacking()', 'view', 'uint256'],
     ['backingToken()', 'view', 'address'],
-    ['deposit(uint256)', 'nonpayable', ''],
+    ['deposit(uint256)', 'nonpayable', '', 'uint256 amount'],
     ['lockAmount()', 'view', 'uint256'],
-    ['lockedAmount(uint256)', 'view', 'uint256'],
-    ['mintBatch(address,uint256)', 'nonpayable', 'uint256'],
+    ['lockedAmount(uint256)', 'view', 'uint256', 'uint256 tokenId'],
+    ['mintBatch(address,uint256)', 'nonpayable', 'uint256', 'address recipient, uint256 quantity'],
     ['publicMintEnabled()', 'view', 'bool'],
-    ['redeem(uint256)', 'nonpayable', ''],
+    ['redeem(uint256)', 'nonpayable', '', 'uint256 tokenId'],
     ['remainingMintCapacity()', 'view', 'uint256'],
-    ['setBaseURI(string)', 'nonpayable', ''],
-    ['setLockAmount(uint256)', 'nonpayable', ''],
-    ['setPublicMintEnabled(bool)', 'nonpayable', ''],
+    ['setBaseURI(string)', 'nonpayable', '', 'string newBaseURI'],
+    ['setLockAmount(uint256)', 'nonpayable', '', 'uint256 newAmount'],
+    ['setPublicMintEnabled(bool)', 'nonpayable', '', 'bool enabled'],
     ['tokenBalance()', 'view', 'uint256'],
     ['totalMinted()', 'view', 'uint256'],
     ['totalRedeemed()', 'view', 'uint256'],
     ['totalReserved()', 'view', 'uint256'],
     ['vaultState()', 'view', 'uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256'],
-    ['withdrawExcessTokens(address,uint256)', 'nonpayable', ''],
+    ['withdrawExcessTokens(address,uint256)', 'nonpayable', '', 'address to, uint256 amount'],
 
     // --- Goman prediction markets (the factory's category table) ------------------------------
     // A category is a uint32 ID plus a table of words for it, one row per language tag (`bytes8`,
@@ -616,20 +628,20 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // tags and the strings as two parallel arrays rather than one list of pairs.
     ['DEFAULT_LANG()', 'view', 'bytes8'],
     ['MAX_CATEGORY_LANGS()', 'view', 'uint256'],
-    ['addCategory(uint32,bytes8[],string[])', 'nonpayable', ''],
+    ['addCategory(uint32,bytes8[],string[])', 'nonpayable', '', 'uint32 categoryId, bytes8[] langs, string[] meanings'],
     ['categoryCount()', 'view', 'uint256'],
     ['categoryIds()', 'view', 'uint32[]'],
-    ['categoryLanguages(uint32)', 'view', 'bytes8[]'],
-    ['categoryMeaning(uint32,bytes8)', 'view', 'string'],
-    ['categoryMeanings(uint32)', 'view', 'bytes8[],string[]'],
-    ['categoryState(uint32)', 'view', 'bool,bool'],
-    ['countByCategory(uint32)', 'view', 'uint256'],
+    ['categoryLanguages(uint32)', 'view', 'bytes8[]', 'uint32 categoryId'],
+    ['categoryMeaning(uint32,bytes8)', 'view', 'string', 'uint32 categoryId, bytes8 lang'],
+    ['categoryMeanings(uint32)', 'view', 'bytes8[],string[]', 'uint32 categoryId'],
+    ['categoryState(uint32)', 'view', 'bool,bool', 'uint32 categoryId'],
+    ['countByCategory(uint32)', 'view', 'uint256', 'uint32 categoryId'],
     ['distributeMarket(uint256,uint256)', 'nonpayable', 'uint256'],
-    ['marketsByCategory(uint32,uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]'],
-    ['setCategoryEnabled(uint32,bool)', 'nonpayable', ''],
-    ['setCategoryMeanings(uint32,bytes8[],string[])', 'nonpayable', ''],
+    ['marketsByCategory(uint32,uint256,uint256)', 'view', '(address,address,string,uint32,uint8,uint64,uint64,uint64,uint32)[]', 'uint32 categoryId, uint256 offset, uint256 limit'],
+    ['setCategoryEnabled(uint32,bool)', 'nonpayable', '', 'uint32 categoryId, bool enabled'],
+    ['setCategoryMeanings(uint32,bytes8[],string[])', 'nonpayable', '', 'uint32 categoryId, bytes8[] langs, string[] meanings'],
     ['setMarketAutoDistribute(uint256,bool)', 'nonpayable', ''],
-    ['sweepUnclaimed(uint256)', 'nonpayable', 'uint256'],
+    ['sweepUnclaimed(uint256)', 'nonpayable', 'uint256', 'uint256 marketId'],
 
     // --- Goman prediction markets (one CPMM market) -------------------------------------------
     // The contract a reader actually lands on from a trade. Outcomes are ERC-1155 ids inside the
@@ -650,11 +662,11 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['CLAIM_WINDOW()', 'view', 'uint64'],
     ['LP_TOKEN_ID()', 'view', 'uint256'],
     ['MAX_OUTCOMES()', 'view', 'uint256'],
-    ['addFunding(uint256)', 'payable', 'uint256'],
+    ['addFunding(uint256)', 'payable', 'uint256', 'uint256 minLpSharesOut'],
     ['autoDistribute()', 'view', 'bool'],
-    ['buy(uint256,uint256,uint256)', 'payable', 'uint256'],
-    ['calcBuy(uint256,uint256)', 'view', 'uint256'],
-    ['calcSell(uint256,uint256)', 'view', 'uint256'],
+    ['buy(uint256,uint256,uint256)', 'payable', 'uint256', 'uint256 outcomeIndex, uint256 minSharesOut, uint256 deadline'],
+    ['calcBuy(uint256,uint256)', 'view', 'uint256', 'uint256 outcomeIndex, uint256 amountIn'],
+    ['calcSell(uint256,uint256)', 'view', 'uint256', 'uint256 outcomeIndex, uint256 returnAmount'],
     // The pool answers this one too: one selector, and both templates cancel the same way.
     ['cancelMarket()', 'nonpayable', ''],
     ['categoryId()', 'view', 'uint32'],
@@ -663,7 +675,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['controller()', 'view', 'address'],
     ['createdAt()', 'view', 'uint64'],
     ['creator()', 'view', 'address'],
-    ['depositOf(address)', 'view', 'uint256'],
+    ['depositOf(address)', 'view', 'uint256', 'address account'],
     ['description()', 'view', 'string'],
     ['distribute(uint256)', 'nonpayable', 'uint256'],
     ['distributionProgress()', 'view', 'uint256,uint256'],
@@ -674,29 +686,29 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['heldFees()', 'view', 'uint256'],
     ['holderCount()', 'view', 'uint256'],
     ['imageURI()', 'view', 'string'],
-    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', ''],
+    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', '', 'address controller, address treasury, (string title, string description, uint32 categoryId, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, string[] outcomeNames) params'],
     ['lockTime()', 'view', 'uint64'],
-    ['mergeSets(uint256)', 'nonpayable', ''],
+    ['mergeSets(uint256)', 'nonpayable', '', 'uint256 amount'],
     ['outcomeCount()', 'view', 'uint256'],
-    ['outcomeName(uint256)', 'view', 'string'],
-    ['pendingPayout(address)', 'view', 'uint256'],
+    ['outcomeName(uint256)', 'view', 'string', 'uint256 outcomeIndex'],
+    ['pendingPayout(address)', 'view', 'uint256', 'address account'],
     ['redeem()', 'nonpayable', 'uint256'],
-    ['removeFunding(uint256)', 'nonpayable', ''],
-    ['resolve(uint256)', 'nonpayable', ''],
+    ['removeFunding(uint256)', 'nonpayable', '', 'uint256 lpShares'],
+    ['resolve(uint256)', 'nonpayable', '', 'uint256 winningOutcome'],
     ['resolveTime()', 'view', 'uint64'],
-    ['sell(uint256,uint256,uint256,uint256)', 'nonpayable', 'uint256'],
+    ['sell(uint256,uint256,uint256,uint256)', 'nonpayable', 'uint256', 'uint256 outcomeIndex, uint256 returnAmount, uint256 maxSharesIn, uint256 deadline'],
     ['setAutoDistribute(bool)', 'nonpayable', ''],
     ['status()', 'view', 'uint8'],
     ['sweepUnclaimed()', 'nonpayable', 'uint256'],
     ['title()', 'view', 'string'],
     ['totalSets()', 'view', 'uint256'],
-    ['totalSupply(uint256)', 'view', 'uint256'],
+    ['totalSupply(uint256)', 'view', 'uint256', 'uint256 id'],
     ['voidMarket()', 'nonpayable', ''],
     ['winningOutcome()', 'view', 'uint256'],
     // Markets stamped by the two older factories above: the templates they were cloned from take
     // the older `MarketParams`, and the first still reads its category back as a string.
-    ['initialize(address,address,(string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', ''],
-    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', ''],
+    ['initialize(address,address,(string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', '', 'address controller, address treasury, (string title, string description, string category, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, uint16 protocolFeeShareBps, string[] outcomeNames) params'],
+    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', '', 'address controller, address treasury, (string title, string description, uint32 categoryId, string imageURI, address creator, uint64 lockTime, uint64 resolveTime, uint16 feeBps, uint16 protocolFeeShareBps, string[] outcomeNames) params'],
     ['category()', 'view', 'string'],
     ['protocolFeeShareBps()', 'view', 'uint16'],
 
@@ -705,25 +717,25 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // `previewPayout` are what a pool answers instead of a price, and `myStake` reads the caller's
     // own - it takes an outcome and not an address, so it is only meaningful through eth_call
     // with a `from`, which is exactly how the explorer issues it.
-    ['bet(uint256)', 'payable', 'uint256'],
+    ['bet(uint256)', 'payable', 'uint256', 'uint256 outcomeIndex'],
     ['claim()', 'nonpayable', 'uint256'],
     ['distributableAmount()', 'view', 'uint256'],
-    ['impliedOdds(uint256)', 'view', 'uint256'],
-    ['myStake(uint256)', 'view', 'uint256'],
+    ['impliedOdds(uint256)', 'view', 'uint256', 'uint256 outcomeIndex'],
+    ['myStake(uint256)', 'view', 'uint256', 'uint256 outcomeIndex'],
     ['participantCount()', 'view', 'uint256'],
-    ['previewPayout(uint256)', 'view', 'uint256'],
-    ['stakeOf(address)', 'view', 'uint256'],
-    ['stakedFor(uint256)', 'view', 'uint256'],
+    ['previewPayout(uint256)', 'view', 'uint256', 'uint256 outcomeIndex'],
+    ['stakeOf(address)', 'view', 'uint256', 'address account'],
+    ['stakedFor(uint256)', 'view', 'uint256', 'uint256 outcomeIndex'],
     ['totalPool()', 'view', 'uint256'],
 
     // --- Goman prediction markets (the fee treasury) ------------------------------------------
     // Where every market's trade fee lands, whole - a market keeps no share of it.
     // `collectedFor` splits the total by the market that paid it, so a reader can see which
     // market funded the balance.
-    ['collectedFor(address)', 'view', 'uint256'],
-    ['depositFee(address)', 'payable', ''],
+    ['collectedFor(address)', 'view', 'uint256', 'address market'],
+    ['depositFee(address)', 'payable', '', 'address market'],
     ['feeRecipient()', 'view', 'address'],
-    ['setFeeRecipient(address)', 'nonpayable', ''],
+    ['setFeeRecipient(address)', 'nonpayable', '', 'address recipient'],
     ['totalCollected()', 'view', 'uint256'],
 
     // --- Nura profile registry ----------------------------------------------------------------
@@ -741,67 +753,67 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['MAX_USERNAME_LENGTH()', 'view', 'uint256'],
     ['MAX_VALUE_LENGTH()', 'view', 'uint256'],
     ['MIN_USERNAME_LENGTH()', 'view', 'uint256'],
-    ['acceptProfile(uint256)', 'nonpayable', ''],
-    ['addImage(uint256,string,string,string)', 'nonpayable', 'uint256'],
-    ['addItem(uint256,string,(string,string,string)[])', 'nonpayable', 'uint256'],
-    ['addSocial(uint256,string,string,string)', 'nonpayable', 'uint256'],
-    ['addWebsite(uint256,string,string)', 'nonpayable', 'uint256'],
-    ['approveExtension(uint256,string,bool)', 'nonpayable', ''],
-    ['cancelTransfer(uint256)', 'nonpayable', ''],
-    ['createProfile(string,string,string,string)', 'nonpayable', 'uint256'],
-    ['deleteProfile(uint256)', 'nonpayable', ''],
-    ['extensionIdOf(address)', 'view', 'bytes32'],
-    ['getExtension(string)', 'view', 'address'],
-    ['getExtensionField(uint256,string,string,string)', 'view', 'string'],
+    ['acceptProfile(uint256)', 'nonpayable', '', 'uint256 profileId'],
+    ['addImage(uint256,string,string,string)', 'nonpayable', 'uint256', 'uint256 profileId, string uri, string category, string alt'],
+    ['addItem(uint256,string,(string,string,string)[])', 'nonpayable', 'uint256', 'uint256 profileId, string kind, (string key, string lang, string value)[] attributes'],
+    ['addSocial(uint256,string,string,string)', 'nonpayable', 'uint256', 'uint256 profileId, string platform, string handle, string url'],
+    ['addWebsite(uint256,string,string)', 'nonpayable', 'uint256', 'uint256 profileId, string url, string title'],
+    ['approveExtension(uint256,string,bool)', 'nonpayable', '', 'uint256 profileId, string extensionId, bool approved'],
+    ['cancelTransfer(uint256)', 'nonpayable', '', 'uint256 profileId'],
+    ['createProfile(string,string,string,string)', 'nonpayable', 'uint256', 'string username, string displayName, string bio, string avatar'],
+    ['deleteProfile(uint256)', 'nonpayable', '', 'uint256 profileId'],
+    ['extensionIdOf(address)', 'view', 'bytes32', 'address extension'],
+    ['getExtension(string)', 'view', 'address', 'string extensionId'],
+    ['getExtensionField(uint256,string,string,string)', 'view', 'string', 'uint256 profileId, string extensionId, string key, string lang'],
     ['getExtensions()', 'view', 'bytes32[],address[]'],
-    ['getField(uint256,string)', 'view', 'string'],
-    ['getItemAttribute(uint256,uint256,string,string)', 'view', 'string'],
-    ['getItemCount(uint256,string)', 'view', 'uint256'],
-    ['getItemIds(uint256,string)', 'view', 'uint256[]'],
-    ['getItemKind(uint256,uint256)', 'view', 'string'],
-    ['getLocalizedField(uint256,string,string)', 'view', 'string'],
-    ['getProfileRecord(uint256)', 'view', '(address,string,uint64,uint64,address,address,uint256)'],
-    ['isAuthorized(uint256,address)', 'view', 'bool'],
-    ['isExtensionApproved(uint256,string)', 'view', 'bool'],
-    ['isOperator(address,address)', 'view', 'bool'],
-    ['isTrustedForwarder(address)', 'view', 'bool'],
-    ['isUsernameAvailable(string)', 'view', 'bool'],
-    ['normalizeUsername(string)', 'pure', 'string'],
-    ['pendingOwnerOf(uint256)', 'view', 'address'],
-    ['profileIdOf(address)', 'view', 'uint256'],
+    ['getField(uint256,string)', 'view', 'string', 'uint256 profileId, string key'],
+    ['getItemAttribute(uint256,uint256,string,string)', 'view', 'string', 'uint256 profileId, uint256 itemId, string key, string lang'],
+    ['getItemCount(uint256,string)', 'view', 'uint256', 'uint256 profileId, string kind'],
+    ['getItemIds(uint256,string)', 'view', 'uint256[]', 'uint256 profileId, string kind'],
+    ['getItemKind(uint256,uint256)', 'view', 'string', 'uint256 profileId, uint256 itemId'],
+    ['getLocalizedField(uint256,string,string)', 'view', 'string', 'uint256 profileId, string key, string lang'],
+    ['getProfileRecord(uint256)', 'view', '(address,string,uint64,uint64,address,address,uint256)', 'uint256 profileId'],
+    ['isAuthorized(uint256,address)', 'view', 'bool', 'uint256 profileId, address account'],
+    ['isExtensionApproved(uint256,string)', 'view', 'bool', 'uint256 profileId, string extensionId'],
+    ['isOperator(address,address)', 'view', 'bool', 'address owner, address operator'],
+    ['isTrustedForwarder(address)', 'view', 'bool', 'address forwarder'],
+    ['isUsernameAvailable(string)', 'view', 'bool', 'string username'],
+    ['normalizeUsername(string)', 'pure', 'string', 'string username'],
+    ['pendingOwnerOf(uint256)', 'view', 'address', 'uint256 profileId'],
+    ['profileIdOf(address)', 'view', 'uint256', 'address owner'],
     ['profilesCreated()', 'view', 'uint256'],
-    ['recoveryAddressOf(uint256)', 'view', 'address'],
-    ['registerExtension(string,address)', 'nonpayable', ''],
-    ['removeExtensionField(uint256,string,string,string)', 'nonpayable', ''],
-    ['removeField(uint256,string,string)', 'nonpayable', ''],
-    ['removeImage(uint256,uint256)', 'nonpayable', ''],
-    ['removeItem(uint256,uint256)', 'nonpayable', ''],
-    ['removeSocial(uint256,uint256)', 'nonpayable', ''],
-    ['removeWebsite(uint256,uint256)', 'nonpayable', ''],
-    ['reserveUsername(string,address)', 'nonpayable', ''],
-    ['resolveField(uint256,string,string)', 'view', 'string'],
-    ['resolveFields(uint256,string[],string)', 'view', 'string[]'],
-    ['resolveItemAttribute(uint256,uint256,string,string)', 'view', 'string'],
-    ['resolveItemAttributes(uint256,uint256,string[],string)', 'view', 'string[]'],
-    ['resolveUsername(string)', 'view', 'uint256,address'],
-    ['setExtensionField(uint256,string,string,string)', 'nonpayable', ''],
-    ['setField(uint256,string,string)', 'nonpayable', ''],
-    ['setFields(uint256,(string,string,string)[])', 'nonpayable', ''],
-    ['setItemAttribute(uint256,uint256,string,string,string)', 'nonpayable', ''],
-    ['setItemAttributes(uint256,uint256,(string,string,string)[])', 'nonpayable', ''],
-    ['setLocalizedField(uint256,string,string,string)', 'nonpayable', ''],
-    ['setOperator(address,bool)', 'nonpayable', ''],
-    ['setRecoveryAddress(uint256,address)', 'nonpayable', ''],
-    ['setUsername(uint256,string)', 'nonpayable', ''],
-    ['transferProfile(uint256,address)', 'nonpayable', ''],
+    ['recoveryAddressOf(uint256)', 'view', 'address', 'uint256 profileId'],
+    ['registerExtension(string,address)', 'nonpayable', '', 'string extensionId, address extension'],
+    ['removeExtensionField(uint256,string,string,string)', 'nonpayable', '', 'uint256 profileId, string extensionId, string key, string lang'],
+    ['removeField(uint256,string,string)', 'nonpayable', '', 'uint256 profileId, string key, string lang'],
+    ['removeImage(uint256,uint256)', 'nonpayable', '', 'uint256 profileId, uint256 imageId'],
+    ['removeItem(uint256,uint256)', 'nonpayable', '', 'uint256 profileId, uint256 itemId'],
+    ['removeSocial(uint256,uint256)', 'nonpayable', '', 'uint256 profileId, uint256 socialId'],
+    ['removeWebsite(uint256,uint256)', 'nonpayable', '', 'uint256 profileId, uint256 websiteId'],
+    ['reserveUsername(string,address)', 'nonpayable', '', 'string username, address claimant'],
+    ['resolveField(uint256,string,string)', 'view', 'string', 'uint256 profileId, string key, string lang'],
+    ['resolveFields(uint256,string[],string)', 'view', 'string[]', 'uint256 profileId, string[] keys, string lang'],
+    ['resolveItemAttribute(uint256,uint256,string,string)', 'view', 'string', 'uint256 profileId, uint256 itemId, string key, string lang'],
+    ['resolveItemAttributes(uint256,uint256,string[],string)', 'view', 'string[]', 'uint256 profileId, uint256 itemId, string[] keys, string lang'],
+    ['resolveUsername(string)', 'view', 'uint256,address', 'string username'],
+    ['setExtensionField(uint256,string,string,string)', 'nonpayable', '', 'uint256 profileId, string key, string lang, string value'],
+    ['setField(uint256,string,string)', 'nonpayable', '', 'uint256 profileId, string key, string value'],
+    ['setFields(uint256,(string,string,string)[])', 'nonpayable', '', 'uint256 profileId, (string key, string lang, string value)[] fields'],
+    ['setItemAttribute(uint256,uint256,string,string,string)', 'nonpayable', '', 'uint256 profileId, uint256 itemId, string key, string lang, string value'],
+    ['setItemAttributes(uint256,uint256,(string,string,string)[])', 'nonpayable', '', 'uint256 profileId, uint256 itemId, (string key, string lang, string value)[] attributes'],
+    ['setLocalizedField(uint256,string,string,string)', 'nonpayable', '', 'uint256 profileId, string key, string lang, string value'],
+    ['setOperator(address,bool)', 'nonpayable', '', 'address operator, bool approved'],
+    ['setRecoveryAddress(uint256,address)', 'nonpayable', '', 'uint256 profileId, address recovery'],
+    ['setUsername(uint256,string)', 'nonpayable', '', 'uint256 profileId, string username'],
+    ['transferProfile(uint256,address)', 'nonpayable', '', 'uint256 profileId, address to'],
     ['trustedForwarder()', 'view', 'address'],
-    ['unregisterExtension(string)', 'nonpayable', ''],
-    ['unreserveUsername(string)', 'nonpayable', ''],
-    ['updateImage(uint256,uint256,string,string,string)', 'nonpayable', ''],
-    ['updateSocial(uint256,uint256,string,string,string)', 'nonpayable', ''],
-    ['updateWebsite(uint256,uint256,string,string)', 'nonpayable', ''],
-    ['usernameOf(uint256)', 'view', 'string'],
-    ['usernameReservation(string)', 'view', 'address,bool'],
+    ['unregisterExtension(string)', 'nonpayable', '', 'string extensionId'],
+    ['unreserveUsername(string)', 'nonpayable', '', 'string username'],
+    ['updateImage(uint256,uint256,string,string,string)', 'nonpayable', '', 'uint256 profileId, uint256 imageId, string uri, string category, string alt'],
+    ['updateSocial(uint256,uint256,string,string,string)', 'nonpayable', '', 'uint256 profileId, uint256 socialId, string platform, string handle, string url'],
+    ['updateWebsite(uint256,uint256,string,string)', 'nonpayable', '', 'uint256 profileId, uint256 websiteId, string url, string title'],
+    ['usernameOf(uint256)', 'view', 'string', 'uint256 profileId'],
+    ['usernameReservation(string)', 'view', 'address,bool', 'string username'],
 
     // --- Nura profile lens (the read-only view) -----------------------------------------------
     // A separate address that reads the registry and assembles whole profiles - the registry
@@ -809,18 +821,18 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // it, and `getFullProfile` returns the profile with its images, socials and websites in ONE
     // call, which is the difference between a profile page and thirty eth_calls.
     ['core()', 'view', 'address'],
-    ['getFullProfile(address,string)', 'view', '((uint256,address,string,uint64,uint64,string,string,string,string,string,string,string),(uint256,string,string,string)[],(uint256,string,string,string)[],(uint256,string,string,string)[])'],
-    ['getFullProfileById(uint256,string)', 'view', '((uint256,address,string,uint64,uint64,string,string,string,string,string,string,string),(uint256,string,string,string)[],(uint256,string,string,string)[],(uint256,string,string,string)[])'],
-    ['getImage(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
-    ['getImages(uint256,string)', 'view', '(uint256,string,string,string)[]'],
-    ['getItems(uint256,string,string,string[],uint256,uint256)', 'view', '(uint256,string[])[],uint256'],
-    ['getProfile(address,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)'],
-    ['getProfileById(uint256,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)'],
-    ['getProfileByUsername(string,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)'],
-    ['getSocial(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
-    ['getSocials(uint256,string)', 'view', '(uint256,string,string,string)[]'],
-    ['getWebsite(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
-    ['getWebsites(uint256,string)', 'view', '(uint256,string,string,string)[]'],
+    ['getFullProfile(address,string)', 'view', '((uint256,address,string,uint64,uint64,string,string,string,string,string,string,string),(uint256,string,string,string)[],(uint256,string,string,string)[],(uint256,string,string,string)[])', 'address owner, string lang'],
+    ['getFullProfileById(uint256,string)', 'view', '((uint256,address,string,uint64,uint64,string,string,string,string,string,string,string),(uint256,string,string,string)[],(uint256,string,string,string)[],(uint256,string,string,string)[])', 'uint256 profileId, string lang'],
+    ['getImage(uint256,uint256,string)', 'view', '(uint256,string,string,string)', 'uint256 profileId, uint256 imageId, string lang'],
+    ['getImages(uint256,string)', 'view', '(uint256,string,string,string)[]', 'uint256 profileId, string lang'],
+    ['getItems(uint256,string,string,string[],uint256,uint256)', 'view', '(uint256,string[])[],uint256', 'uint256 profileId, string kind, string lang, string[] attributeKeys, uint256 offset, uint256 limit'],
+    ['getProfile(address,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)', 'address owner, string lang'],
+    ['getProfileById(uint256,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)', 'uint256 profileId, string lang'],
+    ['getProfileByUsername(string,string)', 'view', '(uint256,address,string,uint64,uint64,string,string,string,string,string,string,string)', 'string username, string lang'],
+    ['getSocial(uint256,uint256,string)', 'view', '(uint256,string,string,string)', 'uint256 profileId, uint256 socialId, string lang'],
+    ['getSocials(uint256,string)', 'view', '(uint256,string,string,string)[]', 'uint256 profileId, string lang'],
+    ['getWebsite(uint256,uint256,string)', 'view', '(uint256,string,string,string)', 'uint256 profileId, uint256 websiteId, string lang'],
+    ['getWebsites(uint256,string)', 'view', '(uint256,string,string,string)[]', 'uint256 profileId, string lang'],
 
     // --- Nura forwarder (ERC-2771 sponsored calls) --------------------------------------------
     // OpenZeppelin's `ERC2771Forwarder`, which is what lets someone else pay the gas for a profile
@@ -828,9 +840,9 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // this address, see `trustedForwarder()` above - reads the signer off the end of the calldata.
     // The request is (from, to, value, gas, deadline, data, signature); `executeBatch` sends a
     // list of them and refunds whatever failed to the address it names.
-    ['execute((address,address,uint256,uint256,uint48,bytes,bytes))', 'payable', ''],
-    ['executeBatch((address,address,uint256,uint256,uint48,bytes,bytes)[],address)', 'payable', ''],
-    ['verify((address,address,uint256,uint256,uint48,bytes,bytes))', 'view', 'bool'],
+    ['execute((address,address,uint256,uint256,uint48,bytes,bytes))', 'payable', '', '(address from, address to, uint256 value, uint256 gas, uint48 deadline, bytes data, bytes signature) request'],
+    ['executeBatch((address,address,uint256,uint256,uint48,bytes,bytes)[],address)', 'payable', '', '(address from, address to, uint256 value, uint256 gas, uint48 deadline, bytes data, bytes signature)[] requests, address refundReceiver'],
+    ['verify((address,address,uint256,uint256,uint48,bytes,bytes))', 'view', 'bool', '(address from, address to, uint256 value, uint256 gas, uint48 deadline, bytes data, bytes signature) request'],
 
     // --- Nura profile extensions (the social verifier) ----------------------------------------
     // An extension contract a profile owner approves, which writes fields the registry will not
@@ -840,13 +852,13 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['EXTENSION_ID()', 'view', 'bytes32'],
     ['VERIFIER_ROLE()', 'view', 'bytes32'],
     ['extensionId()', 'pure', 'bytes32'],
-    ['hashVerifyHandle(uint256,string,string,uint256)', 'view', 'bytes32'],
-    ['nonces(uint256)', 'view', 'uint256'],
+    ['hashVerifyHandle(uint256,string,string,uint256)', 'view', 'bytes32', 'uint256 profileId, string platform, string handle, uint256 deadline'],
+    ['nonces(uint256)', 'view', 'uint256', 'uint256 profileId'],
     ['profileRegistry()', 'view', 'address'],
     ['registry()', 'view', 'address'],
-    ['revokeHandle(uint256,string)', 'nonpayable', ''],
-    ['verifiedHandle(uint256,string)', 'view', 'string'],
-    ['verifyHandle(uint256,string,string,uint256,bytes)', 'nonpayable', ''],
+    ['revokeHandle(uint256,string)', 'nonpayable', '', 'uint256 profileId, string platform'],
+    ['verifiedHandle(uint256,string)', 'view', 'string', 'uint256 profileId, string platform'],
+    ['verifyHandle(uint256,string,string,uint256,bytes)', 'nonpayable', '', 'uint256 profileId, string platform, string handle, uint256 deadline, bytes signature'],
 
     // --- Uniswap V3 callbacks and the interfaces around them ----------------------------------
     // The flash callback completes the set beside the mint and swap ones above. The other three
@@ -854,16 +866,16 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // sends: `onERC721Received` is what makes a contract able to hold a position NFT at all,
     // `isValidSignature` is ERC-1271 contract-wallet approval, and this `permit` is the DAI-style
     // allowed-flag form - a different signature from the ERC-2612 one above, and its own selector.
-    ['isValidSignature(bytes32,bytes)', 'view', 'bytes4'],
-    ['onERC721Received(address,address,uint256,bytes)', 'nonpayable', 'bytes4'],
-    ['permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)', 'nonpayable', ''],
-    ['uniswapV3FlashCallback(uint256,uint256,bytes)', 'nonpayable', ''],
+    ['isValidSignature(bytes32,bytes)', 'view', 'bytes4', 'bytes32 hash, bytes signature'],
+    ['onERC721Received(address,address,uint256,bytes)', 'nonpayable', 'bytes4', 'address operator, address from, uint256 tokenId, bytes data'],
+    ['permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)', 'nonpayable', '', 'address holder, address spender, uint256 nonce, uint256 expiry, bool allowed, uint8 v, bytes32 r, bytes32 s'],
+    ['uniswapV3FlashCallback(uint256,uint256,bytes)', 'nonpayable', '', 'uint256 fee0, uint256 fee1, bytes data'],
 
     // --- Odds and ends every toolchain emits --------------------------------------------------
     // `multicall` is PAYABLE: Uniswap's periphery base declares it so, and the value sent covers
     // whichever of the batched calls wants it. Marked nonpayable it would offer no value field,
     // and a batch that mints a position with native currency could not be sent at all.
-    ['multicall(bytes[])', 'payable', 'bytes[]'],
+    ['multicall(bytes[])', 'payable', 'bytes[]', 'bytes[] data'],
     ['version()', 'view', 'string'],
     ['VERSION()', 'view', 'string']
 ];
@@ -1048,7 +1060,7 @@ function split(signature: string): { name: string; inputs: string[] }
 function indexFunctions(): ReadonlyMap<string, KnownFunction>
 {
     const table = new Map<string, KnownFunction>();
-    for (const [signature, mutability, outputs] of FUNCTIONS)
+    for (const [signature, mutability, outputs, named] of FUNCTIONS)
     {
         const { name, inputs } = split(signature);
         const selector = toFunctionSelector(signature);
@@ -1057,7 +1069,14 @@ function indexFunctions(): ReadonlyMap<string, KnownFunction>
         {
             throw new Error(`signature table: ${ selector } is both '${ clash.signature }' and '${ signature }'`);
         }
-        table.set(selector, { selector, signature, name, inputs, outputs: types(outputs), mutability });
+        const parameters = named === undefined
+            ? inputs.map(parseType)
+            : [...(parseAbiParameters(named) as readonly AbiParameter[])];
+        if (parameters.map(bareType).join(',') !== inputs.join(','))
+        {
+            throw new Error(`signature table: '${ named }' does not describe '${ signature }'`);
+        }
+        table.set(selector, { selector, signature, name, inputs, outputs: types(outputs), mutability, parameters });
     }
     return table;
 }

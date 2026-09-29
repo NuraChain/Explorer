@@ -1,6 +1,6 @@
 import { createResource, Link, useLoader, useParams } from 'azerothjs';
 
-import { client } from '../api.ts';
+import { client, type DecodedCall } from '../api.ts';
 import { formatAmount, formatGwei, formatValue, shortHash } from '../lib/format.ts';
 import type { TransactionData } from '../lib/loaders.ts';
 import { breadcrumbs, pageHead } from '../lib/head.ts';
@@ -60,6 +60,18 @@ export default component TransactionPage()
     // Every description names the chain, and the chain is configuration rather than copy -
     // this explorer runs against whatever node it was pointed at. A neutral word stands in
     // for the one render before the loader's answer is in hand.
+    /**
+     * One row per value: a named struct becomes a row per field, `params.title` beside
+     * `params.feeBps`, so a market's whole `MarketParams` reads as the list it is rather than as
+     * one comma-joined line.
+     */
+    const rows = (args: DecodedCall['args']): Array<{ name: string; type: string; value: string; at: number }> =>
+        args
+            .flatMap((arg) => (arg.fields.length === 0
+                ? [arg]
+                : arg.fields.map((field) => ({ ...field, name: arg.name === '' ? field.name : `${ arg.name }.${ field.name }` }))))
+            .map((row, at) => ({ name: row.name, type: row.type, value: row.value, at }));
+
     const chainName = (): string =>
         (summary === undefined ? locale.t('title.chainFallback') : locale.chainName(summary.chain.name));
 
@@ -201,15 +213,17 @@ export default component TransactionPage()
                             <span class="data text-[13px] text-muted">{ call.selector }</span>
                             <Show when={ call.signature !== '' } fallback={ <span class="text-[14px] text-muted">{ locale.t('contract.unnamed') }</span> }>
                                 <span class="hash min-w-0 flex-1 text-[14px]">
-                                    <span class="font-semibold">{ call.name }</span>(<span class="text-muted">{ call.args.map((arg) => arg.type).join(', ') }</span>)
+                                    <span class="font-semibold">{ call.name }</span>(<span class="text-muted">{ call.args.map((arg) => (arg.name === '' ? arg.type : `${ arg.type } ${ arg.name }`)).join(', ') }</span>)
                                 </span>
                             </Show>
                         </p>
                         <Show when={ call.args.length > 0 }>
                             <dl class="divide-y divide-line border-t border-line">
-                                <For each={ call.args.map((arg, at) => ({ ...arg, at })) } key={ (arg) => String(arg.at) } let={ arg }>
+                                <For each={ rows(call.args) } key={ (arg) => String(arg.at) } let={ arg }>
                                     <div class="flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-baseline sm:gap-x-3">
-                                        <dt class="text-[13px] text-muted sm:w-40 sm:shrink-0"><span class="data">{ arg.type }</span></dt>
+                                        <dt class="text-[13px] text-muted sm:w-48 sm:shrink-0">
+                                            <span class="data"><Show when={ arg.name !== '' }><span class="text-text">{ arg.name }</span> </Show>{ arg.type }</span>
+                                        </dt>
                                         <dd class="min-w-0 text-[14px] sm:flex-1">
                                             {/* Capped on a wrapper, not on the `amount` inside it:
                                                 a `bytes` argument can be kilobytes, and `amount`

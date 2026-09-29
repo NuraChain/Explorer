@@ -1,5 +1,5 @@
 import { EVENT_BY_TOPIC, FUNCTION_BY_SELECTOR, selectorOf, type KnownEvent, type KnownFunction } from './signatures.ts';
-import { decodeReturn } from './values.ts';
+import { decodeArguments, type DecodedArgument } from './values.ts';
 
 // What can be read off a contract's bytecode, with nothing but `eth_getCode`.
 //
@@ -363,6 +363,9 @@ export function analyze(code: string): BytecodeFacts
 export interface DescribedFunction extends KnownFunction
 {
     known: boolean;
+
+    /** Each input's name, '' where the table carries none. */
+    names: string[];
 }
 
 /**
@@ -377,8 +380,8 @@ export function describeFunctions(selectors: readonly string[]): DescribedFuncti
     {
         const known = FUNCTION_BY_SELECTOR.get(selector);
         return known === undefined
-            ? { selector, signature: '', name: '', inputs: [], outputs: [], mutability: 'unknown', known: false }
-            : { ...known, known: true };
+            ? { selector, signature: '', name: '', inputs: [], outputs: [], mutability: 'unknown', parameters: [], known: false, names: [] }
+            : { ...known, known: true, names: known.parameters.map((parameter) => parameter.name ?? '') };
     });
 
     return described.sort((left, right) =>
@@ -401,7 +404,7 @@ export interface DescribedCall
     /** '' when the table does not know the selector, or its arguments do not decode as it says. */
     signature: string;
     name: string;
-    args: Array<{ type: string; value: string }>;
+    args: DecodedArgument[];
     data: string;
 }
 
@@ -421,7 +424,7 @@ export function describeCall(data: string): DescribedCall
         try
         {
             // Counted as well as decoded: an empty tail decodes to NO values rather than throwing.
-            const args = decodeReturn(known.inputs, `0x${ data.slice(10) }`);
+            const args = decodeArguments(known.parameters, `0x${ data.slice(10) }`);
             if (args.length === known.inputs.length)
             {
                 return { selector, signature: known.signature, name: known.name, args, data };

@@ -348,6 +348,55 @@ function parameters(types: readonly string[]): AbiParameter[]
     return types.map(parseType);
 }
 
+/** A parameter's type as a signature spells it - the inverse of {@link parseType}, names dropped. */
+export function bareType(parameter: AbiParameter): string
+{
+    if (!parameter.type.startsWith('tuple') || !('components' in parameter))
+    {
+        return parameter.type;
+    }
+    return `(${ parameter.components.map(bareType).join(',') })${ parameter.type.slice('tuple'.length) }`;
+}
+
+/** One decoded argument. `fields` is a named struct spelled out one level deep; else empty. */
+export interface DecodedArgument
+{
+    name: string;
+    type: string;
+    value: string;
+    fields: Array<{ name: string; type: string; value: string }>;
+}
+
+/**
+ * Calldata arguments, by the parameters the table describes them with - names included.
+ *
+ * Only a single struct whose every field is named is spelled out. A list of structs stays one
+ * line of text, and so does a struct with a nameless field: its values could only be matched to
+ * positions by the reader, which is what the flat line already asks of them.
+ */
+export function decodeArguments(declared: readonly AbiParameter[], data: string): DecodedArgument[]
+{
+    const decoded = decodeAbiParameters(declared, data as `0x${ string }`);
+    return declared.map((parameter, at) =>
+    {
+        const value = decoded[at];
+        const components = parameter.type === 'tuple' && 'components' in parameter ? parameter.components : [];
+        const named = components.length > 0 && components.every((component) => (component.name ?? '') !== '');
+        return {
+            name: parameter.name ?? '',
+            type: bareType(parameter),
+            value: stringify(value),
+            fields: named
+                ? components.map((component, index) => ({
+                    name: component.name ?? '',
+                    type: bareType(component),
+                    value: stringify(Array.isArray(value) ? value[index] : (value as Record<string, unknown>)[component.name ?? ''])
+                }))
+                : []
+        };
+    });
+}
+
 /**
  * The calldata for one call: the four selector bytes, then the arguments packed behind them.
  *
