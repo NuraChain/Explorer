@@ -80,7 +80,14 @@ export default component ProposalPage()
      * asking again. The keyword's `with { }` clause accepts only `source` and `name` - the
      * runtime option exists and is documented, the keyword just cannot reach it - so this one
      * declaration is written out longhand. See framework-bugs.md #21.
+     *
+     * The options carry the `initialValue` KEY only when there is a seed. The kit reads the key,
+     * not the value: on a click-through the loader has not settled when this resource is built,
+     * so an unconditional `initialValue: undefined` was consumed as THE ANSWER, the first fetch
+     * never started, and nothing re-armed it - the page rendered nothing until a refresh. A
+     * direct load loses nothing: its seed is in hand before this line runs.
      */
+    const seed = loaded.data()?.detail;
     const detail = createResource(
         () => (loaded.error() === null && params()['id'] !== undefined ? `${ params()['id'] }|${ page }` : false),
         (key: string) =>
@@ -88,7 +95,7 @@ export default component ProposalPage()
             const [id = '', at = '1'] = key.split('|');
             return client.governance.one({ params: { id }, query: { page: Number(at), limit: 25 } });
         },
-        { initialValue: loaded.data()?.detail, name: 'detail' });
+        seed === undefined ? { name: 'detail' } : { initialValue: seed, name: 'detail' });
 
     derived shown = detail.data() ?? NO_DETAIL;
     derived proposal = shown.proposal;

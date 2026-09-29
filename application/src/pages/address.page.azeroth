@@ -82,11 +82,19 @@ export default component AddressPage()
      * asking again. The keyword's `with { }` clause accepts only `source` and `name` - the
      * runtime option exists and is documented, the keyword just cannot reach it - so this one
      * declaration is written out longhand. See framework-bugs.md #21.
+     *
+     * The options carry the `initialValue` KEY only when there is a seed. The kit reads the key,
+     * not the value: on a click-through from another account the loader has not settled when
+     * this resource is built, so an unconditional `initialValue: undefined` was consumed as THE
+     * ANSWER, the refetch never started, and the balance grid silently vanished - the page kept
+     * the identity header and the lists while showing no figures at all. A direct load loses
+     * nothing: its seed is in hand before this line runs.
      */
+    const seed = loaded.data()?.account;
     const account = createResource(
         () => (address === '' ? false : address),
         (value: string) => client.address.summary({ params: { address: value } }),
-        { initialValue: loaded.data()?.account, name: 'account' });
+        seed === undefined ? { name: 'account' } : { initialValue: seed, name: 'account' });
     resource txs = (key: string) =>
     {
         const [value = '', at = '1', way = 'all'] = key.split('|');
