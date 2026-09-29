@@ -37,12 +37,18 @@ const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
 // visitor who arrived from a shared link cannot answer from the page they landed on. It reads
 // nothing from the chain: the header already carries the live state, and a second copy down here
 // only added a request per page.
+//
+// A RAISED band (`bg-raised`) rather than bare void: a footer that only draws a line across the
+// page reads as the page trailing off, while a surface the eye can see as a floor closes the
+// document the way the header opens it. The Explore and Community columns sit on `panel` tiles so
+// the three columns read as three objects on one floor instead of text floating in the dark; on a
+// phone the grid is one column and the tiles stack in reading order - brand, sections, community.
 export default component SiteFooter()
 {
     const locale = useLocale();
 
-    <footer class="mt-12 border-t border-line">
-        <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-3 sm:px-6">
+    <footer class="mt-12 border-t border-line bg-raised">
+        <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 sm:py-12 lg:grid-cols-[1.2fr_1fr_1fr]">
             <div>
                 <span class="flex items-center gap-2">
                     <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
@@ -50,27 +56,45 @@ export default component SiteFooter()
                     </span>
                     <BrandMark class="text-[15px]" />
                 </span>
-                <p class="mt-2 max-w-xs text-[13px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
-                <p class="mt-1 text-[12px] text-muted">
+                <p class="mt-2.5 max-w-xs text-[13px] leading-relaxed text-muted">{ locale.t('footer.tagline') }</p>
+
+                {/* Icons alone: five named rows repeated what a glyph already says and doubled
+                    the column the two navs own. Each control carries its name in `aria-label`,
+                    and the outlined muted box is the overlay-close recipe the rest of the app
+                    uses - hover lifts the border to the accent before the glyph does. */}
+                <ul class="mt-4 flex flex-wrap items-center gap-2">
+                    <For each={ SOCIALS } key={ (link) => link.name } let={ link }>
+                        <li>
+                            <a
+                                class="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-muted no-underline transition-colors duration-150 hover:border-nur hover:text-nur"
+                                href={ link.href }
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={ link.name }
+                            >
+                                <Icon name={ link.icon } size={ 18 } />
+                            </a>
+                        </li>
+                    </For>
+                </ul>
+
+                <p class="mt-4 text-[12px] text-faint">
                     { locale.t('footer.version') }{ ' ' }<span class="data">{ APP_VERSION }</span>
                 </p>
             </div>
 
-            <nav class="text-center" aria-label={ locale.t('footer.explore') }>
-                <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
-                {/* Two columns, like the Community list: six links down a single one left this
-                    column taller than the two beside it, and paired they end level. */}
-                <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
+            {/* `panel` on the nav itself: the heading and its list are one object, and a tile
+                keeps them from reading as a loose list floating beside the brand column. */}
+            <nav class="panel self-start p-4 sm:p-5" aria-label={ locale.t('footer.explore') }>
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
+                <ul class="mt-3 flex flex-col gap-2.5 text-[14px]">
                     <For each={ SECTIONS } key={ (section) => section.to } let={ section }>
                         <li>
-                            {/* `w-fit` keeps the hover target on the words, so centring takes an
-                                explicit `mx-auto` - the column's `text-center` cannot move a
-                                block-level flex row. */}
                             <Link
-                                class="mx-auto flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
+                                class="flex w-fit items-center gap-2.5 text-muted no-underline transition-colors duration-150 hover:text-text"
                                 to={ section.to }
                             >
-                                <Icon name={ section.icon } size={ 16 } />
+                                <Icon name={ section.icon } size={ 15 } class="text-faint" />
                                 { locale.t(section.key) }
                             </Link>
                         </li>
@@ -78,23 +102,22 @@ export default component SiteFooter()
                 </ul>
             </nav>
 
-            {/* Named in text, not by logo alone: the icon set carries no brand marks, and a
-                generic glyph beside a name still reads correctly in either direction. */}
-            <nav class="text-center" aria-label={ locale.t('footer.community') }>
-                <h2 class="text-[13px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
-                <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[14px]">
+            {/* Named in text beside the glyph, not by logo alone: the icon set carries no brand
+                marks, and a generic glyph plus a name reads correctly in either direction - the
+                socials themselves went to icon buttons, where the name is the label and one row
+                of five stays one row on a phone. */}
+            <nav class="panel self-start p-4 sm:p-5" aria-label={ locale.t('footer.community') }>
+                <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
+                <ul class="mt-3 flex flex-col gap-2.5 text-[14px]">
                     <For each={ SOCIALS } key={ (link) => link.name } let={ link }>
                         <li>
-                            {/* `w-fit` keeps the hover target on the words, so centring takes an
-                                explicit `mx-auto` - the column's `text-center` cannot move a
-                                block-level flex row. */}
                             <a
-                                class="mx-auto flex w-fit items-center gap-2 text-muted no-underline transition-colors duration-150 hover:text-text"
+                                class="flex w-fit items-center gap-2.5 text-muted no-underline transition-colors duration-150 hover:text-text"
                                 href={ link.href }
                                 target="_blank"
                                 rel="noreferrer"
                             >
-                                <Icon name={ link.icon } size={ 18 } />
+                                <Icon name={ link.icon } size={ 16 } class="text-faint" />
                                 { link.name }
                             </a>
                         </li>
@@ -104,7 +127,7 @@ export default component SiteFooter()
         </div>
 
         <div class="border-t border-line">
-            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-[13px] text-faint sm:px-6">
+            <div class="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-4 text-[13px] text-faint sm:flex-row sm:items-center sm:justify-between sm:gap-x-6 sm:px-6">
                 <p>{ locale.t('footer.note') }</p>
                 <p>
                     {/* Explicit: a literal text line before an element line collapses to a single
