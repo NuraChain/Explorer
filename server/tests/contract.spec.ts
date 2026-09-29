@@ -343,6 +343,18 @@ describe('describeCall: calldata read back through the table', () =>
         expect(describeCall(data).args.map((arg) => arg.value.toLowerCase())).toEqual([RECIPIENT, '7', 'anura, 5000']);
     });
 
+    it('decodes the createMarket an OLDER live factory still answers', () =>
+    {
+        // 0x356c31e1: the MarketParams before category ids, from contracts@8672590. The factory at
+        // 0x33fe315c... is that build, and its calls stayed unreadable until the table knew it.
+        const signature = 'createMarket((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))';
+        const data = calldata(signature, [`["Will it rain?", "", "weather", "", "${ RECIPIENT }", "10", "20", "100", "0", ["yes", "no"]]`]);
+        const call = describeCall(data);
+        expect(call).toMatchObject({ selector: '0x356c31e1', name: 'createMarket' });
+        expect(call.args).toHaveLength(1);
+        expect(call.args[0]!.value).toContain('Will it rain?, , weather');
+    });
+
     it('reports a selector the table does not know as unknown, with the bytes intact', () =>
     {
         expect(describeCall('0xdeadbeef0001')).toEqual({ selector: '0xdeadbeef', signature: '', name: '', args: [], data: '0xdeadbeef0001' });

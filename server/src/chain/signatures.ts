@@ -489,8 +489,8 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     //
     // `category` is a uint32 ID, not the label: the factory keeps the words in its own table, one
     // per language (`categoryMeaning(uint32,bytes8)`), so a market carries the id and a reader is
-    // shown whichever language they asked for. A row that spelled the category as a string is an
-    // OLDER factory than the one deployed here.
+    // shown whichever language they asked for. A string category is an OLDER factory - and two
+    // older factories are still live, which is what the last block of this section is for.
     ['marketCount()', 'view', 'uint256'],
     ['marketImplementation()', 'view', 'address'],
     ['poolImplementation()', 'view', 'address'],
@@ -528,6 +528,20 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     // A market caches the treasury it was stamped with; this pushes the factory's current one on
     // to a market already deployed, which is why it takes an id and not an address.
     ['repointTreasury(uint256)', 'nonpayable', ''],
+    ['cancelMarket(uint256)', 'nonpayable', ''],
+    // Earlier releases this chain still runs. 0x33fe315c... is the factory from before category
+    // ids (contracts@8672590: a string category, and a protocol fee share beside the trade fee);
+    // 0xf0af7cb9... came after the ids but still carried the share (@185c433). `closeMarket`,
+    // `voidMarket` and the pause pair above are from those releases too. A deployed contract
+    // never changes shape, so an entry here stays for as long as a contract that answers it does
+    // - however far the source has moved on.
+    ['createMarket((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
+    ['createMarket2((string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
+    ['createMarket((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', 'uint256,address'],
+    ['createMarket2((string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'nonpayable', 'uint256,address'],
+    ['setDefaultFees(uint16,uint16)', 'nonpayable', ''],
+    ['defaultProtocolFeeShareBps()', 'view', 'uint16'],
+    ['BPS()', 'view', 'uint16'],
 
     // --- Nura bridge tokens -------------------------------------------------------------------
     // The three assets bridged in from other chains - BNB, USDT and the bridge token itself.
@@ -641,12 +655,15 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['buy(uint256,uint256,uint256)', 'payable', 'uint256'],
     ['calcBuy(uint256,uint256)', 'view', 'uint256'],
     ['calcSell(uint256,uint256)', 'view', 'uint256'],
+    // The pool answers this one too: one selector, and both templates cancel the same way.
+    ['cancelMarket()', 'nonpayable', ''],
     ['categoryId()', 'view', 'uint32'],
     ['claimDeadline()', 'view', 'uint64'],
     ['close()', 'nonpayable', ''],
     ['controller()', 'view', 'address'],
     ['createdAt()', 'view', 'uint64'],
     ['creator()', 'view', 'address'],
+    ['depositOf(address)', 'view', 'uint256'],
     ['description()', 'view', 'string'],
     ['distribute(uint256)', 'nonpayable', 'uint256'],
     ['distributionProgress()', 'view', 'uint256,uint256'],
@@ -654,6 +671,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['exists(uint256)', 'view', 'bool'],
     ['feeBps()', 'view', 'uint16'],
     ['getPrices()', 'view', 'uint256[]'],
+    ['heldFees()', 'view', 'uint256'],
     ['holderCount()', 'view', 'uint256'],
     ['imageURI()', 'view', 'string'],
     ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,string[]))', 'payable', ''],
@@ -675,6 +693,12 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['totalSupply(uint256)', 'view', 'uint256'],
     ['voidMarket()', 'nonpayable', ''],
     ['winningOutcome()', 'view', 'uint256'],
+    // Markets stamped by the two older factories above: the templates they were cloned from take
+    // the older `MarketParams`, and the first still reads its category back as a string.
+    ['initialize(address,address,(string,string,string,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', ''],
+    ['initialize(address,address,(string,string,uint32,string,address,uint64,uint64,uint16,uint16,string[]))', 'payable', ''],
+    ['category()', 'view', 'string'],
+    ['protocolFeeShareBps()', 'view', 'uint16'],
 
     // --- Goman prediction markets (the parimutuel pool) ---------------------------------------
     // The factory's other template: one stake per outcome, no curve and no LP. `impliedOdds` and
@@ -688,6 +712,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['myStake(uint256)', 'view', 'uint256'],
     ['participantCount()', 'view', 'uint256'],
     ['previewPayout(uint256)', 'view', 'uint256'],
+    ['stakeOf(address)', 'view', 'uint256'],
     ['stakedFor(uint256)', 'view', 'uint256'],
     ['totalPool()', 'view', 'uint256'],
 
@@ -739,6 +764,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['isAuthorized(uint256,address)', 'view', 'bool'],
     ['isExtensionApproved(uint256,string)', 'view', 'bool'],
     ['isOperator(address,address)', 'view', 'bool'],
+    ['isTrustedForwarder(address)', 'view', 'bool'],
     ['isUsernameAvailable(string)', 'view', 'bool'],
     ['normalizeUsername(string)', 'pure', 'string'],
     ['pendingOwnerOf(uint256)', 'view', 'address'],
@@ -768,6 +794,7 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['setRecoveryAddress(uint256,address)', 'nonpayable', ''],
     ['setUsername(uint256,string)', 'nonpayable', ''],
     ['transferProfile(uint256,address)', 'nonpayable', ''],
+    ['trustedForwarder()', 'view', 'address'],
     ['unregisterExtension(string)', 'nonpayable', ''],
     ['unreserveUsername(string)', 'nonpayable', ''],
     ['updateImage(uint256,uint256,string,string,string)', 'nonpayable', ''],
@@ -794,6 +821,16 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string]> = [
     ['getSocials(uint256,string)', 'view', '(uint256,string,string,string)[]'],
     ['getWebsite(uint256,uint256,string)', 'view', '(uint256,string,string,string)'],
     ['getWebsites(uint256,string)', 'view', '(uint256,string,string,string)[]'],
+
+    // --- Nura forwarder (ERC-2771 sponsored calls) --------------------------------------------
+    // OpenZeppelin's `ERC2771Forwarder`, which is what lets someone else pay the gas for a profile
+    // write: the owner signs a request, a relayer sends it here, and the registry - which trusts
+    // this address, see `trustedForwarder()` above - reads the signer off the end of the calldata.
+    // The request is (from, to, value, gas, deadline, data, signature); `executeBatch` sends a
+    // list of them and refunds whatever failed to the address it names.
+    ['execute((address,address,uint256,uint256,uint48,bytes,bytes))', 'payable', ''],
+    ['executeBatch((address,address,uint256,uint256,uint48,bytes,bytes)[],address)', 'payable', ''],
+    ['verify((address,address,uint256,uint256,uint48,bytes,bytes))', 'view', 'bool'],
 
     // --- Nura profile extensions (the social verifier) ----------------------------------------
     // An extension contract a profile owner approves, which writes fields the registry will not
@@ -911,6 +948,7 @@ const EVENTS: readonly string[] = [
     'FeesUpdated(uint16)',
     'LiquidityAdded(address,address,uint256,uint256)',
     'LiquidityRemoved(address,address,uint256)',
+    'MarketCancelled(address)',
     'MarketClosed(address)',
     'MarketCreated(uint256,address,address,uint32,uint256,uint256)',
     'MarketPaused(address)',
@@ -930,6 +968,7 @@ const EVENTS: readonly string[] = [
     // or a field key arrives as bytes32, because an indexed string is stored as its hash and the
     // original is not in the log at all; the unhashed value is on the contract, which is what
     // `usernameOf` and `getField` are for.
+    'ExecutedForwardRequest(address,uint256,bool)',
     'ExtensionAdded(bytes32,address)',
     'ExtensionApprovalSet(uint256,bytes32,bool)',
     'ExtensionFieldRemoved(uint256,bytes32,bytes32,bytes32)',
