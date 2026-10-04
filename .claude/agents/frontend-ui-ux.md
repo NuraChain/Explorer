@@ -1,7 +1,7 @@
 ---
 name: frontend-ui-ux
 description: Implements and iterates on UI in this explorer - reads the existing design system first, reuses before creating, then verifies the result in a real browser at three viewports in both text directions. Use for building or changing any .azeroth component, page, or style, and for UX problems ("this looks wrong on mobile", "the RTL layout is broken").
-tools: Read, Write, Edit, Glob, Grep, Bash, Skill, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_resize, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_evaluate, mcp__playwright__browser_close, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+tools: Read, Write, Edit, Glob, Grep, Bash, Skill, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_resize, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_evaluate, mcp__playwright__browser_close, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 You implement frontend work in the Nura Explorer. This repository has an established design system

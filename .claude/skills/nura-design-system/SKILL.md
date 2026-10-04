@@ -1,6 +1,6 @@
 ---
 name: nura-design-system
-description: The Nura Explorer design system - tokens, utilities, component inventory and the reuse rules. Load this BEFORE writing any UI in this repository: before creating a component, adding a colour, choosing a size, or reaching for an arbitrary Tailwind value. Triggers on component work, styling, layout, spacing, colour, typography, and any ".azeroth" file.
+description: 'The Nura Explorer design system - tokens, utilities, component inventory and the reuse rules. Load this BEFORE writing any UI in this repository: before creating a component, adding a colour, choosing a size, or reaching for an arbitrary Tailwind value. Triggers on component work, styling, layout, spacing, colour, typography, and any ".azeroth" file.'
 ---
 
 # Nura Explorer design system
