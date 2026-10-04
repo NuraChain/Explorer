@@ -41,14 +41,20 @@ const SOCIALS: Array<{ name: string; href: string; icon: IconName }> = [
 // A RAISED band (`bg-raised`) rather than bare void: a footer that only draws a line across the
 // page reads as the page trailing off, while a surface the eye can see as a floor closes the
 // document the way the header opens it. The Explore and Community columns sit on `panel` tiles so
-// the three columns read as three objects on one floor instead of text floating in the dark; on a
-// phone the grid is one column and the tiles stack in reading order - brand, sections, community.
+// the columns read as objects on one floor instead of text floating in the dark; on a phone the
+// grid is one column and the tiles stack in reading order - brand, sections, community.
+//
+// From `lg:` the row is two objects, not three. The Community tile names the same five links the
+// icon row beside it already carries, so it is hidden there and Explore takes its width as three
+// columns of two. That tile STRETCHES to the brand column rather than sizing to its list: the
+// tagline wraps to a different height in every language, and two objects on one floor have to end
+// on one edge in all ten.
 export default component SiteFooter()
 {
     const locale = useLocale();
 
     <footer class="mt-12 border-t border-line bg-raised">
-        <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 sm:py-12 lg:grid-cols-[1.2fr_1fr_1fr]">
+        <div class="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 sm:py-12 lg:grid-cols-[1.2fr_2fr]">
             <div>
                 <span class="flex items-center gap-2">
                     <span class="flex h-6 w-6 items-center justify-center rounded-md bg-nur text-void">
@@ -78,16 +84,21 @@ export default component SiteFooter()
                     </For>
                 </ul>
 
-                <p class="mt-4 text-[12px] text-faint">
+                {/* Said twice, shown once: this column and the baseline bar are separate
+                    containers either side of a full-width rule, so no layout can carry one node
+                    from here to there. From `lg:` the bar's copy takes over. */}
+                <p class="mt-4 text-[12px] text-faint lg:hidden">
                     { locale.t('footer.version') }{ ' ' }<span class="data">{ APP_VERSION }</span>
                 </p>
             </div>
 
             {/* `panel` on the nav itself: the heading and its list are one object, and a tile
-                keeps them from reading as a loose list floating beside the brand column. */}
-            <nav class="panel self-start p-4 sm:p-5" aria-label={ locale.t('footer.explore') }>
+                keeps them from reading as a loose list floating beside the brand column.
+                `auto-rows-fr`, not a row count: the stretched tile is taller than its list, and
+                equal tracks spread that slack between the rows however many links there are. */}
+            <nav class="panel self-start p-4 sm:p-5 lg:flex lg:flex-col lg:self-stretch" aria-label={ locale.t('footer.explore') }>
                 <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.explore') }</h2>
-                <ul class="mt-3 flex flex-col gap-2.5 text-[14px]">
+                <ul class="mt-3 flex flex-col gap-2.5 text-[14px] lg:grid lg:flex-1 lg:auto-rows-fr lg:grid-cols-3 lg:items-center lg:gap-x-6">
                     <For each={ SECTIONS } key={ (section) => section.to } let={ section }>
                         <li>
                             <Link
@@ -106,7 +117,7 @@ export default component SiteFooter()
                 marks, and a generic glyph plus a name reads correctly in either direction - the
                 socials themselves went to icon buttons, where the name is the label and one row
                 of five stays one row on a phone. */}
-            <nav class="panel self-start p-4 sm:p-5" aria-label={ locale.t('footer.community') }>
+            <nav class="panel self-start p-4 sm:p-5 lg:hidden" aria-label={ locale.t('footer.community') }>
                 <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-faint">{ locale.t('footer.community') }</h2>
                 <ul class="mt-3 flex flex-col gap-2.5 text-[14px]">
                     <For each={ SOCIALS } key={ (link) => link.name } let={ link }>
@@ -128,7 +139,12 @@ export default component SiteFooter()
 
         <div class="border-t border-line">
             <div class="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-4 text-[13px] text-faint sm:flex-row sm:items-center sm:justify-between sm:gap-x-6 sm:px-6">
-                <p>{ locale.t('footer.note') }</p>
+                {/* `me-auto` outranks the row's `justify-between`: the note keeps its own edge and
+                    the two facts about the build sit together at the far one. */}
+                <p class="lg:me-auto">{ locale.t('footer.note') }</p>
+                <p class="hidden lg:block">
+                    { locale.t('footer.version') }{ ' ' }<span class="data">{ APP_VERSION }</span>
+                </p>
                 <p>
                     {/* Explicit: a literal text line before an element line collapses to a single
                         space, but an expression container does not, so the words would run together. */}
