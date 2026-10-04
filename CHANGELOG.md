@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.6.2
+
+### Features
+
+- **The transaction page decodes what a contract call sent** - the function its calldata named and
+  the arguments it passed, read back through the signature table, with the raw calldata beside
+  them. The index keeps only the calldata's size, so this one section asks the node, bounded and
+  never thrown: a node that is slow or down costs the reader the section, not the page. A selector
+  the table knows whose bytes do not decode as its signature is reported unknown rather than
+  named, because a name the arguments cannot back is a guess
+- **Each argument is named from the Nura contracts' own ABIs.** A selector carries names only where
+  every contract that declares it spells them the same way - `transfer` is `to` in one codebase
+  and `recipient` in the next, and naming a reader's argument after either would be a guess. A
+  named struct is spelled out one field per row, so a market's `MarketParams` reads as the list it
+  is rather than as one comma-joined line
+- **The signature table matches what is deployed**, not only what the source says today. The two
+  older market factories this chain still runs keep their entries, and the ERC-2771 forwarder
+  that sponsors profile writes is in it
+- **The footer closes the page on a raised band**, and from 1024px up it is two objects rather
+  than three. The Community tile repeated the five links the icon row beside it already carries,
+  so it is hidden there; Explore takes the width as three columns of two and stretches to the
+  brand column, so both end on one edge in all ten languages; the version joins the note on the
+  bottom bar
+
+### Fixes
+
+- **A click-through no longer lands on an empty page.** The address, block, proposal and
+  transaction pages built their resource with `initialValue: undefined` whenever the loader had
+  not settled, and the kit reads the key, not the value - so it took that as the answer and never
+  fetched. An account lost its balance grid and the others drew nothing until a refresh. The key
+  is passed only when there is a seed
+
 ## 1.6.1
 
 ### Fixes
