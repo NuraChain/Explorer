@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.6.3
+
+### Fixes
+
+- **The design-system skill is offered by its own description again.** The description carried an
+  unquoted `: `, which YAML takes for another key, so the header failed to parse and the skill was
+  listed under its first heading - with nothing to say when it should be loaded. The value is
+  quoted
+- **The UI agent can read library documentation again.** It named a Context7 tool the server has
+  since renamed, so it could resolve a library and then had nothing to ask it with
+
+### Documentation
+
+- The visual-QA skill says what the dev session and a production build share, and where they part
+
 ## 1.6.2
 
 ### Features
