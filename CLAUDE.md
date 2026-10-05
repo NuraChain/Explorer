@@ -35,11 +35,11 @@ thing it flags, with the reason written above it:
 Two things went with ESLint, and neither has a replacement yet:
 
 - **`.azeroth` files are no longer linted.** oxlint cannot parse the single-file component format,
-  so the 44 components are typechecked and nothing more - the reactivity rules that came with
+  so the components are typechecked and nothing more - the reactivity rules that came with
   `@azerothjs/eslint-plugin` are gone. Review UI code by reading it.
 - **The house STYLE is unenforced.** oxlint deliberately implements no formatting rules, and oxfmt
-  is Prettier-shaped: it has no brace-style option, so `npm run format` would pull all 78 source
-  files off Allman braces onto K&R. It is installed and configured (`.oxfmtrc.json` carries the
+  is Prettier-shaped: it has no brace-style option, so `npm run format` would pull every source
+  file off Allman braces onto K&R. It is installed and configured (`.oxfmtrc.json` carries the
   4-space indent, single quotes, no trailing comma, 110 columns) but it has never been run against
   this repository. Do not run it without deciding to change the house style first.
 
@@ -61,22 +61,6 @@ no call-order rule.
 A `<Show>` never re-reads the value its `when` just checked. `<Show when={ x.data() } let={ shown }>`
 and read `shown`; `x.data()!` inside the branch is a second, independent read that can observe a
 null while the branch is still mounted, and the compiler reports it.
-
-```
-application/src/
-  components/ui/        primitives: badge button empty-state input pagination skeleton toasts tooltip
-  components/chain/     chain-aware: hash-link flow-ledger contract-panel contract-call cadence-strip
-                        wallet-connect wallet-picker add-chain-button price-ticker vote-tally
-                        proposal-actions
-  components/layout/    brand-mark search-bar nav-drawer site-footer theme-switch language-switch
-  pages/                one component per route
-  stores/               locale (10 languages) · theme · toasts · wallet (EIP-6963 + EIP-1193)
-  lib/loaders.ts        what each page fetches, run where the page is rendered
-  lib/head.ts           the one `pageHead()` every page declares its <head> through
-  lib/format.ts         all amount arithmetic — uint256 through bigint, never a double
-  styles/tokens.css     every colour, font and motion value
-  styles/base.css       element rules and the @utility layer
-```
 
 `server/` owns the wire shape. A new chain field starts in `server/src/schemas.ts`; the browser's
 client type is inferred from that declaration, so it is decided in exactly one place.
@@ -157,13 +141,8 @@ Conventions the codebase already holds: overlay close buttons are the outlined m
 ## Responsive rules
 
 Mobile-first, and effectively **one breakpoint**: `sm:` carries ~45 usages, `lg:` 3. Do not add
-`md:`/`xl:` layers without a real need. Target viewports for review:
-
-```
-Desktop 1440 × 900     Tablet 1024 × 768     Mobile 390 × 844
-```
-
-Below `sm:` the header collapses into the nav drawer — that is where mobile bugs surface.
+`md:`/`xl:` layers without a real need. Below `sm:` the header collapses into the nav drawer — that
+is where mobile bugs surface.
 
 ## RTL/LTR rules
 
@@ -202,15 +181,11 @@ colour-only (the selected language carries a tick as well as `text-nur`).
 ## Playwright / visual QA
 
 Playwright reaches the app through the **Playwright MCP** (user scope). There is no in-repo
-Playwright config and none is needed. Scratch output lands in `.playwright-mcp/`, which is ignored.
+Playwright config and none is needed.
 
-The loop, for every significant UI change: build/serve → three viewports → both directions →
-inspect → fix → re-check the same cell. Detail: `.claude/skills/visual-qa/`.
-
-**Walk a PRODUCTION build, not the dev session.** They now share one route table, one renderer and
-one origin, but they are not the same: the dev session ignores the page cache and renders static
-pages live, and it registers `/_image` by hand where production mounts it over the built client.
-`npm run build && npm start --workspace server` is what a reader gets.
+Every significant UI change runs the loop in `.claude/skills/visual-qa/` before it is done.
+**Walk a PRODUCTION build, not the dev session** — `npm run build && npm start --workspace server`
+is what a reader gets.
 
 ## Testing workflow
 
@@ -232,15 +207,8 @@ reduced-motion readers get the result without the travel. The server side alread
 node reads (`server/src/chain/cache.ts`) — do not add a second caching layer in the browser without
 a measurement showing one is needed.
 
-## Agents and skills
-
-`.claude/agents/frontend-ui-ux.md` implements UI and verifies it in a browser.
-`.claude/agents/frontend-reviewer.md` reviews without editing.
-`.claude/skills/` holds `nura-design-system`, `rtl-bidi-ui` and `visual-qa`.
+## Plugins
 
 Installed plugins: `frontend-design` (Anthropic) for aesthetic direction on greenfield work, and
 `modern-web-guidance` (Google Chrome) for current platform practice. **Where either disagrees with
 this repository's settled visual language, this repository wins.**
-
-MCP servers: Context7 (current library docs — prefer it over memory), Filesystem (scoped to this
-project), Playwright (browser QA).
