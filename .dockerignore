@@ -1,0 +1,27 @@
+# The image installs and builds everything itself. A checkout's node_modules carries THIS
+# machine's native bindings (rolldown, lightningcss, tailwind's oxide), and a stale dist would be
+# shipped instead of the one the build stage makes.
+**/node_modules
+**/dist
+**/dist-server
+**/.azeroth
+**/*.tsbuildinfo
+**/coverage
+
+# Configuration and state belong to the deployment, never to the image: .env is read at RUN time
+# (env_file / --env-file), and the index lives on a volume.
+**/.env
+**/*.local
+**/.data
+**/logs
+
+.git
+.github
+.claude
+.playwright-mcp
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+Dockerfile
+.dockerignore
