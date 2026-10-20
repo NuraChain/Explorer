@@ -32,55 +32,55 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
         <div class="flex min-h-dvh flex-col bg-void">
             <header class="sticky top-0 z-20 border-b border-line bg-void/90 backdrop-blur">
                 {/* Five links and no more: this row carries a brand, the sections, a search, a
-                    language and a theme inside a 1024px column, and the longest vocabulary in the
-                    catalog has to fit it too. The fifth is Staking rather than Governance because
-                    staking is the page a reader returns to - a delegation is watched, where a
-                    proposal is read once and voted on. Governance is in the footer. */}
-                <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:gap-x-4 sm:px-6 sm:py-3">
-                    <Link to="/" class="flex shrink-0 items-center gap-2 no-underline">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-md bg-nur text-void">
-                            <Icon name="layers" size={ 17 } />
+                    language and a theme. The 1536px page column gives the row the room its old
+                    1024px column never had, so the search - the one elastic thing here - can
+                    finally take the width a query wants, and the longest vocabulary in the
+                    catalog still fits with air to spare. The fifth link is Staking rather than
+                    Governance because staking is the page a reader returns to - a delegation is
+                    watched, where a proposal is read once and voted on. Governance is in the
+                    footer. */}
+                <div class="mx-auto flex w-full max-w-page flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:h-16 sm:flex-nowrap sm:gap-x-6 sm:px-6 sm:py-0 lg:px-8">
+                    <Link to="/" class="flex shrink-0 items-center gap-2.5 no-underline">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-nur text-void shadow-[0_0_18px_-4px] shadow-nur/60">
+                            <Icon name="layers" size={ 18 } />
                         </span>
                         <BrandMark class="text-[16px] text-text" />
                     </Link>
 
-                    <nav class="hidden items-center gap-3 text-[14px] sm:flex" aria-label={ locale.t('nav.sections') }>
+                    <nav class="hidden items-center gap-1 text-[14px] sm:flex" aria-label={ locale.t('nav.sections') }>
                         <Link
                             to="/blocks"
-                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            class="relative rounded-md px-2.5 py-1.5 text-muted no-underline transition-colors duration-150 hover:text-text after:absolute after:inset-x-2.5 after:-bottom-[9px] after:h-0.5 after:rounded-full after:bg-nur after:opacity-0 after:transition-opacity after:duration-150 [&.active]:text-nur [&.active]:after:opacity-100"
                             activeClass="active"
                         >{ locale.t('nav.blocks') }</Link>
                         <Link
                             to="/txs"
-                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            class="relative rounded-md px-2.5 py-1.5 text-muted no-underline transition-colors duration-150 hover:text-text after:absolute after:inset-x-2.5 after:-bottom-[9px] after:h-0.5 after:rounded-full after:bg-nur after:opacity-0 after:transition-opacity after:duration-150 [&.active]:text-nur [&.active]:after:opacity-100"
                             activeClass="active"
                         >{ locale.t('nav.transactions') }</Link>
                         <Link
                             to="/accounts"
-                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            class="relative rounded-md px-2.5 py-1.5 text-muted no-underline transition-colors duration-150 hover:text-text after:absolute after:inset-x-2.5 after:-bottom-[9px] after:h-0.5 after:rounded-full after:bg-nur after:opacity-0 after:transition-opacity after:duration-150 [&.active]:text-nur [&.active]:after:opacity-100"
                             activeClass="active"
                         >{ locale.t('nav.accounts') }</Link>
                         <Link
                             to="/staking"
-                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            class="relative rounded-md px-2.5 py-1.5 text-muted no-underline transition-colors duration-150 hover:text-text after:absolute after:inset-x-2.5 after:-bottom-[9px] after:h-0.5 after:rounded-full after:bg-nur after:opacity-0 after:transition-opacity after:duration-150 [&.active]:text-nur [&.active]:after:opacity-100"
                             activeClass="active"
                         >{ locale.t('nav.staking') }</Link>
                         <Link
                             to="/charts"
-                            class="text-muted no-underline transition-colors duration-150 hover:text-text [&.active]:text-nur"
+                            class="relative rounded-md px-2.5 py-1.5 text-muted no-underline transition-colors duration-150 hover:text-text after:absolute after:inset-x-2.5 after:-bottom-[9px] after:h-0.5 after:rounded-full after:bg-nur after:opacity-0 after:transition-opacity after:duration-150 [&.active]:text-nur [&.active]:after:opacity-100"
                             activeClass="active"
                         >{ locale.t('nav.charts') }</Link>
                     </nav>
 
                     {/* Search lives in the chrome, on every page. It is the one place it appears,
-                        so no page repeats it under its own title.
-
-                        The floor is 200 and not 280 because the field is the one elastic thing in
-                        this row: five sections plus a brand, a language and a theme leave 1024px
-                        of column with nothing to give, and a wider floor pushed the theme switch
-                        onto a second line of chrome above every page - in Russian, where both the
-                        brand and the sections are longest, by 33px. */}
-                    <div class="order-last w-full sm:order-none sm:ms-auto sm:w-auto sm:min-w-[200px] sm:max-w-md sm:flex-1">
+                        so no page repeats it under its own title. The 1536px column retired the
+                        200px floor the old 1024px row forced: five sections plus a brand leave
+                        room for a field wide enough to hold a full hash visibly, and the row
+                        still never wraps. */}
+                    <div class="order-last w-full sm:order-none sm:ms-auto sm:w-auto sm:min-w-[260px] sm:max-w-md sm:flex-1">
                         <SearchBar size="compact" />
                     </div>
 
@@ -90,7 +90,7 @@ export default component App(props: { url?: string; handoff?: LoaderHandoff })
                 </div>
             </header>
 
-            <main class="mx-auto w-full max-w-5xl flex-1 px-4 py-5 sm:px-6 sm:py-8 motion-safe:animate-rise">
+            <main class="mx-auto w-full max-w-page flex-1 px-4 py-5 sm:px-6 sm:py-8 lg:px-8 motion-safe:animate-rise">
                 {/* The two advertising slots live HERE and nowhere else, so no page has to make
                     room for one and none of them can be broken by one. Both render nothing at all
                     until a deployment sells them - see sponsors.ts.
