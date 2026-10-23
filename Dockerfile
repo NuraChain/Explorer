@@ -2,12 +2,11 @@
 
 # The whole explorer in one image: the server IS the service - it runs the api and the indexer, and
 # in production serves the built client itself, so there is one process and one port. The index is
-# a PostgreSQL database beside it: `docker compose up` (compose.yaml) runs the two together, or the
-# image runs alone against a database of your own:
+# a PostgreSQL database of your own, outside the image:
 #
 #   docker build -t nura-explorer .
 #   docker run -d --name nura-explorer --restart unless-stopped --stop-timeout 30 \
-#       --env-file server/.env -e PORT=4300 -p 4300:4300 \
+#       --env-file .env -e PORT=4300 -p 4300:4300 \
 #       -e DATABASE_URL=postgres://explorer:<password>@host.docker.internal:5432/nura_explorer \
 #       --add-host host.docker.internal:host-gateway \
 #       nura-explorer
@@ -17,9 +16,10 @@
 # port published must be the one the server binds, and `--stop-timeout` covers the server's own
 # bounded shutdown, which may take longer than Docker's default ten seconds.
 #
-# Governance and staking read the node's Cosmos REST api and CometBFT rpc, and both default to
-# 127.0.0.1 - which inside a container is the CONTAINER, so a node running on the host is not
-# there. Point COSMOS_REST_URL and COMETBFT_RPC_URL at http://host.docker.internal:1317 and :26657
+# Every key in .env is required - the server holds no defaults and refuses to boot with one
+# missing. Governance and staking read the node's Cosmos REST api and CometBFT rpc; a node running
+# on the host is not at 127.0.0.1 from inside a container, which is the CONTAINER. Point
+# COSMOS_REST_URL and COMETBFT_RPC_URL at http://host.docker.internal:1317 and :26657
 # (the --add-host above), and have the node listen on an address the bridge reaches: its api and
 # rpc bind loopback by default. Without that the EVM half works and both modules report
 # themselves unreachable.
@@ -54,13 +54,13 @@ FROM node:${NODE_VERSION}-bookworm-slim
 
 # Without NODE_ENV=production the server takes its DEVELOPMENT path, which imports vite - a
 # devDependency this image does not install - and the boot dies. 4300 is the image's own port, not
-# the dev session's 3003 or the code's default 3000.
+# the dev session's 3003.
 ENV NODE_ENV=production \
     PORT=4300
 
-# The layout mirrors the checkout, and the server runs from server/ exactly as the systemd unit
-# does: `.env`, CLIENT_DIR, SSR_ENTRY and logs/ all resolve from the working directory, so the
-# paths in a server/.env written for a checkout are correct here unchanged.
+# The layout mirrors the checkout, and the server runs from server/ exactly as `npm start` does:
+# CLIENT_DIR, SSR_ENTRY and logs/ all resolve from the working directory, so the paths in a .env
+# written for a checkout are correct here unchanged.
 WORKDIR /app/server
 
 COPY --from=deps /app /app

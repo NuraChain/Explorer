@@ -179,32 +179,20 @@ export interface CacheOptions
     tokenMs: number;
 }
 
-export const DEFAULT_CACHE: CacheOptions = {
-    enabled: true,
-    maxEntries: 4096,
-    headMs: 1_000,
-    balanceMs: 2_000,
-    callMs: 2_000,
-    storageMs: 2_000,
-    codeMs: 600_000,
-    codeAbsentMs: 5_000,
-    tokenMs: 600_000
-};
-
-/** Reads the cache spans from the environment. Every one has a default; none has to be set. */
-export function loadCacheOptions(): CacheOptions
+/** Reads the cache spans from the environment (or `env`, for a test). Every one is required. */
+export function loadCacheOptions(env?: Record<string, string | undefined>): CacheOptions
 {
     return loadConfig({
-        enabled: flag('RPC_CACHE', { default: DEFAULT_CACHE.enabled }),
-        maxEntries: num('RPC_CACHE_MAX', { default: DEFAULT_CACHE.maxEntries }),
-        headMs: num('RPC_CACHE_HEAD_MS', { default: DEFAULT_CACHE.headMs }),
-        balanceMs: num('RPC_CACHE_BALANCE_MS', { default: DEFAULT_CACHE.balanceMs }),
-        callMs: num('RPC_CACHE_CALL_MS', { default: DEFAULT_CACHE.callMs }),
-        storageMs: num('RPC_CACHE_STORAGE_MS', { default: DEFAULT_CACHE.storageMs }),
-        codeMs: num('RPC_CACHE_CODE_MS', { default: DEFAULT_CACHE.codeMs }),
-        codeAbsentMs: num('RPC_CACHE_CODE_ABSENT_MS', { default: DEFAULT_CACHE.codeAbsentMs }),
-        tokenMs: num('RPC_CACHE_TOKEN_MS', { default: DEFAULT_CACHE.tokenMs })
-    });
+        enabled: flag('RPC_CACHE'),
+        maxEntries: num('RPC_CACHE_MAX'),
+        headMs: num('RPC_CACHE_HEAD_MS'),
+        balanceMs: num('RPC_CACHE_BALANCE_MS'),
+        callMs: num('RPC_CACHE_CALL_MS'),
+        storageMs: num('RPC_CACHE_STORAGE_MS'),
+        codeMs: num('RPC_CACHE_CODE_MS'),
+        codeAbsentMs: num('RPC_CACHE_CODE_ABSENT_MS'),
+        tokenMs: num('RPC_CACHE_TOKEN_MS')
+    }, env);
 }
 
 type TokenMeta = { name: string; symbol: string; decimals: number } | null;
@@ -234,7 +222,7 @@ export class CachedChain implements ChainGateway
     #head: { value: number; until: number } | null = null;
     #headInflight: Promise<number> | null = null;
 
-    constructor(inner: ChainGateway, options: CacheOptions = DEFAULT_CACHE)
+    constructor(inner: ChainGateway, options: CacheOptions)
     {
         this.#inner = inner;
         this.#options = options;

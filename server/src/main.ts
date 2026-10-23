@@ -17,21 +17,65 @@ import { IndexStore } from './chain/store.ts';
 import { startIndexer } from './chain/indexer.ts';
 import { loadPriceEnv, SwapPriceFeed } from './price.ts';
 
+// ONE .env, at the repository root. Resolved from this module rather than from the working
+// directory, so it is found however the process is started. A variable already in the environment wins over the file.
 try
 {
-    process.loadEnvFile();
+    process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url)));
 }
 catch
 {
-    // No .env file - the ambient environment is the configuration.
+    // No .env file - the ambient environment is the configuration (a container's --env-file).
 }
 
-const config = loadConfig({
-    port: num('PORT', { default: 3000 }),
-    env: oneOf('NODE_ENV', ['development', 'production', 'test'], { default: 'development' }),
-    clientDir: str('CLIENT_DIR', { default: '../application/dist' }),
-    ssrEntry: str('SSR_ENTRY', { default: '../application/dist-server/entry.server.js' })
-});
+/*
+ * Every key in the .env is required, and none has a default in code.
+ *
+ * All of it is read HERE, before anything opens the database, starts the follower or binds a
+ * port, so a missing key fails the boot with nothing half-started. Each loader names only its own
+ * keys; their complaints are gathered into ONE error so a fresh .env is fixed in one pass rather
+ * than one restart per key.
+ */
+const problems: string[] = [];
+function read<T>(load: () => T): T
+{
+    try
+    {
+        return load();
+    }
+    catch (error)
+    {
+        const message = error instanceof Error ? error.message : String(error);
+        const lines = message.split('\n').filter((line) => line.startsWith('  - '));
+        problems.push(...(lines.length > 0 ? lines : [`  - ${ message }`]));
+        // Never read: the throw below fires before any of these values is used.
+        return undefined as T;
+    }
+}
+
+const config = read(() => loadConfig({
+    port: num('PORT'),
+    env: oneOf('NODE_ENV', ['development', 'production', 'test']),
+    // Bound only by the development session; production keeps the adapter's own bind, which is
+    // what a container needs. Required anyway, so the .env is the one place it is decided.
+    host: str('HOST'),
+    clientDir: str('CLIENT_DIR'),
+    ssrEntry: str('SSR_ENTRY')
+}));
+const chainEnv = read(() => loadChainEnv());
+// The same node's OTHER two apis: the Cosmos REST module api and CometBFT's rpc. Governance lives
+// there rather than in the EVM, and the explorer is meant to run beside the node that serves them.
+const cosmosEnv = read(() => loadCosmosEnv());
+const databaseEnv = read(() => loadDatabaseEnv());
+const cacheOptions = read(() => loadCacheOptions());
+const priceEnv = read(() => loadPriceEnv());
+
+if (problems.length > 0)
+{
+    throw new Error(`Configuration is invalid (${ problems.length } problem${ problems.length === 1 ? '' : 's' }):\n`
+        + problems.join('\n'));
+}
+
 const isProduction = config.env === 'production';
 
 // Readable lines on the terminal, NDJSON in server/logs/ - both, in every mode. The file alone
@@ -46,27 +90,23 @@ const log = createLogger({
 // current. It starts BEFORE the server binds and is never awaited - a backfill of a long chain
 // takes minutes, and the explorer must serve what it already has while the rest arrives. The
 // stats endpoint reports both heads so a reader can see the gap.
-const chainEnv = loadChainEnv();
-// The same node's OTHER two apis: the Cosmos REST module api and CometBFT's rpc. Governance lives
-// there rather than in the EVM, and the explorer is meant to run beside the node that serves them.
-const cosmosEnv = loadCosmosEnv();
 const chain = new ChainReader(chainEnv);
 // Opening migrates the index, and fails the boot - loudly, with the reason - when the database is
 // unreachable or unfit; a supervisor's restart policy is what retries it.
-const store = await IndexStore.open({ connection: connectionOf(loadDatabaseEnv()), log });
+const store = await IndexStore.open({ connection: connectionOf(databaseEnv), log });
 const indexer = startIndexer(store, chain, log);
 
 // The API reads the node THROUGH a cache; the indexer above keeps the raw reader. Same node, two
 // appetites: the sync path reads each height once and must see a reorg the moment it happens,
 // while the API is asked for the same head, the same bytecode and the same balances by every
 // visitor at once. See chain/cache.ts for what is held and for how long.
-const reads = new CachedChain(chain, loadCacheOptions());
+const reads = new CachedChain(chain, cacheOptions);
 
 // The only read in this process that is not the chain. It is held behind its own TTL, so the
 // exchange sees one request every half minute however many people are on the home page, and a
 // failure there is logged and then forgotten - the route answers `null` and the page prints
 // nothing rather than an error nobody can act on.
-const price = new SwapPriceFeed(loadPriceEnv(), chainEnv.symbol, {
+const price = new SwapPriceFeed(priceEnv, chainEnv.symbol, {
     onError: (error: unknown) => log.warn('price feed unreachable', { error: String(error) })
 });
 
@@ -160,7 +200,7 @@ const served = await serve(handler, {
     // Dev binds IPv4 loopback, because `localhost` resolves to ::1 first on some platforms and a
     // page that cannot reach its own origin is the confusing failure. HOST=0.0.0.0 opens it to
     // another device. Production keeps the adapter's own bind.
-    hostname: isProduction ? undefined : (process.env.HOST ?? '127.0.0.1')
+    hostname: isProduction ? undefined : config.host
 });
 
 // The HMR socket rides THIS server: vite was given a relay it never listens on, so the page dials
@@ -238,12 +278,8 @@ handleShutdownSignals(served, {
 // their per-request state, and long-lived stores. That is live application data, so the bridge
 // attaches ONLY under NODE_ENV=development and every upgrade must present the token below from a
 // loopback peer. The token is minted per boot: it is never written to disk and never committed.
-// Reads the RAW variable, not `config.env`. `loadConfig` defaults an unset NODE_ENV to
-// 'development' for this app's own purposes, but the bridge refuses anything that is not
-// literally development - so guarding on the defaulted value would call it in a scaffold where
-// nothing is set, and the boot would die on a bridge that was never going to attach.
 // `azeroth dev` sets NODE_ENV=development, so `npm run dev` gets the panel.
-if (process.env.NODE_ENV === 'development')
+if (config.env === 'development')
 {
     const { attachDevtools } = await import('@azerothjs/devtools/server');
     const token = crypto.randomUUID();

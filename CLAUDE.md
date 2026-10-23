@@ -9,7 +9,7 @@ disagrees with the code, the code is right and this file needs fixing.
 ```sh
 npm run dev                   # ONE process on 3003: the server runs vite inside itself
 npm run build                 # client bundle, SSR bundle, prerender
-npm start --workspace server  # run the built app (NODE_ENV=production, honours PORT, needs DATABASE_URL)
+npm start --workspace server  # run the built app (needs a COMPLETE root .env: no key has a default)
 npm run check                 # typecheck both workspaces + oxlint — the gate
 npm run lint                  # oxlint on its own (`lint:fix` applies what it can fix)
 npm run format                # oxfmt — READ the note below before running this
@@ -17,7 +17,6 @@ npx azeroth check             # the typecheck half alone; the CLI's lint step kn
 npm test                      # every suite (the server half needs TEST_DATABASE_URL)
 npm run test:shuffle          # every suite in random order — the isolation gate
 npm run test:coverage         # server suite + coverage report
-docker compose up -d --build  # the explorer and its PostgreSQL together (compose.yaml)
 ```
 
 `npm run check`, `npm test` and `npm run test:shuffle` must all pass before a change is done.
@@ -84,8 +83,13 @@ Two consequences worth knowing before reaching for either:
 **The `<head>` is declared by the page**, through `pageHead()` in `lib/head.ts`, which wraps the
 framework's `useHead`. It runs on both sides, so a crawler and a reader with no JavaScript get the
 real title, description, canonical, Open Graph and JSON-LD. Absolute urls come from `EXPLORER_URL`
-only — never from the request — and where none is configured the canonical is emitted relative and
-the absolute-only tags are omitted rather than guessed.
+only — never from the request. The server will not boot without it, but `pageHead()` still emits
+a relative canonical and omits the absolute-only tags when handed an empty one.
+
+**Configuration has no defaults.** ONE `.env`, at the repository root, serves the server in a
+checkout and a container alike (`--env-file`). Every key the server reads is required in it (the
+full list is `.env.example`); `main.ts` runs every loader before anything starts and fails the boot
+with one error naming every missing or malformed key. A new key gets no `default:`.
 
 **Images go through `<Image>` and the `/_image` endpoint**, which sizes one candidate per device
 width and answers content-addressed bytes. No adapter is installed, so nothing is transcoded; the
@@ -216,7 +220,7 @@ backfill catches up, so judge layout on data the index already holds.
 
 Vitest in both workspaces. The browser half runs under happy-dom with `@azerothjs/testing`
 (`renderTest` / `fire` / `cleanup`); the server half runs against a stubbed chain gateway and a
-**real PostgreSQL**: `TEST_DATABASE_URL`, from the environment or that one key of `server/.env` — a
+**real PostgreSQL**: `TEST_DATABASE_URL`, from the environment or that one key of the root `.env` — a
 database of its own, never the index. `tests/support/database.ts` gives every store a schema nobody
 else picks and drops it after the test; open stores only through it. Nothing reaches a chain.
 

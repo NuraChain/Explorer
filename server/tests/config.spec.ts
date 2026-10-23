@@ -1,121 +1,131 @@
 // @vitest-environment node
 //
 // Configuration is read ONCE at boot and never re-consulted, so a mistake in it is a deployment
-// that runs for a week pointed at the wrong chain. `loadConfig` takes any record rather than
+// that runs for a week pointed at the wrong chain. Every loader takes a record rather than only
 // reaching for process.env, which is what lets these run without touching the real environment -
 // no global is mutated here and no test can leak into another.
+//
+// None of the keys has a default in code: every one is in the root .env, and a missing one fails
+// the boot by name.
+import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+
 import { describe, it, expect } from 'vitest';
-import { loadConfig, num, str, flag } from '@azerothjs/http';
 
 import { describeChain, loadChainEnv } from '../src/chain/client.ts';
-import { DEFAULT_CACHE, loadCacheOptions } from '../src/chain/cache.ts';
+import { loadCacheOptions } from '../src/chain/cache.ts';
+import { loadCosmosEnv } from '../src/chain/cosmos.ts';
 import { loadDatabaseEnv } from '../src/chain/data-source.ts';
+import { loadPriceEnv } from '../src/price.ts';
 import { ENV } from './support/fixtures.ts';
 
-/** The chain shape, declared exactly as loadChainEnv declares it, but read from a given record. */
-function chainEnvFrom(env: Record<string, string | undefined>): ReturnType<typeof loadConfig>
+/** The committed example, parsed exactly as `process.loadEnvFile` would read it. */
+const EXAMPLE = readFileSync(new URL('../../.env.example', import.meta.url), 'utf8');
+const EXAMPLE_ENV: Record<string, string | undefined> = parseEnv(EXAMPLE);
+
+const CHAIN = {
+    RPC_URL: 'https://rpc.example.test',
+    CHAIN_ID: '1020',
+    CHAIN_NAME: 'Nura Chain',
+    CURRENCY_SYMBOL: 'NURA',
+    CURRENCY_DECIMALS: '18',
+    CHAIN_SITE_URL: 'https://chain.example.test',
+    EXPLORER_URL: 'https://explorer.example.test',
+    START_BLOCK: '500',
+    POLL_MS: '3000',
+    BATCH_SIZE: '512',
+    RPC_CONCURRENCY: '512',
+    RPC_BATCH_SIZE: '128'
+};
+
+const CACHE = {
+    RPC_CACHE: 'true',
+    RPC_CACHE_MAX: '4096',
+    RPC_CACHE_HEAD_MS: '1000',
+    RPC_CACHE_BALANCE_MS: '2000',
+    RPC_CACHE_CALL_MS: '2000',
+    RPC_CACHE_STORAGE_MS: '2000',
+    RPC_CACHE_CODE_MS: '600000',
+    RPC_CACHE_CODE_ABSENT_MS: '5000',
+    RPC_CACHE_TOKEN_MS: '600000'
+};
+
+/** The message a loader throws for `env`, or '' when it does not throw. */
+function failure(load: () => unknown): string
 {
-    return loadConfig({
-        rpcUrl: str('RPC_URL', { default: 'http://127.0.0.1:8545' }),
-        chainId: num('CHAIN_ID', { default: 31337 }),
-        name: str('CHAIN_NAME', { default: 'Local EVM' }),
-        symbol: str('CURRENCY_SYMBOL', { default: 'ETH' }),
-        decimals: num('CURRENCY_DECIMALS', { default: 18 }),
-        siteUrl: str('CHAIN_SITE_URL', { default: '' }),
-        explorerUrl: str('EXPLORER_URL', { default: '' }),
-        startBlock: num('START_BLOCK', { default: 0 }),
-        pollMs: num('POLL_MS', { default: 2000 }),
-        batchSize: num('BATCH_SIZE', { default: 1000 }),
-        concurrency: num('RPC_CONCURRENCY', { default: 1000 }),
-        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 })
-    }, env);
+    try
+    {
+        load();
+    }
+    catch (error)
+    {
+        return String(error);
+    }
+    return '';
 }
 
 describe('the chain environment', () =>
 {
-    it('boots against a local node with nothing set at all', () =>
-    {
-        // A fresh clone with no .env has to start, or the first run is a configuration exercise.
-        const config = chainEnvFrom({}) as Record<string, unknown>;
-        expect(config.rpcUrl).toBe('http://127.0.0.1:8545');
-        expect(config.chainId).toBe(31337);
-        expect(config.startBlock).toBe(0);
-    });
-
     it('reads every value the deployment sets', () =>
     {
-        const config = chainEnvFrom({
-            RPC_URL: 'https://rpc.example.test',
-            CHAIN_ID: '1020',
-            CHAIN_NAME: 'Nura Chain',
-            CURRENCY_SYMBOL: 'NURA',
-            CURRENCY_DECIMALS: '18',
-            START_BLOCK: '500',
-            BATCH_SIZE: '512'
-        }) as Record<string, unknown>;
-
-        expect(config).toMatchObject({
+        expect(loadChainEnv(CHAIN)).toEqual({
             rpcUrl: 'https://rpc.example.test',
             chainId: 1020,
+            name: 'Nura Chain',
             symbol: 'NURA',
+            decimals: 18,
+            siteUrl: 'https://chain.example.test',
+            explorerUrl: 'https://explorer.example.test',
             startBlock: 500,
-            batchSize: 512
+            pollMs: 3000,
+            batchSize: 512,
+            concurrency: 512,
+            rpcBatchSize: 128
         });
+    });
+
+    it('refuses to boot with nothing set, and names EVERY key it wants at once', () =>
+    {
+        // Not one key per restart: a fresh .env is fixed in one pass.
+        const message = failure(() => loadChainEnv({}));
+        for (const name of Object.keys(CHAIN))
+        {
+            expect(message).toContain(name);
+        }
+    });
+
+    it('refuses each key on its own - there is no default left to fall back on', () =>
+    {
+        for (const name of Object.keys(CHAIN))
+        {
+            expect(() => loadChainEnv({ ...CHAIN, [name]: undefined }), name).toThrow(name);
+        }
+    });
+
+    it('treats an EMPTY variable as missing, which is what `KEY=` in a .env means', () =>
+    {
+        expect(() => loadChainEnv({ ...CHAIN, POLL_MS: '' })).toThrow('POLL_MS');
+        expect(() => loadChainEnv({ ...CHAIN, EXPLORER_URL: '' })).toThrow('EXPLORER_URL');
     });
 
     it('refuses a malformed number at BOOT rather than at the first request', () =>
     {
         // Loud at startup is the whole contract: a NaN chain id discovered on request 400 is a
         // deployment that has been answering wrongly for an hour.
-        expect(() => chainEnvFrom({ CHAIN_ID: 'mainnet' })).toThrow();
-        expect(() => chainEnvFrom({ START_BLOCK: 'latest' })).toThrow();
-        expect(() => chainEnvFrom({ POLL_MS: 'Infinity' })).toThrow();
-        expect(() => chainEnvFrom({ BATCH_SIZE: 'NaN' })).toThrow();
-        expect(() => chainEnvFrom({ CHAIN_ID: '  ' })).toThrow();
-    });
-
-    it('treats an EMPTY variable as unset, which is what `KEY=` in a .env means', () =>
-    {
-        // A commented-out or blank line must take the default rather than failing the boot -
-        // otherwise every optional key has to be deleted rather than emptied.
-        const config = chainEnvFrom({ POLL_MS: '', CHAIN_NAME: '' }) as Record<string, unknown>;
-        expect(config.pollMs).toBe(2000);
-        expect(config.chainName ?? config.name).toBe('Local EVM');
+        expect(() => loadChainEnv({ ...CHAIN, CHAIN_ID: 'mainnet' })).toThrow();
+        expect(() => loadChainEnv({ ...CHAIN, START_BLOCK: 'latest' })).toThrow();
+        expect(() => loadChainEnv({ ...CHAIN, POLL_MS: 'Infinity' })).toThrow();
+        expect(() => loadChainEnv({ ...CHAIN, BATCH_SIZE: 'NaN' })).toThrow();
+        expect(() => loadChainEnv({ ...CHAIN, CHAIN_ID: '  ' })).toThrow();
     });
 
     it('reports EVERY bad variable at once, not one per restart', () =>
     {
-        let message = '';
-        try
-        {
-            chainEnvFrom({ CHAIN_ID: 'no', CURRENCY_DECIMALS: 'nope', BATCH_SIZE: 'never' });
-        }
-        catch (error)
-        {
-            message = String(error);
-        }
+        const message = failure(() =>
+            loadChainEnv({ ...CHAIN, CHAIN_ID: 'no', CURRENCY_DECIMALS: 'nope', BATCH_SIZE: 'never' }));
         expect(message).toContain('CHAIN_ID');
         expect(message).toContain('CURRENCY_DECIMALS');
         expect(message).toContain('BATCH_SIZE');
-    });
-
-    it('leaves the optional link empty rather than pointing at somebody else\'s site', () =>
-    {
-        // No default on purpose: a deployment on another network must not link its chain name to
-        // a site that is not its own.
-        const config = chainEnvFrom({}) as Record<string, unknown>;
-        expect(config.siteUrl).toBe('');
-        expect(config.explorerUrl).toBe('');
-    });
-
-    it('reads a real loadChainEnv against an ambient environment', () =>
-    {
-        // The function the server actually calls; it reads process.env, so this only asserts that
-        // it produces a complete, well-typed object rather than pinning a machine's values.
-        const config = loadChainEnv();
-        expect(typeof config.rpcUrl).toBe('string');
-        expect(Number.isInteger(config.chainId)).toBe(true);
-        expect(Number.isInteger(config.startBlock)).toBe(true);
     });
 });
 
@@ -125,16 +135,19 @@ describe('the database environment', () =>
 
     it('refuses to boot without a database, and names the variable it wants', () =>
     {
-        // No default on purpose: an index silently pointed at the wrong database is worse than a
-        // server that will not start.
-        expect(() => loadDatabaseEnv({})).toThrow('DATABASE_URL');
-        expect(() => loadDatabaseEnv({ DATABASE_URL: '' })).toThrow('DATABASE_URL');
+        expect(() => loadDatabaseEnv({ DATABASE_POOL_SIZE: '10' })).toThrow('DATABASE_URL');
+        expect(() => loadDatabaseEnv({ DATABASE_URL: '', DATABASE_POOL_SIZE: '10' })).toThrow('DATABASE_URL');
     });
 
-    it('reads the url, and a pool size that defaults to ten', () =>
+    it('refuses to boot without a pool size', () =>
     {
-        expect(loadDatabaseEnv({ DATABASE_URL: CONNECTION })).toMatchObject({ url: CONNECTION, poolSize: 10 });
-        expect(loadDatabaseEnv({ DATABASE_URL: CONNECTION, DATABASE_POOL_SIZE: '25' }).poolSize).toBe(25);
+        expect(() => loadDatabaseEnv({ DATABASE_URL: CONNECTION })).toThrow('DATABASE_POOL_SIZE');
+    });
+
+    it('reads the url and the pool size', () =>
+    {
+        expect(loadDatabaseEnv({ DATABASE_URL: CONNECTION, DATABASE_POOL_SIZE: '25' }))
+            .toMatchObject({ url: CONNECTION, poolSize: 25 });
     });
 
     it('refuses a malformed pool size at boot', () =>
@@ -146,10 +159,45 @@ describe('the database environment', () =>
     {
         // The url carries the database password. The value is there for the store to use; a
         // config object logged in a debugging panic must not carry it into the log as well.
-        const config = loadDatabaseEnv({ DATABASE_URL: CONNECTION });
+        const config = loadDatabaseEnv({ DATABASE_URL: CONNECTION, DATABASE_POOL_SIZE: '10' });
         expect(config.url).toBe(CONNECTION);
         expect(JSON.stringify(config)).not.toContain('hunter2');
         expect(String(config)).not.toContain('hunter2');
+        // Nor into a boot failure that sits beside it.
+        expect(failure(() => loadDatabaseEnv({ DATABASE_URL: CONNECTION }))).not.toContain('hunter2');
+    });
+});
+
+describe('the governance and price environments', () =>
+{
+    it('refuse to boot with any key missing, and name it', () =>
+    {
+        const cosmos = failure(() => loadCosmosEnv({}));
+        expect(cosmos).toContain('COSMOS_REST_URL');
+        expect(cosmos).toContain('COMETBFT_RPC_URL');
+        expect(cosmos).toContain('COSMOS_TIMEOUT_MS');
+
+        const price = failure(() => loadPriceEnv({}));
+        expect(price).toContain('SWAP_API_URL');
+        expect(price).toContain('PRICE_TTL_MS');
+        expect(price).toContain('PRICE_STALE_MS');
+        expect(price).toContain('PRICE_TIMEOUT_MS');
+    });
+
+    it('read what the deployment sets', () =>
+    {
+        expect(loadCosmosEnv({
+            COSMOS_REST_URL: 'http://node.test:1317',
+            COMETBFT_RPC_URL: 'http://node.test:26657',
+            COSMOS_TIMEOUT_MS: '4000'
+        })).toEqual({ restUrl: 'http://node.test:1317', rpcUrl: 'http://node.test:26657', timeoutMs: 4000 });
+
+        expect(loadPriceEnv({
+            SWAP_API_URL: 'https://swap.example.test',
+            PRICE_TTL_MS: '30000',
+            PRICE_STALE_MS: '600000',
+            PRICE_TIMEOUT_MS: '4000'
+        })).toEqual({ apiUrl: 'https://swap.example.test', ttlMs: 30_000, staleMs: 600_000, timeoutMs: 4000 });
     });
 });
 
@@ -174,105 +222,88 @@ describe('describeChain', () =>
 
 describe('the cache configuration', () =>
 {
-    /** The cache shape, declared as loadCacheOptions declares it, read from a given record. */
-    function cacheFrom(env: Record<string, string | undefined>): Record<string, unknown>
+    it('reads every span the deployment sets', () =>
     {
-        return loadConfig({
-            enabled: flag('RPC_CACHE', { default: DEFAULT_CACHE.enabled }),
-            maxEntries: num('RPC_CACHE_MAX', { default: DEFAULT_CACHE.maxEntries }),
-            headMs: num('RPC_CACHE_HEAD_MS', { default: DEFAULT_CACHE.headMs }),
-            balanceMs: num('RPC_CACHE_BALANCE_MS', { default: DEFAULT_CACHE.balanceMs }),
-            callMs: num('RPC_CACHE_CALL_MS', { default: DEFAULT_CACHE.callMs }),
-            storageMs: num('RPC_CACHE_STORAGE_MS', { default: DEFAULT_CACHE.storageMs }),
-            codeMs: num('RPC_CACHE_CODE_MS', { default: DEFAULT_CACHE.codeMs }),
-            codeAbsentMs: num('RPC_CACHE_CODE_ABSENT_MS', { default: DEFAULT_CACHE.codeAbsentMs }),
-            tokenMs: num('RPC_CACHE_TOKEN_MS', { default: DEFAULT_CACHE.tokenMs })
-        }, env) as unknown as Record<string, unknown>;
-    }
+        expect(loadCacheOptions(CACHE)).toEqual({
+            enabled: true,
+            maxEntries: 4096,
+            headMs: 1000,
+            balanceMs: 2000,
+            callMs: 2000,
+            storageMs: 2000,
+            codeMs: 600_000,
+            codeAbsentMs: 5000,
+            tokenMs: 600_000
+        });
+    });
 
-    it('is on by default, with every span defaulted', () =>
+    it('refuses to boot with nothing set, and names every span', () =>
     {
-        expect(cacheFrom({})).toEqual({ ...DEFAULT_CACHE });
+        const message = failure(() => loadCacheOptions({}));
+        for (const name of Object.keys(CACHE))
+        {
+            expect(message).toContain(name);
+        }
     });
 
     it('can be switched off entirely with one variable', () =>
     {
-        expect(cacheFrom({ RPC_CACHE: 'false' }).enabled).toBe(false);
-        expect(cacheFrom({ RPC_CACHE: '0' }).enabled).toBe(false);
-        expect(cacheFrom({ RPC_CACHE: 'no' }).enabled).toBe(false);
-        expect(cacheFrom({ RPC_CACHE: 'true' }).enabled).toBe(true);
+        expect(loadCacheOptions({ ...CACHE, RPC_CACHE: 'false' }).enabled).toBe(false);
+        expect(loadCacheOptions({ ...CACHE, RPC_CACHE: '0' }).enabled).toBe(false);
+        expect(loadCacheOptions({ ...CACHE, RPC_CACHE: 'no' }).enabled).toBe(false);
+        expect(loadCacheOptions({ ...CACHE, RPC_CACHE: 'true' }).enabled).toBe(true);
     });
 
     it('refuses a flag that is neither true nor false', () =>
     {
-        expect(() => cacheFrom({ RPC_CACHE: 'maybe' })).toThrow();
+        expect(() => loadCacheOptions({ ...CACHE, RPC_CACHE: 'maybe' })).toThrow('RPC_CACHE');
     });
 
     it('lets one span be disabled without disabling the rest', () =>
     {
-        const config = cacheFrom({ RPC_CACHE_BALANCE_MS: '0' });
+        const config = loadCacheOptions({ ...CACHE, RPC_CACHE_BALANCE_MS: '0' });
         expect(config.balanceMs).toBe(0);
-        expect(config.headMs).toBe(DEFAULT_CACHE.headMs);
-    });
-
-    it('holds the ordering the defaults exist to express', () =>
-    {
-        // Bytecode outlives a balance by orders of magnitude, and the absence of code outlives
-        // neither. If these ever invert, the cache is serving stale answers for the wrong things.
-        expect(DEFAULT_CACHE.codeMs).toBeGreaterThan(DEFAULT_CACHE.codeAbsentMs);
-        expect(DEFAULT_CACHE.codeAbsentMs).toBeGreaterThan(DEFAULT_CACHE.balanceMs);
-        expect(DEFAULT_CACHE.tokenMs).toBeGreaterThanOrEqual(DEFAULT_CACHE.codeMs);
-        expect(DEFAULT_CACHE.headMs).toBeLessThanOrEqual(DEFAULT_CACHE.balanceMs);
-    });
-
-    it('reads a real loadCacheOptions without throwing on a bare environment', () =>
-    {
-        const options = loadCacheOptions();
-        expect(typeof options.enabled).toBe('boolean');
-        expect(options.maxEntries).toBeGreaterThan(0);
+        expect(config.headMs).toBe(1000);
     });
 });
 
 describe('the .env example stays in step with the code', () =>
 {
-    it('documents every variable the server reads', async () =>
+    it('documents every variable the server reads', () =>
     {
-        // A variable that exists and is undocumented is one a deployment will never set.
-        const { readFileSync } = await import('node:fs');
-        const { fileURLToPath } = await import('node:url');
-        const { dirname, join } = await import('node:path');
-        const here = dirname(fileURLToPath(import.meta.url));
-        const example = readFileSync(join(here, '..', '.env.example'), 'utf8');
-
+        // A variable that exists and is undocumented is one a deployment will never set - and
+        // with no default behind it, one that stops the boot.
         const declared = [
-            'RPC_URL', 'CHAIN_ID', 'CHAIN_NAME', 'CURRENCY_SYMBOL', 'CURRENCY_DECIMALS',
-            'CHAIN_SITE_URL', 'EXPLORER_URL', 'START_BLOCK', 'POLL_MS', 'BATCH_SIZE',
-            'RPC_CONCURRENCY', 'RPC_BATCH_SIZE',
+            ...Object.keys(CHAIN), ...Object.keys(CACHE),
             'DATABASE_URL', 'DATABASE_POOL_SIZE', 'TEST_DATABASE_URL',
-            'RPC_CACHE', 'RPC_CACHE_MAX', 'RPC_CACHE_HEAD_MS', 'RPC_CACHE_BALANCE_MS',
-            'RPC_CACHE_CALL_MS', 'RPC_CACHE_STORAGE_MS', 'RPC_CACHE_CODE_MS',
-            'RPC_CACHE_CODE_ABSENT_MS', 'RPC_CACHE_TOKEN_MS',
-            'PORT', 'NODE_ENV', 'CLIENT_DIR', 'SSR_ENTRY'
+            'COSMOS_REST_URL', 'COMETBFT_RPC_URL', 'COSMOS_TIMEOUT_MS',
+            'SWAP_API_URL', 'PRICE_TTL_MS', 'PRICE_STALE_MS', 'PRICE_TIMEOUT_MS',
+            'PORT', 'NODE_ENV', 'HOST', 'CLIENT_DIR', 'SSR_ENTRY'
         ];
         for (const name of declared)
         {
-            expect(example, `${ name } is not documented in .env.example`).toContain(`${ name }=`);
+            expect(EXAMPLE_ENV[name], `${ name } is not set in .env.example`).toBeTruthy();
         }
+    });
+
+    it('is a complete configuration every loader accepts as it stands', () =>
+    {
+        // Copying the example is how a deployment starts; it must boot without filling anything in.
+        expect(() => loadChainEnv(EXAMPLE_ENV)).not.toThrow();
+        expect(() => loadCacheOptions(EXAMPLE_ENV)).not.toThrow();
+        expect(() => loadCosmosEnv(EXAMPLE_ENV)).not.toThrow();
+        expect(() => loadDatabaseEnv(EXAMPLE_ENV)).not.toThrow();
+        expect(() => loadPriceEnv(EXAMPLE_ENV)).not.toThrow();
     });
 
     it('carries no real secret', () =>
     {
         // The file is committed. Anything that looks like a credential in it is a leak.
-        const example = new URL('../.env.example', import.meta.url);
-        return import('node:fs').then(({ readFileSync }) =>
-        {
-            const text = readFileSync(example, 'utf8');
-            expect(text).not.toMatch(/PRIVATE_KEY|MNEMONIC|SECRET\s*=\s*\S/i);
-            // A bare `0x` followed by 64 hex digits is a private key shape.
-            expect(text).not.toMatch(/0x[0-9a-fA-F]{64}/);
-            // A connection string with a password in it - `scheme://user:password@host` - is a
-            // credential however ordinary the url around it looks.
-            expect(text).not.toMatch(/[a-z]+:\/\/[^\s/:@]+:[^\s@]+@/i);
-        });
+        expect(EXAMPLE).not.toMatch(/PRIVATE_KEY|MNEMONIC|SECRET\s*=\s*\S/i);
+        // A bare `0x` followed by 64 hex digits is a private key shape.
+        expect(EXAMPLE).not.toMatch(/0x[0-9a-fA-F]{64}/);
+        // A connection string with a password in it - `scheme://user:password@host` - is a
+        // credential however ordinary the url around it looks.
+        expect(EXAMPLE).not.toMatch(/[a-z]+:\/\/[^\s/:@]+:[^\s@]+@/i);
     });
 });

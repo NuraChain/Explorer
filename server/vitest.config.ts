@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config';
 // (see tests/support/database.ts). Nothing else - no server to start, no node to reach.
 
 /**
- * TEST_DATABASE_URL from the environment, or else that ONE key of server/.env.
+ * TEST_DATABASE_URL from the environment, or else that ONE key of the repository's root .env.
  *
  * Only that key: the rest of .env configures a running server - a port, a production NODE_ENV -
  * and a suite that inherited it would be testing a deployment rather than the code.
@@ -21,7 +21,7 @@ function testDatabaseUrl(): string | undefined
     }
     try
     {
-        return parseEnv(readFileSync(new URL('./.env', import.meta.url), 'utf8')).TEST_DATABASE_URL;
+        return parseEnv(readFileSync(new URL('../.env', import.meta.url), 'utf8')).TEST_DATABASE_URL;
     }
     catch
     {

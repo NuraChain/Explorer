@@ -13,7 +13,7 @@ export interface ChainEnv
     symbol: string;
     decimals: number;
 
-    /** The chain's own website, linked from its name in the footer. Empty means do not link. */
+    /** The chain's own website, linked from its name in the footer. */
     siteUrl: string;
 
     /**
@@ -21,7 +21,7 @@ export interface ChainEnv
      *
      * Not the request's own origin: the page offering the button may be reached over localhost,
      * a preview host or an internal name, and a wallet that stores one of those has a dead
-     * "view on explorer" link forever. Empty falls back to the origin, which is right in dev.
+     * "view on explorer" link forever.
      */
     explorerUrl: string;
 
@@ -41,30 +41,27 @@ export interface ChainEnv
     rpcBatchSize: number;
 }
 
-/** Reads the chain configuration from the environment, with local-anvil defaults. */
-export function loadChainEnv(): ChainEnv
+/**
+ * Reads the chain configuration from the environment (or `env`, for a test). Every key is
+ * required: a deployment pointed at the wrong chain by a default is worse than one that refuses
+ * to start, and the boot error names every key that is missing.
+ */
+export function loadChainEnv(env?: Record<string, string | undefined>): ChainEnv
 {
-    const config = loadConfig({
-        rpcUrl: str('RPC_URL', { default: 'http://127.0.0.1:8545' }),
-        chainId: num('CHAIN_ID', { default: 31337 }),
-        name: str('CHAIN_NAME', { default: 'Local EVM' }),
-        symbol: str('CURRENCY_SYMBOL', { default: 'ETH' }),
-        decimals: num('CURRENCY_DECIMALS', { default: 18 }),
-        // No default: a deployment pointed at another network must not link its chain name to
-        // somebody else's site, so an unset key renders the name as plain text.
-        siteUrl: str('CHAIN_SITE_URL', { default: '' }),
-        explorerUrl: str('EXPLORER_URL', { default: '' }),
-        startBlock: num('START_BLOCK', { default: 0 }),
-        pollMs: num('POLL_MS', { default: 2000 }),
-        batchSize: num('BATCH_SIZE', { default: 1000 }),
-        // Measured against a remote endpoint, not guessed: a window of 1000 block reads coalesced
-        // into HTTP batches of 100 ran ~3x a window of 64 into batches of 50, because the cost out
-        // there is the ROUND TRIP, and a small window leaves the link idle waiting for it. Batches
-        // larger than 100 lose again - providers cap the batch and the retry costs the trip twice.
-        concurrency: num('RPC_CONCURRENCY', { default: 1000 }),
-        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 })
-    });
-    return config;
+    return loadConfig({
+        rpcUrl: str('RPC_URL'),
+        chainId: num('CHAIN_ID'),
+        name: str('CHAIN_NAME'),
+        symbol: str('CURRENCY_SYMBOL'),
+        decimals: num('CURRENCY_DECIMALS'),
+        siteUrl: str('CHAIN_SITE_URL'),
+        explorerUrl: str('EXPLORER_URL'),
+        startBlock: num('START_BLOCK'),
+        pollMs: num('POLL_MS'),
+        batchSize: num('BATCH_SIZE'),
+        concurrency: num('RPC_CONCURRENCY'),
+        rpcBatchSize: num('RPC_BATCH_SIZE')
+    }, env);
 }
 
 /** The viem chain description for {@link ChainEnv}. */

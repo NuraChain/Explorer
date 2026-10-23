@@ -17,7 +17,7 @@ import { bech32ToHex } from './bech32.ts';
 
 export interface CosmosEnv
 {
-    /** The Cosmos REST api ("LCD"). Empty disables the governance section outright. */
+    /** The Cosmos REST api ("LCD"). */
     restUrl: string;
 
     /** CometBFT's rpc - what the node says about its own height and sync. */
@@ -27,15 +27,14 @@ export interface CosmosEnv
     timeoutMs: number;
 }
 
-export function loadCosmosEnv(): CosmosEnv
+/** Reads the node's Cosmos endpoints from the environment (or `env`, for a test). All required. */
+export function loadCosmosEnv(env?: Record<string, string | undefined>): CosmosEnv
 {
     return loadConfig({
-        // Localhost by default: the explorer is meant to run beside the node it reads, and a
-        // deployment that puts them apart says so in its own .env.
-        restUrl: str('COSMOS_REST_URL', { default: 'http://127.0.0.1:1317' }),
-        rpcUrl: str('COMETBFT_RPC_URL', { default: 'http://127.0.0.1:26657' }),
-        timeoutMs: num('COSMOS_TIMEOUT_MS', { default: 4000 })
-    });
+        restUrl: str('COSMOS_REST_URL'),
+        rpcUrl: str('COMETBFT_RPC_URL'),
+        timeoutMs: num('COSMOS_TIMEOUT_MS')
+    }, env);
 }
 
 export interface CosmosCoin

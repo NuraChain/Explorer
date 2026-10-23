@@ -2,7 +2,7 @@
 // is not what the cache returns but how many times it went to the node to find out.
 import { describe, it, expect } from 'vitest';
 
-import { CachedChain, DEFAULT_CACHE, TtlCache, type CacheOptions } from '../src/chain/cache.ts';
+import { CachedChain, TtlCache, type CacheOptions } from '../src/chain/cache.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/client.ts';
 
 const ENV: ChainEnv = {
@@ -49,10 +49,23 @@ function counting(overrides: Partial<ChainGateway> = {}): ChainGateway & { calls
     return { ...base, ...overrides, calls };
 }
 
-/** The defaults with every span made tiny, so a test can outlive one without sleeping long. */
+/** The spans the .env example ships, the code having none of its own. */
+const SHIPPED: CacheOptions = {
+    enabled: true,
+    maxEntries: 4096,
+    headMs: 1_000,
+    balanceMs: 2_000,
+    callMs: 2_000,
+    storageMs: 2_000,
+    codeMs: 600_000,
+    codeAbsentMs: 5_000,
+    tokenMs: 600_000
+};
+
+/** The shipped spans with the short ones made tiny, so a test can outlive one without sleeping long. */
 function brief(overrides: Partial<CacheOptions> = {}): CacheOptions
 {
-    return { ...DEFAULT_CACHE, headMs: 20, balanceMs: 20, callMs: 20, storageMs: 20, codeAbsentMs: 20, ...overrides };
+    return { ...SHIPPED, headMs: 20, balanceMs: 20, callMs: 20, storageMs: 20, codeAbsentMs: 20, ...overrides };
 }
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -277,7 +290,7 @@ describe('the cache in front of the node', () =>
     it('goes straight to the node when it is switched off', async () =>
     {
         const node = counting();
-        const chain = new CachedChain(node, { ...DEFAULT_CACHE, enabled: false });
+        const chain = new CachedChain(node, { ...SHIPPED, enabled: false });
 
         await chain.head();
         await chain.head();

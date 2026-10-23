@@ -36,7 +36,7 @@ export interface PriceSource
 
 export interface PriceEnv
 {
-    /** Origin serving `/api/market/tokens`. Empty switches the feed off - no price is quoted. */
+    /** Origin serving `/api/market/tokens`. */
     apiUrl: string;
 
     /** How long a reading is served before another is fetched. */
@@ -54,14 +54,15 @@ export interface PriceEnv
     timeoutMs: number;
 }
 
-export function loadPriceEnv(): PriceEnv
+/** Reads the price feed's configuration from the environment (or `env`, for a test). All required. */
+export function loadPriceEnv(env?: Record<string, string | undefined>): PriceEnv
 {
     return loadConfig({
-        apiUrl: str('SWAP_API_URL', { default: 'https://swap.nurachain.net' }),
-        ttlMs: num('PRICE_TTL_MS', { default: 30_000 }),
-        staleMs: num('PRICE_STALE_MS', { default: 600_000 }),
-        timeoutMs: num('PRICE_TIMEOUT_MS', { default: 4000 })
-    });
+        apiUrl: str('SWAP_API_URL'),
+        ttlMs: num('PRICE_TTL_MS'),
+        staleMs: num('PRICE_STALE_MS'),
+        timeoutMs: num('PRICE_TIMEOUT_MS')
+    }, env);
 }
 
 /**

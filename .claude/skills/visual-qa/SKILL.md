@@ -25,7 +25,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3003/
 ```
 
 If nothing answers, build and start **production** — `npm run build && npm start --workspace server`,
-honouring `PORT`, with `DATABASE_URL` set in `server/.env` (the index is PostgreSQL; on a fresh one
+honouring `PORT`, with `DATABASE_URL` set in the root `.env` (the index is PostgreSQL; on a fresh one
 the pages stay sparse until the backfill catches up). That is what a reader gets, and it is not what
 the dev session gives you. The two share one route table, one renderer and one origin, but the dev
 session ignores the page cache, renders static pages live, and registers `/_image` by hand where

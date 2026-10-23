@@ -21,14 +21,12 @@ export interface DatabaseEnv
     poolSize: number;
 }
 
-/** Reads the database configuration from the environment (or `env`, for a test). */
+/** Reads the database configuration from the environment (or `env`, for a test). Both required. */
 export function loadDatabaseEnv(env?: Record<string, string | undefined>): DatabaseEnv
 {
     return loadConfig({
-        // No default. An index silently pointed at the wrong database is worse than a server that
-        // refuses to start, and the boot error names the variable.
         url: str('DATABASE_URL', { secret: true }),
-        poolSize: num('DATABASE_POOL_SIZE', { default: 10 })
+        poolSize: num('DATABASE_POOL_SIZE')
     }, env);
 }
 
