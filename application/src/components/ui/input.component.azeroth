@@ -46,8 +46,8 @@ export default component Input(props: {
             fallback={
                 <textarea
                     class={ [
-                        'min-w-0 flex-1 resize-y bg-transparent leading-relaxed text-text outline-none placeholder:font-sans placeholder:text-muted',
-                        props.prose === true ? '' : 'hash-field',
+                        'min-w-0 flex-1 resize-y bg-transparent text-text outline-none placeholder:font-sans placeholder:text-muted',
+                        props.prose === true ? 'leading-relaxed' : 'hash-field leading-code',
                         big ? 'text-[16px]' : 'text-[14px]'
                     ].filter(Boolean).join(' ') }
                     rows={ props.rows ?? 6 }

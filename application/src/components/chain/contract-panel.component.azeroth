@@ -299,7 +299,7 @@ export default component ContractPanel(props: { detail: ContractDetail; chain: C
                 {/* `whitespace-pre-wrap` because a <pre> otherwise holds 13000 characters on one
                     line, and the horizontal scrollbar that follows drags the whole page sideways.
                     `hash` lets it break between characters - it is hex, so every point is one. */}
-                <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[12px] leading-relaxed text-muted">{ props.detail.bytecode }</pre>
+                <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[12px] leading-code text-muted">{ props.detail.bytecode }</pre>
             </Show>
         </section>
     </div>

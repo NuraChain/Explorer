@@ -23,10 +23,18 @@
 
     /*
      * Persian sits lower and taller than Latin at the same size - descenders carry dots, and the
-     * default 1.4 packs consecutive lines close enough that they collide. It also puts the shipped
+     * Latin leading packs consecutive lines close enough that they collide. It also puts the shipped
      * Vazirmatn ahead of Archivo, so Persian is set in the face drawn for it. Scoped to the
      * language rather than the direction, so both follow the text and not the layout. Arabic is
      * the same script with the same metrics, and Vazirmatn's Arabic subset covers it.
+     */
+    /*
+     * The `leading-*` utilities read these tokens, and Tailwind's values are Latin ones. Left
+     * alone they would undo the line-height above for exactly the text that asked for its own
+     * leading: a `leading-relaxed` paragraph came out at 1.625, TIGHTER than plain Persian body
+     * text, and a wrapped `leading-tight` heading stacked dots into the line beneath. Each is
+     * rescaled here so it keeps its place relative to the body leading - relaxed stays above
+     * it, tight stays the tightest that still clears Vazirmatn's 1.56em content area.
      */
     html:lang(fa),
     html:lang(ar)
@@ -34,6 +42,9 @@
         font-family: var(--font-persian);
         font-size: 1.0625rem;
         line-height: 1.85;
+        --leading-tight: 1.5;
+        --leading-snug: 1.65;
+        --leading-relaxed: 1.95;
     }
 
     /* Devanagari stacks headline bars and under-marks the same way: at 1.6 a matra can touch the
@@ -41,6 +52,9 @@
     html:lang(hi)
     {
         line-height: 1.75;
+        --leading-tight: 1.4;
+        --leading-snug: 1.5;
+        --leading-relaxed: 1.8;
     }
 
     /* The clear button a `type="search"` field draws for itself. It is a button and it acts like

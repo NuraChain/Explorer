@@ -260,7 +260,7 @@ export default component TransactionPage()
                             <summary class="cursor-pointer px-4 py-3 text-[13px] text-muted transition-colors duration-150 marker:text-nur hover:text-text">
                                 { locale.t('tx.input.raw') }
                             </summary>
-                            <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 pb-3 text-[12px] leading-relaxed text-muted">{ call.data }</pre>
+                            <pre class="hash max-h-80 overflow-y-auto whitespace-pre-wrap px-4 pb-3 text-[12px] leading-code text-muted">{ call.data }</pre>
                         </details>
                     </section>
                 </Show>

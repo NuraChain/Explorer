@@ -260,7 +260,7 @@ export default component ProposalPage()
                                         type url says what is being changed and nothing about how.
                                         Printed as text - it is json from a transaction, and this
                                         page renders none of it. */}
-                                    <pre class="hash overflow-x-auto rounded-lg bg-raised px-3 py-2 text-[12px] leading-relaxed text-muted">{ message.body }</pre>
+                                    <pre class="hash overflow-x-auto rounded-lg bg-raised px-3 py-2 text-[12px] leading-code text-muted">{ message.body }</pre>
                                 </li>
                             </For>
                         </ul>
