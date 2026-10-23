@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.7.0
+
+### Features
+
+- **The index lives in PostgreSQL, through TypeORM and `pg`.** Every query used to run on the event
+  loop - the charts rebuild alone held every request for seconds on a long chain - and now runs on
+  a pooled connection beside it. Wei and every uint256 are `NUMERIC`, so fees and flows sum exactly
+  in SQL. `DATABASE_URL` is required and the database must be UTF8; the old sqlite index is not
+  migrated, and the new one replays from `START_BLOCK`
+- **Configuration has no defaults.** Every key the server reads is required, and a boot with any of
+  them missing, empty or malformed fails before anything starts, with one error naming them all.
+  An empty `COSMOS_REST_URL` or `SWAP_API_URL` no longer switches governance or the price feed off
+- **ONE `.env`, at the repository root**, serves a checkout and a container (`--env-file`) alike.
+  `.env.example` moves there with it
+- **The explorer ships as one image.** The Dockerfile is the deployment; `compose.yaml` and the
+  systemd scripts (with the `service:*` npm scripts) are gone
+- **Home, navbar and footer sit on a 1536px page column**, giving the search field back the width
+  the old 1024px column took
+
+### Fixes
+
+- **Persian, Arabic and Hindi keep their taller line-height in prose and headings.** Tailwind's
+  `leading-*` utilities carried Latin values and replaced the body's per-language leading, so
+  wrapped headings clipped Vazirmatn's glyphs. Hex blocks take a `leading-code` token that stays
+  Latin in every language
+
+### Chores
+
+- Every dependency is on its latest release; TypeScript stays on 6, which `@azerothjs/compiler`
+  requires, and Dependabot holds it there
+
 ## 1.6.3
 
 ### Fixes
