@@ -1,7 +1,7 @@
 # Nura Explorer — working notes for Claude Code
 
-An EVM block explorer. Two npm workspaces: `application/` (the UI) and `server/` (the API and the
-sqlite index). Everything below is drawn from the repository as it stands — if a rule here ever
+An EVM block explorer. Two npm workspaces: `application/` (the UI) and `server/` (the API and its
+PostgreSQL index). Everything below is drawn from the repository as it stands — if a rule here ever
 disagrees with the code, the code is right and this file needs fixing.
 
 ## Commands
@@ -9,14 +9,15 @@ disagrees with the code, the code is right and this file needs fixing.
 ```sh
 npm run dev                   # ONE process on 3003: the server runs vite inside itself
 npm run build                 # client bundle, SSR bundle, prerender
-npm start --workspace server  # run the built app (NODE_ENV=production, honours PORT)
+npm start --workspace server  # run the built app (NODE_ENV=production, honours PORT, needs DATABASE_URL)
 npm run check                 # typecheck both workspaces + oxlint — the gate
 npm run lint                  # oxlint on its own (`lint:fix` applies what it can fix)
 npm run format                # oxfmt — READ the note below before running this
 npx azeroth check             # the typecheck half alone; the CLI's lint step knew eslint, which is gone
-npm test                      # every suite
+npm test                      # every suite (the server half needs TEST_DATABASE_URL)
 npm run test:shuffle          # every suite in random order — the isolation gate
 npm run test:coverage         # server suite + coverage report
+docker compose up -d --build  # the explorer and its PostgreSQL together (compose.yaml)
 ```
 
 `npm run check`, `npm test` and `npm run test:shuffle` must all pass before a change is done.
@@ -95,7 +96,7 @@ module, so proposals live in `x/gov` and never touch the EVM — there is not on
 log on the chain. It is read from the node's OTHER two apis instead: the Cosmos REST api for the
 module's state and CometBFT's rpc for the height it was read at (`server/src/chain/cosmos.ts`,
 configured by `COSMOS_REST_URL` / `COMETBFT_RPC_URL` / `COSMOS_TIMEOUT_MS`). Only the server calls
-them, the routes hold the answer for five seconds, and nothing is copied into sqlite — a chain has
+them, the routes hold the answer for five seconds, and nothing is copied into the index — a chain has
 tens of proposals where it has millions of transactions, so a copy would only be one that can be
 wrong. Cosmos addresses are bech32; `server/src/chain/bech32.ts` decodes them so a proposer or a
 voter still links to the account page the EVM knows.
@@ -106,6 +107,29 @@ signed by the reader's wallet. The two capabilities are reported separately — 
 REST api answered, `writable` says the precompile is among the chain's `active_static_precompiles`
 — because a chain that exposes one without the other is the normal case, and the page then follows
 a proposal without offering an action nothing can send.
+
+## The index
+
+PostgreSQL through **TypeORM 1.x and `pg`** (`server/src/chain/`: `store.ts`, `data-source.ts`,
+`entities.ts`, `migrations/`). `DATABASE_URL` is required; the database must be UTF8. Every row is
+derived from the chain, so dropping the tables is safe — the indexer replays from `START_BLOCK`.
+
+- **Entities are `EntitySchema` objects, never decorators.** The server runs as `node src/main.ts`
+  under Node's type stripping, which rejects a decorator outright and never reads tsconfig.
+- **A schema change is a new migration** in `migrations/`, raw SQL, added to the explicit list in
+  `data-source.ts` (never a glob). It runs once, when the store opens. Name every index it makes in
+  the entity with `synchronize: false`; `store.spec.ts` asks TypeORM's schema builder whether the
+  entities and the tables still agree.
+- **`typeorm` is declared in the ROOT `package.json`, not in `server/`.** `@azerothjs/cli` 2.1.0
+  treats any server listing it as a decorator-built backend, and `azeroth dev` would then wait for a
+  `dist/` that is never emitted. Move it back once the CLI decides that from tsconfig flags.
+- **Inside `store.transaction()` / `store.snapshot()` work: sequential awaits on the store only.**
+  No network call, no `Promise.all`, nothing left running when the work returns — a call that
+  outlives its transaction is refused, never committed on its own.
+- Raw SQL takes its table names from `tables.ts` (schema-qualified: the suite gives every store a
+  schema of its own), binds `$n` parameters, and aliases in snake_case read back by name — Postgres
+  folds an unquoted camelCase alias. Wei and every uint256 are `NUMERIC` and stay decimal strings;
+  int8 counts cross as numbers through `parseInt8`. Nothing amount-shaped goes through a double.
 
 ## Design system
 
@@ -185,13 +209,16 @@ Playwright config and none is needed.
 
 Every significant UI change runs the loop in `.claude/skills/visual-qa/` before it is done.
 **Walk a PRODUCTION build, not the dev session** — `npm run build && npm start --workspace server`
-is what a reader gets.
+is what a reader gets. It needs `DATABASE_URL`; on a fresh index the pages are sparse until the
+backfill catches up, so judge layout on data the index already holds.
 
 ## Testing workflow
 
 Vitest in both workspaces. The browser half runs under happy-dom with `@azerothjs/testing`
-(`renderTest` / `fire` / `cleanup`); the server half runs against `:memory:` sqlite and a stubbed
-chain gateway. Nothing binds a port or reaches the network.
+(`renderTest` / `fire` / `cleanup`); the server half runs against a stubbed chain gateway and a
+**real PostgreSQL**: `TEST_DATABASE_URL`, from the environment or that one key of `server/.env` — a
+database of its own, never the index. `tests/support/database.ts` gives every store a schema nobody
+else picks and drops it after the test; open stores only through it. Nothing reaches a chain.
 
 Both halves lean on module-level singletons, so **`npm run test:shuffle` is a gate** — a test that
 only passes in declaration order will fail for somebody else at random.
