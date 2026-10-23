@@ -512,10 +512,12 @@ describe('the follower loop', () =>
         const store = await openTestStore({ strict: false });
         // An index left over from a different chain: same heights, different history.
         await store.ensureChain('0xsomeotherchain');
-        await store.insertBlock(
-            { number: 0, hash: '0xstale', parent_hash: '0x00', timestamp: 1, miner: MINER,
+        await store.insertBlocks([{
+            block: { number: 0, hash: '0xstale', parent_hash: '0x00', timestamp: 1, miner: MINER,
                 gas_used: '0', gas_limit: '0', base_fee: null, size: 0, tx_count: 0 },
-            [], []);
+            transactions: [],
+            transfers: []
+        }]);
         await store.setCursor(0);
 
         const handle = follow(startIndexer(store, stubChain(blocks, { env: { pollMs: 5 } }), silent));

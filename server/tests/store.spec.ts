@@ -11,14 +11,20 @@ import { describe, it, expect } from 'vitest';
 import { DataSource } from 'typeorm';
 
 import { dataSourceOptions } from '../src/chain/data-source.ts';
-import { normalize } from '../src/chain/rows.ts';
-import type { BlockRow, TransactionRow, TransferRow, IndexStore } from '../src/chain/store.ts';
+import { normalize, type BlockRow, type TransactionRow, type TransferRow } from '../src/chain/rows.ts';
+import type { IndexStore } from '../src/chain/store.ts';
 import { inspect, openTestStore, reopen, schemaOf, testDatabase } from './support/database.ts';
 import { ALICE, BOB, CAROL, MINER, TOKEN, ZERO } from './support/fixtures.ts';
 
 function store(): Promise<IndexStore>
 {
     return openTestStore();
+}
+
+/** One block and its rows, written as a batch of one - the way every case here fills an index. */
+function write(index: IndexStore, block: BlockRow, transactions: TransactionRow[], transfers: TransferRow[]): Promise<void>
+{
+    return index.insertBlocks([{ block, transactions, transfers }]);
 }
 
 function blockRow(number: number, overrides: Partial<BlockRow> = {}): BlockRow
@@ -143,7 +149,7 @@ describe('ensureChain - the stale-index guard', () =>
     {
         const index = await store();
         await index.ensureChain('0xgenesis');
-        await index.insertBlock(blockRow(0), [txRow('0xt0', 0)], []);
+        await write(index, blockRow(0), [txRow('0xt0', 0)], []);
         await index.setCursor(0);
 
         expect(await index.ensureChain('0xgenesis')).toBe(false);
@@ -155,8 +161,8 @@ describe('ensureChain - the stale-index guard', () =>
     {
         const index = await store();
         await index.ensureChain('0xgenesis');
-        await index.insertBlock(blockRow(0), [txRow('0xt0', 0)], [transferRow('0xt0', 0, 0)]);
-        await index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
+        await write(index, blockRow(0), [txRow('0xt0', 0)], [transferRow('0xt0', 0, 0)]);
+        await index.upsertTokens([{ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' }]);
         await index.setCursor(0);
 
         expect(await index.ensureChain('0xdifferent')).toBe(true);
@@ -165,7 +171,7 @@ describe('ensureChain - the stale-index guard', () =>
         expect(stats.blocks).toBe(0);
         expect(stats.transactions).toBe(0);
         expect(stats.transfers).toBe(0);
-        expect(await index.tokens()).toEqual([]);
+        expect((await index.totals()).tokens).toBe(0);
         // The cursor is dropped too, or the next sync resumes past history it no longer has.
         expect(await index.cursor(0)).toBe(-1);
         expect(await index.getMeta('genesis')).toBe('0xdifferent');
@@ -177,21 +183,20 @@ describe('ensureChain - the stale-index guard', () =>
         // the indexer asks which tokens are unknown, and a row-less "known" answer skips it.
         const index = await store();
         await index.ensureChain('0xgenesis');
-        await index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
-        expect(await index.knownToken(TOKEN)).toBe(true);
+        await index.upsertTokens([{ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' }]);
+        expect(await index.unknownTokens([TOKEN])).toEqual(new Set());
 
         await index.ensureChain('0xdifferent');
-        expect(await index.knownToken(TOKEN)).toBe(false);
         expect(await index.unknownTokens([TOKEN])).toEqual(new Set([TOKEN]));
     });
 });
 
-describe('insertBlock', () =>
+describe('insertBlocks', () =>
 {
     it('writes a block with its transactions and transfers', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
 
         expect(await index.blockByNumber(1)).toMatchObject({ number: 1, hash: '0xb1' });
         expect(await index.transactionByHash('0xt1')).toMatchObject({ hash: '0xt1', block_number: 1 });
@@ -205,7 +210,7 @@ describe('insertBlock', () =>
         const index = await store();
         for (let attempt = 0; attempt < 3; attempt++)
         {
-            await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
+            await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
         }
         const stats = await index.stats();
         expect(stats.blocks).toBe(1);
@@ -216,8 +221,8 @@ describe('insertBlock', () =>
     it('updates a block\'s hash in place when the same height is re-indexed', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1, { hash: '0xold' }), [], []);
-        await index.insertBlock(blockRow(1, { hash: '0xnew', parent_hash: '0xnewparent' }), [], []);
+        await write(index, blockRow(1, { hash: '0xold' }), [], []);
+        await write(index, blockRow(1, { hash: '0xnew', parent_hash: '0xnewparent' }), [], []);
 
         const found = await index.blockByNumber(1);
         expect(found?.hash).toBe('0xnew');
@@ -228,7 +233,7 @@ describe('insertBlock', () =>
     it('keeps two transfers of the same transaction apart by log index', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [
             transferRow('0xt1', 0, 1),
             transferRow('0xt1', 1, 1, { to_addr: CAROL })
         ]);
@@ -238,7 +243,7 @@ describe('insertBlock', () =>
     it('accepts a block with no transactions at all', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1, { tx_count: 0 }), [], []);
+        await write(index, blockRow(1, { tx_count: 0 }), [], []);
         expect((await index.blockByNumber(1))?.tx_count).toBe(0);
         expect((await index.stats()).transactions).toBe(0);
     });
@@ -246,7 +251,7 @@ describe('insertBlock', () =>
     it('keeps a null to_addr - a contract deployment has no recipient', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { to_addr: null, contract_address: CAROL })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { to_addr: null, contract_address: CAROL })], []);
         const row = await index.transactionByHash('0xt1');
         expect(row?.to_addr).toBeNull();
         expect(row?.contract_address).toBe(CAROL);
@@ -255,7 +260,7 @@ describe('insertBlock', () =>
     it('keeps a null base fee - a pre-1559 chain has none', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1, { base_fee: null }), [], []);
+        await write(index, blockRow(1, { base_fee: null }), [], []);
         expect((await index.blockByNumber(1))?.base_fee).toBeNull();
     });
 
@@ -263,7 +268,7 @@ describe('insertBlock', () =>
     {
         const max = ((1n << 256n) - 1n).toString();
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { value: max })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { value: max })], []);
         expect((await index.transactionByHash('0xt1'))?.value).toBe(max);
     });
 });
@@ -275,8 +280,8 @@ describe('transactions and rollback', () =>
         const index = await store();
         await index.transaction(async () =>
         {
-            await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
-            await index.insertBlock(blockRow(2), [txRow('0xt2', 2)], []);
+            await write(index, blockRow(1), [txRow('0xt1', 1)], []);
+            await write(index, blockRow(2), [txRow('0xt2', 2)], []);
         });
         expect((await index.stats()).blocks).toBe(2);
     });
@@ -284,11 +289,11 @@ describe('transactions and rollback', () =>
     it('rolls the WHOLE batch back when the work throws', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(0), [], []);
+        await write(index, blockRow(0), [], []);
 
         await expect(index.transaction(async () =>
         {
-            await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+            await write(index, blockRow(1), [txRow('0xt1', 1)], []);
             await index.setCursor(1);
             throw new Error('the node dropped the next batch');
         })).rejects.toThrow('the node dropped');
@@ -307,7 +312,7 @@ describe('transactions and rollback', () =>
         {
             throw new Error('boom');
         })).rejects.toThrow();
-        await index.insertBlock(blockRow(1), [], []);
+        await write(index, blockRow(1), [], []);
         expect((await index.stats()).blocks).toBe(1);
     });
 
@@ -319,7 +324,7 @@ describe('transactions and rollback', () =>
         const result = await index.transaction(async () =>
             index.transaction(async () =>
             {
-                await index.insertBlock(blockRow(1), [], []);
+                await write(index, blockRow(1), [], []);
                 return 'inner';
             }));
         expect(result).toBe('inner');
@@ -331,7 +336,7 @@ describe('transactions and rollback', () =>
         const index = await store();
         await expect(index.transaction(async () =>
         {
-            await index.transaction(async () => index.insertBlock(blockRow(1), [], []));
+            await index.transaction(async () => write(index, blockRow(1), [], []));
             throw new Error('outer failed');
         })).rejects.toThrow();
         expect((await index.stats()).blocks).toBe(0);
@@ -394,8 +399,8 @@ describe('the transaction contract', () =>
         const index = await store();
         await index.transaction(async () =>
         {
-            await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
-            await index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
+            await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
+            await index.upsertTokens([{ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' }]);
             await index.setCursor(1);
 
             expect((await index.blockByNumber(1))?.hash).toBe('0xb1');
@@ -412,7 +417,7 @@ describe('the transaction contract', () =>
     it('refuses a write inside a read-only snapshot, and hands back the snapshot\'s answer', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [], []);
+        await write(index, blockRow(1), [], []);
 
         expect(await index.snapshot(async () => (await index.stats()).blocks)).toBe(1);
         await expect(index.snapshot(async () => index.setCursor(9))).rejects.toThrow(/read-only/);
@@ -433,7 +438,7 @@ describe('the transaction contract', () =>
     it('answers a height no row can carry as a miss rather than handing it to the database', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], []);
         for (const height of [1.5, Number.NaN, -1, 2 ** 60])
         {
             expect(await index.blockByNumber(height), String(height)).toBeNull();
@@ -447,7 +452,7 @@ describe('the transaction contract', () =>
         // No hash, address or name in the index contains one, and a database may refuse to bind it.
         const nul = '\u0000';
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
 
         expect(await index.transactionByHash(nul)).toBeNull();
         expect(await index.blockByHash(nul)).toBeNull();
@@ -464,9 +469,9 @@ describe('the transaction contract', () =>
     it('reads a page\'s worth of heights, transactions and tokens as sets', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
-        await index.insertBlock(blockRow(2), [txRow('0xt2', 2)], []);
-        await index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
+        await write(index, blockRow(1), [txRow('0xt1', 1)], []);
+        await write(index, blockRow(2), [txRow('0xt2', 2)], []);
+        await index.upsertTokens([{ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' }]);
 
         expect(await index.head()).toBe(2);
         expect(await index.blockHashes([2, 1, 2, 99])).toEqual(new Map([[2, '0xb2'], [1, '0xb1']]));
@@ -524,7 +529,7 @@ describe('rollbackFrom - the reorg half', () =>
         const index = await store();
         for (const number of [1, 2, 3])
         {
-            await index.insertBlock(blockRow(number), [txRow(`0xt${ number }`, number)], [transferRow(`0xt${ number }`, 0, number)]);
+            await write(index, blockRow(number), [txRow(`0xt${ number }`, number)], [transferRow(`0xt${ number }`, 0, number)]);
         }
 
         await index.rollbackFrom(2);
@@ -538,7 +543,7 @@ describe('rollbackFrom - the reorg half', () =>
     it('is inclusive of the height it is given', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(5), [], []);
+        await write(index, blockRow(5), [], []);
         await index.rollbackFrom(5);
         expect(await index.blockByNumber(5)).toBeNull();
     });
@@ -546,7 +551,7 @@ describe('rollbackFrom - the reorg half', () =>
     it('does nothing when nothing is that high', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [], []);
+        await write(index, blockRow(1), [], []);
         await index.rollbackFrom(99);
         expect((await index.stats()).blocks).toBe(1);
     });
@@ -554,8 +559,8 @@ describe('rollbackFrom - the reorg half', () =>
     it('leaves tokens alone - a token contract survives a reorg of its transfers', async () =>
     {
         const index = await store();
-        await index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
+        await index.upsertTokens([{ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' }]);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
         await index.rollbackFrom(1);
         expect(await index.token(TOKEN)).not.toBeNull();
     });
@@ -566,17 +571,31 @@ describe('tokens', () =>
     it('upserts by address, replacing the description rather than duplicating it', async () =>
     {
         const index = await store();
-        await index.upsertToken({ address: TOKEN, name: 'Old', symbol: 'OLD', decimals: 6, kind: 'erc20' });
-        await index.upsertToken({ address: TOKEN, name: 'New', symbol: 'NEW', decimals: 18, kind: 'erc721' });
+        await index.upsertTokens([{ address: TOKEN, name: 'Old', symbol: 'OLD', decimals: 6, kind: 'erc20' }]);
+        await index.upsertTokens([{ address: TOKEN, name: 'New', symbol: 'NEW', decimals: 18, kind: 'erc721' }]);
 
-        expect(await index.tokens()).toHaveLength(1);
+        expect((await index.totals()).tokens).toBe(1);
         expect(await index.token(TOKEN)).toMatchObject({ name: 'New', symbol: 'NEW', decimals: 18, kind: 'erc721' });
+    });
+
+    it('keeps the last description of an address one batch names twice', async () =>
+    {
+        // One multi-row upsert may not touch a row twice, so the batch is narrowed to one row per
+        // address first - the one a row-at-a-time write would have left.
+        const index = await store();
+        await index.upsertTokens([
+            { address: TOKEN, name: 'Old', symbol: 'OLD', decimals: 6, kind: 'erc20' },
+            { address: TOKEN, name: 'New', symbol: 'NEW', decimals: 18, kind: 'erc721' }
+        ]);
+
+        expect((await index.totals()).tokens).toBe(1);
+        expect(await index.token(TOKEN)).toMatchObject({ name: 'New', symbol: 'NEW' });
     });
 
     it('finds a token whatever case it is asked for', async () =>
     {
         const index = await store();
-        await index.upsertToken({ address: TOKEN, name: 'T', symbol: 'T', decimals: 18, kind: 'erc20' });
+        await index.upsertTokens([{ address: TOKEN, name: 'T', symbol: 'T', decimals: 18, kind: 'erc20' }]);
         expect(await index.token(TOKEN.toUpperCase().replace('0X', '0x'))).not.toBeNull();
     });
 
@@ -588,25 +607,16 @@ describe('tokens', () =>
     it('keeps an unnamed token, because it still moved value', async () =>
     {
         const index = await store();
-        await index.upsertToken({ address: TOKEN, name: '', symbol: '', decimals: 0, kind: 'erc20' });
+        await index.upsertTokens([{ address: TOKEN, name: '', symbol: '', decimals: 0, kind: 'erc20' }]);
         expect(await index.token(TOKEN)).toMatchObject({ name: '', symbol: '', decimals: 0 });
-    });
-
-    it('orders the list by symbol', async () =>
-    {
-        const index = await store();
-        await index.upsertToken({ address: CAROL, name: 'C', symbol: 'ZZZ', decimals: 18, kind: 'erc20' });
-        await index.upsertToken({ address: TOKEN, name: 'T', symbol: 'AAA', decimals: 18, kind: 'erc20' });
-        expect((await index.tokens()).map((row) => row.symbol)).toEqual(['AAA', 'ZZZ']);
     });
 
     it('knows a token once it is described, whatever case it is asked in, and honestly before', async () =>
     {
         const index = await store();
-        expect(await index.knownToken(TOKEN)).toBe(false);
-        await index.upsertToken({ address: TOKEN, name: 'T', symbol: 'T', decimals: 18, kind: 'erc20' });
-        expect(await index.knownToken(TOKEN)).toBe(true);
-        expect(await index.knownToken(TOKEN.toUpperCase().replace('0X', '0x'))).toBe(true);
+        expect(await index.unknownTokens([TOKEN])).toEqual(new Set([TOKEN]));
+        await index.upsertTokens([{ address: TOKEN, name: 'T', symbol: 'T', decimals: 18, kind: 'erc20' }]);
+        expect(await index.unknownTokens([TOKEN, TOKEN.toUpperCase().replace('0X', '0x')])).toEqual(new Set());
     });
 });
 
@@ -618,7 +628,8 @@ describe('reads: ordering, paging and filtering', () =>
         const index = await store();
         for (const number of [2, 0, 1])
         {
-            await index.insertBlock(
+            await write(
+                index,
                 blockRow(number, { tx_count: 2 }),
                 [
                     txRow(`0x${ number }a`, number, { tx_index: 0 }),
@@ -684,7 +695,8 @@ describe('reads: ordering, paging and filtering', () =>
     async function mixed(): Promise<IndexStore>
     {
         const index = await store();
-        await index.insertBlock(
+        await write(
+            index,
             blockRow(1, { tx_count: 4 }),
             [
                 txRow('0xok1', 1, { tx_index: 0, status: 1 }),
@@ -754,7 +766,8 @@ describe('reads: ordering, paging and filtering', () =>
         for (const number of [0, 1, 2, 3])
         {
             const carries = number === 1 || number === 3;
-            await index.insertBlock(
+            await write(
+                index,
                 blockRow(number, { tx_count: carries ? 1 : 0 }),
                 carries ? [txRow(`0x${ number }a`, number)] : [],
                 []);
@@ -825,11 +838,11 @@ describe('the address queries this index exists for', () =>
     async function withHistory(): Promise<IndexStore>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [
+        await write(index, blockRow(1), [
             txRow('0xt1', 1, { from_addr: ALICE, to_addr: BOB }),
             txRow('0xt2', 1, { tx_index: 1, from_addr: BOB, to_addr: ALICE, value: '5' })
         ], []);
-        await index.insertBlock(blockRow(2), [
+        await write(index, blockRow(2), [
             txRow('0xt3', 2, { from_addr: CAROL, to_addr: CAROL })
         ], []);
         return index;
@@ -902,7 +915,7 @@ describe('the address queries this index exists for', () =>
         // Ascending, unlike every other list here: within one transaction the log index IS the
         // order the contract emitted them in. An airdrop read backwards is a different story.
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [
             transferRow('0xt1', 0, 1),
             transferRow('0xt1', 1, 1, { to_addr: CAROL }),
             transferRow('0xt1', 2, 1, { to_addr: MINER })
@@ -921,7 +934,7 @@ describe('the address queries this index exists for', () =>
     it('answers a transaction that emitted nothing with an empty page, not an error', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], []);
         expect(await index.transfersOfTransaction('0xt1', 10, 0)).toEqual({ rows: [], total: 0 });
     });
 
@@ -930,7 +943,7 @@ describe('the address queries this index exists for', () =>
         // A token contract is never a PARTY to its own transfers; keyed on from/to alone its page
         // was empty while the index held every transfer it had ever emitted.
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1)]);
         expect((await index.transfersOfAddress(TOKEN, 10, 0)).total).toBe(1);
         expect((await index.transfersOfAddress(ALICE, 10, 0)).total).toBe(1);
         expect((await index.transfersOfAddress(BOB, 10, 0)).total).toBe(1);
@@ -939,14 +952,14 @@ describe('the address queries this index exists for', () =>
     it('counts a transfer once even when the token is also a party to it', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1, { from_addr: TOKEN })]);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1, { from_addr: TOKEN })]);
         expect((await index.transfersOfAddress(TOKEN, 10, 0)).total).toBe(1);
     });
 
     it('finds the transaction that deployed a contract', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { to_addr: null, contract_address: CAROL })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { to_addr: null, contract_address: CAROL })], []);
         expect((await index.contractCreation(CAROL))?.hash).toBe('0xt1');
         expect((await index.contractCreation(CAROL.toUpperCase().replace('0X', '0x')))?.hash).toBe('0xt1');
         expect(await index.contractCreation(BOB)).toBeNull();
@@ -958,7 +971,7 @@ describe('flowOfAddress', () =>
     it('sums value in and out, and fees only on what the address SENT', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [
+        await write(index, blockRow(1), [
             txRow('0xin', 1, { from_addr: BOB, to_addr: ALICE, value: '100', gas_used: '21000', effective_gas_price: '1' }),
             txRow('0xout', 1, { tx_index: 1, from_addr: ALICE, to_addr: BOB, value: '30', gas_used: '21000', effective_gas_price: '2' })
         ], []);
@@ -973,14 +986,14 @@ describe('flowOfAddress', () =>
     it('ignores a reverted transaction, whose value never moved', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { value: '999', status: 0 })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { value: '999', status: 0 })], []);
         expect(await index.flowOfAddress(ALICE)).toEqual({ in: '0', out: '0', fees: '0' });
     });
 
     it('counts a self-send on BOTH sides, because the address really did each', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { from_addr: ALICE, to_addr: ALICE, value: '7' })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { from_addr: ALICE, to_addr: ALICE, value: '7' })], []);
         const flow = await index.flowOfAddress(ALICE);
         expect(flow.in).toBe('7');
         expect(flow.out).toBe('7');
@@ -990,7 +1003,7 @@ describe('flowOfAddress', () =>
     {
         const big = (10n ** 30n).toString();
         const index = await store();
-        await index.insertBlock(blockRow(1), [
+        await write(index, blockRow(1), [
             txRow('0xa', 1, { from_addr: BOB, to_addr: ALICE, value: big }),
             txRow('0xb', 1, { tx_index: 1, from_addr: BOB, to_addr: ALICE, value: big })
         ], []);
@@ -1008,7 +1021,7 @@ describe('distinctAddresses - the rich list candidates', () =>
     it('gathers every side of every row, deduplicated', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1, { to_addr: CAROL })]);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], [transferRow('0xt1', 0, 1, { to_addr: CAROL })]);
 
         const addresses = await index.distinctAddresses();
         expect(new Set(addresses)).toEqual(new Set([ALICE, BOB, CAROL, MINER, TOKEN]));
@@ -1018,14 +1031,14 @@ describe('distinctAddresses - the rich list candidates', () =>
     it('excludes the zero address, which nothing can be spent from', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { from_addr: ZERO, to_addr: ALICE })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { from_addr: ZERO, to_addr: ALICE })], []);
         expect(await index.distinctAddresses()).not.toContain(ZERO);
     });
 
     it('drops the null recipient of a deployment rather than listing it', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1, { to_addr: null, contract_address: CAROL })], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1, { to_addr: null, contract_address: CAROL })], []);
         expect(await index.distinctAddresses()).not.toContain(null);
     });
 });
@@ -1037,7 +1050,8 @@ describe('the Etherscan-shaped range queries', () =>
         const index = await store();
         for (const number of [1, 2, 3])
         {
-            await index.insertBlock(
+            await write(
+                index,
                 blockRow(number),
                 [txRow(`0xt${ number }`, number)],
                 [transferRow(`0xt${ number }`, 0, number, { kind: number === 3 ? 'erc721' : 'erc20' })]);
@@ -1106,18 +1120,21 @@ describe('the daily aggregates the charts are drawn from', () =>
     async function fortnight(): Promise<IndexStore>
     {
         const index = await store();
-        await index.insertBlock(
+        await write(
+            index,
             blockRow(1, { timestamp: MONDAY + 10, tx_count: 2, size: 400 }),
             [
                 txRow('0xa1', 1, { timestamp: MONDAY + 10 }),
                 txRow('0xa2', 1, { tx_index: 1, timestamp: MONDAY + 10, from_addr: BOB, to_addr: CAROL })
             ],
             [transferRow('0xa1', 0, 1, { timestamp: MONDAY + 10 })]);
-        await index.insertBlock(
+        await write(
+            index,
             blockRow(2, { timestamp: MONDAY + 16, tx_count: 1, size: 600 }),
             [txRow('0xa3', 2, { timestamp: MONDAY + 16, contract_address: TOKEN })],
             []);
-        await index.insertBlock(
+        await write(
+            index,
             blockRow(3, { timestamp: MONDAY + DAY + 5, tx_count: 1, size: 500 }),
             [txRow('0xb1', 3, { timestamp: MONDAY + DAY + 5, from_addr: MINER, to_addr: ALICE })],
             []);
@@ -1197,7 +1214,7 @@ describe('the daily aggregates the charts are drawn from', () =>
         // close - and an explorer that reports fees which are merely close has misreported them.
         const price = '123456789012345678';
         const index = await store();
-        await index.insertBlock(blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
+        await write(index, blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
             txRow('0xf1', 1, { timestamp: MONDAY + 10, gas_used: '21000', effective_gas_price: price }),
             txRow('0xf2', 1, { tx_index: 1, timestamp: MONDAY + 10, gas_used: '21000', effective_gas_price: price })
         ], []);
@@ -1212,7 +1229,7 @@ describe('the daily aggregates the charts are drawn from', () =>
     it('reports the mean gas price of a day, rounded to the wei', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
+        await write(index, blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
             txRow('0xg1', 1, { timestamp: MONDAY + 10, effective_gas_price: '1000000000' }),
             txRow('0xg2', 1, { tx_index: 1, timestamp: MONDAY + 10, effective_gas_price: '3000000000' })
         ], []);
@@ -1233,14 +1250,16 @@ describe('the window figures behind the headline tiles', () =>
     async function busy(): Promise<IndexStore>
     {
         const index = await store();
-        await index.insertBlock(
+        await write(
+            index,
             blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }),
             [
                 txRow('0xa1', 1, { timestamp: MONDAY + 10 }),
                 txRow('0xa2', 1, { tx_index: 1, timestamp: MONDAY + 10, contract_address: TOKEN })
             ],
             [transferRow('0xa1', 0, 1, { timestamp: MONDAY + 10 })]);
-        await index.insertBlock(
+        await write(
+            index,
             blockRow(2, { timestamp: MONDAY + 40, tx_count: 1 }),
             [txRow('0xa3', 2, { timestamp: MONDAY + 40, from_addr: CAROL, to_addr: MINER })],
             []);
@@ -1271,7 +1290,7 @@ describe('the window figures behind the headline tiles', () =>
     {
         const price = '123456789012345678';
         const index = await store();
-        await index.insertBlock(blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
+        await write(index, blockRow(1, { timestamp: MONDAY + 10, tx_count: 2 }), [
             txRow('0xf1', 1, { timestamp: MONDAY + 10, gas_used: '21000', effective_gas_price: price }),
             txRow('0xf2', 1, { tx_index: 1, timestamp: MONDAY + 10, gas_used: '63000', effective_gas_price: price })
         ], []);
@@ -1294,9 +1313,9 @@ describe('the cumulative totals', () =>
     it('counts every table, and every address the chain has shown', async () =>
     {
         const index = await store();
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1), txRow('0xt2', 1, { tx_index: 1, contract_address: TOKEN })],
+        await write(index, blockRow(1), [txRow('0xt1', 1), txRow('0xt2', 1, { tx_index: 1, contract_address: TOKEN })],
             [transferRow('0xt1', 0, 1)]);
-        await index.upsertToken({ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' });
+        await index.upsertTokens([{ address: TOKEN, name: 'Token', symbol: 'TKN', decimals: 18, kind: 'erc20' }]);
 
         const totals = await index.totals();
         expect(totals).toMatchObject({ blocks: 1, transactions: 2, transfers: 1, tokens: 1, contracts: 1 });
@@ -1320,7 +1339,7 @@ describe('the migration', () =>
         // were the tables dropped and rebuilt, the index would forget a backfill on every deploy.
         const index = await store();
         await index.ensureChain('0xgenesis');
-        await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+        await write(index, blockRow(1), [txRow('0xt1', 1)], []);
         await index.setCursor(1);
 
         const restarted = await reopen(index);
@@ -1365,7 +1384,7 @@ describe('concurrent access', () =>
         await Promise.all(Array.from({ length: 25 }, async (_entry, number) =>
         {
             await Promise.resolve();
-            await index.insertBlock(blockRow(number), [txRow(`0xt${ number }`, number)], []);
+            await write(index, blockRow(number), [txRow(`0xt${ number }`, number)], []);
         }));
         expect((await index.stats()).blocks).toBe(25);
         expect((await index.stats()).transactions).toBe(25);
@@ -1380,7 +1399,7 @@ describe('concurrent access', () =>
         const writes = Array.from({ length: 20 }, async (_entry, number) =>
         {
             await Promise.resolve();
-            await index.insertBlock(blockRow(number), [txRow(`0xt${ number }`, number)], []);
+            await write(index, blockRow(number), [txRow(`0xt${ number }`, number)], []);
         });
         const reads = Array.from({ length: 20 }, async () =>
         {
@@ -1402,12 +1421,12 @@ describe('concurrent access', () =>
         // own transaction. Until the batch commits, a reader must see the index as it was - never
         // the half of a batch that happens to have been written so far.
         const index = await openTestStore({ strict: false });
-        await index.insertBlock(blockRow(0), [], []);
+        await write(index, blockRow(0), [], []);
         const written = gate();
         const held = gate();
         const batch = index.transaction(async () =>
         {
-            await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+            await write(index, blockRow(1), [txRow('0xt1', 1)], []);
             written.open();
             await held.opened;
         });
@@ -1424,7 +1443,7 @@ describe('concurrent access', () =>
     it('keeps a failed batch from leaving half a block behind under interleaving', async () =>
     {
         const index = await openTestStore({ strict: false });
-        await index.insertBlock(blockRow(0), [], []);
+        await write(index, blockRow(0), [], []);
 
         const attempts = [1, 2, 3].map(async (number) =>
         {
@@ -1433,7 +1452,7 @@ describe('concurrent access', () =>
             {
                 await index.transaction(async () =>
                 {
-                    await index.insertBlock(blockRow(number), [txRow(`0xt${ number }`, number)], []);
+                    await write(index, blockRow(number), [txRow(`0xt${ number }`, number)], []);
                     if (number === 2)
                     {
                         throw new Error('batch 2 failed');

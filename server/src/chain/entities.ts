@@ -15,7 +15,7 @@ import type { BlockRow, TokenRow, TransactionRow, TransferRow } from './rows.ts'
 // without a test noticing (see store.spec.ts).
 
 /** One key/value pair of the index's own bookkeeping: the genesis it was built from, the cursor. */
-export interface MetaRow
+interface MetaRow
 {
     key: string;
     value: string;

@@ -135,12 +135,6 @@ export function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): Ch
     };
 }
 
-/** An empty index, closed after the test. */
-export function freshStore(): Promise<IndexStore>
-{
-    return openTestStore();
-}
-
 /** An index filled from `blocks`, plus the gateway it was filled from. Closed after the test. */
 export async function indexed(blocks: BlockWithReceipts[], stub: ChainStub = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
 {

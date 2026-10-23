@@ -12,7 +12,7 @@ import type { IndexerHandle } from '../../src/chain/indexer.ts';
 import { IndexStore } from '../../src/chain/store.ts';
 
 /** A schema this suite made: `t_<worker>_<process>_<n>`. Nothing else in the database matches. */
-export const TEST_SCHEMA = /^t_\d+_\d+_\d+$/;
+const TEST_SCHEMA = /^t_\d+_\d+_\d+$/;
 
 interface Opened
 {

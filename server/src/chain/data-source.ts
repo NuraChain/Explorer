@@ -47,7 +47,7 @@ export interface Connection
 }
 
 /** Every migration, in order - an explicit list like the entities, never a glob. */
-export const MIGRATIONS = [InitialIndex1792713600000];
+const MIGRATIONS = [InitialIndex1792713600000];
 
 /** The one member of TypeORM's options union this index is opened with. */
 export type PostgresOptions = Extract<DataSourceOptions, { type: 'postgres' }>;

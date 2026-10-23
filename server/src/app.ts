@@ -20,7 +20,7 @@ import {
     type CosmosStatus
 } from './chain/cosmos.ts';
 import { GOV_PRECOMPILE, precompileEnabled } from './chain/gov.ts';
-import { normalize, silentDay, type DailyStats, type TransferRow } from './chain/rows.ts';
+import { DAY_SECONDS, normalize, silentDay, type DailyStats, type TransferRow } from './chain/rows.ts';
 import { selectorOf } from './chain/signatures.ts';
 import {
     readBech32Prefix,
@@ -179,9 +179,6 @@ function inActiveSet(row: StakingValidator): boolean
 
 /** How far the charts look back when nobody says. A month reads as a trend; a week reads as noise. */
 const DEFAULT_CHART_DAYS = 30;
-
-/** Seconds in a day, and the window every headline figure is measured over. */
-const DAY_SECONDS = 86_400;
 
 /**
  * A headline figure and how it moved, as a RATIO of the earlier window.

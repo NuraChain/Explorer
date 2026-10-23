@@ -25,20 +25,6 @@ import {
 } from './rows.ts';
 import { tablesIn, type Tables } from './tables.ts';
 
-export type {
-    BlockEntry,
-    BlockRow,
-    DailyStats,
-    Flow,
-    IndexStats,
-    Page,
-    TokenRow,
-    TotalStats,
-    TransactionRow,
-    TransferRow,
-    WindowStats
-} from './rows.ts';
-
 // The index, in PostgreSQL through TypeORM. Everything here is DERIVED from the chain: a schema
 // change is a migration (see ./migrations) that may simply truncate and replay from START_BLOCK.
 //
@@ -683,31 +669,12 @@ export class IndexStore
         });
     }
 
-    /** One block - see {@link insertBlocks}. */
-    public insertBlock(row: BlockRow, transactions: TransactionRow[], transfers: TransferRow[]): Promise<void>
-    {
-        return this.insertBlocks([{ block: row, transactions, transfers }]);
-    }
-
     /** Describes tokens, replacing any earlier description of the same address. */
     public async upsertTokens(rows: readonly TokenRow[]): Promise<void>
     {
         const unique = lastByKey(rows, (row) => row.address)
             .sort((left, right) => (left.address < right.address ? -1 : left.address > right.address ? 1 : 0));
         await this.#insert('upsertTokens', Token, unique, 5, { overwrite: ['name', 'symbol', 'decimals', 'kind'], target: ['address'] });
-    }
-
-    public upsertToken(row: TokenRow): Promise<void>
-    {
-        return this.upsertTokens([row]);
-    }
-
-    /** Whether this token has already been described. */
-    public async knownToken(address: string): Promise<boolean>
-    {
-        const account = bindable(normalize(address));
-        return account !== null
-            && (await this.#row('knownToken', `SELECT 1 AS known FROM ${ this.#t.tokens } WHERE address = $1`, [account])) !== undefined;
     }
 
     /**
@@ -1278,11 +1245,5 @@ export class IndexStore
         }
         const rows = await this.#rows<TokenRow>('tokensOf', `SELECT * FROM ${ this.#t.tokens } WHERE address = ANY($1::text[])`, [wanted]);
         return new Map(rows.map((row) => [row.address, row]));
-    }
-
-    /** Every token, by symbol in byte order - the order a list sorted by eye expects, on any database locale. */
-    public tokens(): Promise<TokenRow[]>
-    {
-        return this.#rows<TokenRow>('tokens', `SELECT * FROM ${ this.#t.tokens } ORDER BY symbol COLLATE "C" ASC, address ASC`);
     }
 }
