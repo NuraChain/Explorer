@@ -135,43 +135,46 @@ export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logg
     // The NEXT range is asked for before the current one is written, so the node is answering
     // while the index is writing instead of the two taking turns. On a remote RPC the fetch
     // dominates, and this is most of the difference between the two.
-    let pending: Promise<BlockWithReceipts[]> | null = chain.range(from, lastOf(from));
-
-    try
+    //
+    // Each is marked handled the moment it is asked for. It is awaited only on the next pass,
+    // after this batch's writes, and a node that fails it in between - while the database is
+    // answering - must not count as an unhandled rejection, which ends the process. Its error
+    // still reaches the pass that awaits it; a pass that never does leaves nothing in the air.
+    const ask = (start: number): Promise<BlockWithReceipts[]> =>
     {
-        while (from <= head)
+        const range = chain.range(start, lastOf(start));
+        void range.catch(() => undefined);
+        return range;
+    };
+    let pending: Promise<BlockWithReceipts[]> | null = ask(from);
+
+    while (from <= head)
+    {
+        signal?.throwIfAborted();
+        const to = lastOf(from);
+        const blocks = await abortable(pending!, signal);
+        signal?.throwIfAborted();
+        const ahead = to + 1;
+        pending = ahead <= head ? ask(ahead) : null;
+
+        // Decode first, describe unknown tokens second, write last. Only the store is awaited
+        // inside the transaction: a write transaction held open across a network call blocks
+        // every reader on this database for as long as the node takes to answer.
+        const prepared = blocks.map(block => prepare(block));
+        const unknown = await store.unknownTokens(prepared.flatMap(entry => [...entry.tokens]));
+        const described = await abortable(describeTokens(chain, unknown, log), signal);
+        signal?.throwIfAborted();
+
+        await store.transaction(async () =>
         {
-            signal?.throwIfAborted();
-            const to = lastOf(from);
-            const blocks = await abortable(pending!, signal);
-            signal?.throwIfAborted();
-            const ahead = to + 1;
-            pending = ahead <= head ? chain.range(ahead, lastOf(ahead)) : null;
+            await store.upsertTokens(described);
+            await store.insertBlocks(prepared);
+            await store.setCursor(to);
+        });
 
-            // Decode first, describe unknown tokens second, write last. Only the store is awaited
-            // inside the transaction: a write transaction held open across a network call blocks
-            // every reader on this database for as long as the node takes to answer.
-            const prepared = blocks.map(block => prepare(block));
-            const unknown = await store.unknownTokens(prepared.flatMap(entry => [...entry.tokens]));
-            const described = await abortable(describeTokens(chain, unknown, log), signal);
-            signal?.throwIfAborted();
-
-            await store.transaction(async () =>
-            {
-                await store.upsertTokens(described);
-                await store.insertBlocks(prepared);
-                await store.setCursor(to);
-            });
-
-            indexed += blocks.length;
-            report(log, { from, to, head, indexed, backlog, startedAt, prepared });
-            from = to + 1;
-        }
-    }
-    finally
-    {
-        // A batch that failed mid-flight leaves the prefetch in the air; nobody will await it.
-        void pending?.catch(() => undefined);
+        indexed += blocks.length;
+        report(log, { from, to, head, indexed, backlog, startedAt, prepared });
+        from = to + 1;
     }
 }
 
@@ -419,6 +422,18 @@ function topicToAddress(topic: string): string
  * rather than one round per token. A contract that does not answer is still recorded: it moved
  * value, so it belongs in the index under its address.
  */
+/**
+ * A name or symbol as the index can store it: without NUL bytes.
+ *
+ * A contract's `name()` is whatever bytes it returns, decoded as they come, and Postgres refuses a
+ * NUL in a text column outright. Kept, one such token would fail its batch - and the indexer would
+ * retry that same batch forever, holding the whole chain behind one odd contract.
+ */
+function printable(text: string): string
+{
+    return text.replaceAll('\u0000', '');
+}
+
 async function describeTokens(chain: ChainGateway, addresses: ReadonlySet<string>, log: Logger): Promise<TokenRow[]>
 {
     if (addresses.size === 0)
@@ -432,7 +447,7 @@ async function describeTokens(chain: ChainGateway, addresses: ReadonlySet<string
             const meta = await chain.tokenMetadata(address);
             return meta === null
                 ? { address, name: '', symbol: '', decimals: 0, kind: 'erc20' }
-                : { address, name: meta.name, symbol: meta.symbol, decimals: meta.decimals, kind: 'erc20' };
+                : { address, name: printable(meta.name), symbol: printable(meta.symbol), decimals: meta.decimals, kind: 'erc20' };
         }
         catch (error)
         {

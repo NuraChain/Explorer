@@ -630,3 +630,45 @@ describe('the follower loop', () =>
         expect(resolved).toBe(false);
     });
 });
+
+describe('what a chain may hand it', () =>
+{
+    // Each of these is a value some contract or node can produce, and each is one a typed database
+    // refuses unless the index is ready for it. Refused inside a batch, it fails that batch - and
+    // the indexer retries the same batch forever, holding the whole chain behind one odd contract.
+    // Every one must be indexed, with the cursor moved past it.
+
+    it('keeps a Transfer whose data is wider than any uint256', async () =>
+    {
+        // The amount is read from the whole data field, and a contract may emit more than one word.
+        const carrier = tokenBlock(1, '0xa0', '0xa1');
+        carrier.transactions[0]!.logs[0]!.data = `0x${ 'ff'.repeat(64) }`;
+        const store = await sync(stubChain([block(0, '0x00', '0xa0'), carrier]));
+
+        expect(await store.cursor(0)).toBe(1);
+        const [row] = (await store.transfersOfAddress(TOKEN, 10, 0)).rows;
+        expect(row?.value).toBe((2n ** 512n - 1n).toString());
+    });
+
+    it('keeps a token whose name and symbol carry NUL bytes, without them', async () =>
+    {
+        const blocks = [block(0, '0x00', '0xa0'), tokenBlock(1, '0xa0', '0xa1')];
+        const store = await sync(stubChain(blocks, {
+            tokenMetadata: async () => ({ name: 'Bad\u0000Token', symbol: 'B\u0000D', decimals: 18 })
+        }));
+
+        expect(await store.cursor(0)).toBe(1);
+        expect(await store.token(TOKEN)).toMatchObject({ name: 'BadToken', symbol: 'BD', decimals: 18 });
+    });
+
+    it('keeps a token that claims more decimals than a uint8 can say', async () =>
+    {
+        const blocks = [block(0, '0x00', '0xa0'), tokenBlock(1, '0xa0', '0xa1')];
+        const store = await sync(stubChain(blocks, {
+            tokenMetadata: async () => ({ name: 'Odd', symbol: 'ODD', decimals: 2 ** 32 })
+        }));
+
+        expect(await store.cursor(0)).toBe(1);
+        expect((await store.token(TOKEN))?.decimals).toBe(2 ** 32);
+    });
+});

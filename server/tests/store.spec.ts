@@ -8,10 +8,12 @@
 // written twice by a retry, a rollback that leaves half a block behind, an ordering that quietly
 // depends on insertion order, and the address queries this whole file exists to make possible.
 import { describe, it, expect } from 'vitest';
+import { DataSource } from 'typeorm';
 
+import { dataSourceOptions } from '../src/chain/data-source.ts';
 import { normalize } from '../src/chain/rows.ts';
 import type { BlockRow, TransactionRow, TransferRow, IndexStore } from '../src/chain/store.ts';
-import { openTestStore } from './support/database.ts';
+import { inspect, openTestStore, reopen, schemaOf, testDatabase } from './support/database.ts';
 import { ALICE, BOB, CAROL, MINER, TOKEN, ZERO } from './support/fixtures.ts';
 
 function store(): Promise<IndexStore>
@@ -426,25 +428,6 @@ describe('the transaction contract', () =>
         await index.close();
         await expect(index.stats()).rejects.toThrow(/closed/);
         await expect(index.transaction(async () => 1)).rejects.toThrow(/closed/);
-    });
-
-    it('fails a call that waited too long for its turn, naming who held it', async () =>
-    {
-        const index = await openTestStore({ strict: false, lockTimeoutMs: 50 });
-        const begun = gate();
-        const held = gate();
-        const open = index.transaction(async () =>
-        {
-            begun.open();
-            await held.opened;
-        });
-        await begun.opened;
-
-        await expect(index.stats()).rejects.toThrow(/'stats' waited 50 ms for its turn behind 'transaction'/);
-        held.open();
-        await open;
-        // The queue moved on: a call that gave up does not hold the store for anyone after it.
-        expect((await index.stats()).blocks).toBe(0);
     });
 
     it('answers a height no row can carry as a miss rather than handing it to the database', async () =>
@@ -1105,7 +1088,7 @@ describe('the Etherscan-shaped range queries', () =>
 
     it('does NOT take the sort direction from caller text', async () =>
     {
-        // The direction is interpolated into ORDER BY because sqlite takes no parameter there.
+        // The direction is interpolated into ORDER BY because SQL takes no parameter for one.
         // It is a boolean at the type level, and this pins that it stays one.
         const index = await ranged();
         const rows = await index.addressTransactionsInRange(ALICE, 0, 99, 100, 0, Boolean('anything'));
@@ -1329,26 +1312,43 @@ describe('the cumulative totals', () =>
     });
 });
 
-describe('schema versioning', () =>
+describe('the migration', () =>
 {
-    it('rebuilds rather than migrating when the stored version is not the current one', async () =>
+    it('builds the schema once: a store opened over it again migrates nothing and keeps every row', async () =>
     {
-        // Every table is derived from the chain, so a schema change drops and replays. A stale
-        // file that kept its rows would serve columns that no longer mean what they say.
+        // What a restart is. Were the migration to run twice, its CREATE TABLE would fail the boot;
+        // were the tables dropped and rebuilt, the index would forget a backfill on every deploy.
         const index = await store();
         await index.ensureChain('0xgenesis');
         await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
-        expect((await index.stats()).blocks).toBe(1);
+        await index.setCursor(1);
 
-        await index.setMeta('schema', 'from-an-older-build');
-        // Re-opening the SAME in-memory handle is not possible, so this asserts the guard's own
-        // condition: the version is what decides, and it is written when the index opens.
-        expect(await index.getMeta('schema')).toBe('from-an-older-build');
+        const restarted = await reopen(index);
+        expect((await restarted.stats()).blocks).toBe(1);
+        expect(await restarted.cursor(0)).toBe(1);
+        expect(await restarted.getMeta('genesis')).toBe('0xgenesis');
+
+        const ran = await inspect<{ name: string }>(`SELECT name FROM "${ schemaOf(index) }"."migrations" ORDER BY id`);
+        expect(ran.map((row) => row.name)).toEqual(['InitialIndex1792713600000']);
     });
 
-    it('stamps a schema version on a fresh index', async () =>
+    it('describes to TypeORM exactly the tables the migration built', async () =>
     {
-        expect(await (await store()).getMeta('schema')).not.toBeNull();
+        // The entities are what the insert builder writes through, and the migration is what made
+        // the tables. If the two drift - a column renamed in one and not the other, a type that no
+        // longer matches - TypeORM's own schema builder sees it, and this is where it says so.
+        const index = await store();
+        const source = new DataSource(dataSourceOptions({ url: testDatabase(), schema: schemaOf(index), poolSize: 1 }));
+        await source.initialize();
+        try
+        {
+            const pending = await source.driver.createSchemaBuilder().log();
+            expect(pending.upQueries.map((query) => query.query)).toEqual([]);
+        }
+        finally
+        {
+            await source.destroy();
+        }
     });
 });
 
@@ -1394,6 +1394,31 @@ describe('concurrent access', () =>
             expect(stats.transactions).toBe(stats.blocks);
         }
         expect((await index.stats()).blocks).toBe(20);
+    });
+
+    it('shows a read beside an open write only what was committed', async () =>
+    {
+        // The follower's batch and a request's read run on different connections, each in its
+        // own transaction. Until the batch commits, a reader must see the index as it was - never
+        // the half of a batch that happens to have been written so far.
+        const index = await openTestStore({ strict: false });
+        await index.insertBlock(blockRow(0), [], []);
+        const written = gate();
+        const held = gate();
+        const batch = index.transaction(async () =>
+        {
+            await index.insertBlock(blockRow(1), [txRow('0xt1', 1)], []);
+            written.open();
+            await held.opened;
+        });
+        await written.opened;
+
+        expect(await index.stats()).toMatchObject({ blocks: 1, transactions: 0 });
+        expect(await index.transactionByHash('0xt1')).toBeNull();
+
+        held.open();
+        await batch;
+        expect(await index.stats()).toMatchObject({ blocks: 2, transactions: 1 });
     });
 
     it('keeps a failed batch from leaving half a block behind under interleaving', async () =>

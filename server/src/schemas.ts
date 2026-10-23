@@ -681,8 +681,8 @@ export type SearchResult = Infer<typeof searchResult>;
  * `page` needs a maximum for the same reason `limit` does, and it is less obvious: the handler
  * multiplies it out into an offset, and a page of 1e21 - which arrives as an ordinary-looking
  * query string and passes an integer check, because it IS integral as a double - produced an
- * offset past Number.MAX_SAFE_INTEGER. sqlite refuses to bind one of those, so the request died
- * as a 500 instead of the 422 every other malformed page gets.
+ * offset past Number.MAX_SAFE_INTEGER. The database refuses to bind one of those, so the request
+ * died as a 500 instead of the 422 every other malformed page gets.
  *
  * A trillion pages at the largest permitted size is an offset of 1e14: still a safe integer with
  * two orders of magnitude to spare, and far beyond any row count this index will ever hold. The

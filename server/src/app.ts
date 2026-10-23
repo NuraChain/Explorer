@@ -391,11 +391,12 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
      * Five minutes, not thirty seconds. This payload is thirteen series of DAILY buckets plus a
      * rolling twenty-four-hour figure: nothing in it can visibly move in half a minute, so the
      * old window bought no freshness a reader could see and paid for it thirteen series at a
-     * time. What it cost was the whole server - `node:sqlite` is synchronous, so the rebuild
-     * blocked the event loop, and on a million-block chain a request for any other page issued
-     * during one waited the full seven to ten seconds with it.
+     * time. On the synchronous sqlite index it cost the whole server: the rebuild blocked the
+     * event loop, and on a million-block chain a request for any other page issued during one
+     * waited the full seven to ten seconds with it. PostgreSQL runs it off the loop, but it still
+     * scans a window of the whole chain on a pooled connection of its own.
      *
-     * The indexes in `chain/store.ts` are what made the rebuild cheap; this is what makes it
+     * The indexes in the index's migration are what make the rebuild cheap; this is what makes it
      * rare. Both were needed: a cheap query run constantly is still a queue.
      *
      * Held as the PROMISE, from the moment of the miss: a request that arrives while a rebuild

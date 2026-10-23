@@ -4,9 +4,10 @@
 # long one - a lint error and a failing integration test are different problems and are triaged by
 # different people.
 #
-# Nothing here needs a secret, a database service or a network: the whole suite runs against an
-# in-memory sqlite index and a stubbed chain, so a fork's pull request gets exactly the same
-# result as a push to main.
+# Nothing here needs a secret or a network: the server suite runs against a PostgreSQL the job
+# starts for itself and a stubbed chain, so a fork's pull request gets exactly the same result as a
+# push to main. The database is a throwaway service container that trusts its local connections -
+# there is no password in this file because there is no password to keep.
 name: CI
 on:
   push:
@@ -41,6 +42,20 @@ jobs:
   test-server:
     name: Server tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: nura_explorer_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        # Over TCP: while the image initialises, its temporary server listens on the socket only,
+        # and a socket check would call it healthy before the suite can reach it.
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d nura_explorer_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/nura_explorer_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -74,6 +89,18 @@ jobs:
   test-shuffled:
     name: Tests in random order
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: nura_explorer_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d nura_explorer_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/nura_explorer_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

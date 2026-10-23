@@ -33,7 +33,7 @@ import { openTestStore, type TestStoreOptions } from './support/database.ts';
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
-    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
+    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10
 };
 
 const ALICE = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -624,30 +624,44 @@ describe('the API over the index', () =>
         const carrier = block(3, '0xb2', '0xb3');
         carrier.transactions[0]!.inputSize = (data.length - 2) / 2;
         const hash = carrier.transactions[0]!.hash;
-        const read = async (input: (hash: string) => Promise<string>): Promise<Response> =>
+        /** The transaction page over an index built from `input`'s node, ready to be asked for. */
+        const page = async (input: (hash: string) => Promise<string>): Promise<() => Promise<Response>> =>
         {
-            // The last read runs on a fake clock that jumps three seconds at once. Under the
-            // harness's two-second lock timeout, a call still waiting for its turn at that jump
-            // would fail for a wait that took no real time at all.
-            const { store, chain } = await indexed([...CHAIN, carrier], { input }, { lockTimeoutMs: 60_000 });
-            return buildApp({ dev: false, store, chain }).handle(new Request(`http://local/api/txs/${ hash }`));
+            const { store, chain } = await indexed([...CHAIN, carrier], { input });
+            const app = buildApp({ dev: false, store, chain });
+            return () => app.handle(new Request(`http://local/api/txs/${ hash }`));
         };
 
-        const decoded = (await (await read(async () => data)).json()) as TransactionDetail;
+        const decoded = (await (await (await page(async () => data))()).json()) as TransactionDetail;
         expect(decoded.call).toMatchObject({ name: 'transfer', args: [{ type: 'address' }, { type: 'uint256', value: '5' }], data });
 
-        const down = await read(async () =>
+        const down = await (await page(async () =>
         {
             throw new Error('node down');
-        });
+        }))();
         expect(down.status).toBe(200);
         expect(((await down.json()) as TransactionDetail).call).toBeNull();
 
-        // A node that never answers costs the section, not the page.
-        vi.useFakeTimers();
+        // A node that never answers costs the section, not the page. Only the clock that waits on
+        // the node is faked, and only once the index exists: the index is a real database behind a
+        // pool that schedules work of its own, and a frozen clock would freeze that too.
+        let asked = (): void => undefined;
+        const waiting = new Promise<void>((resolve) =>
+        {
+            asked = resolve;
+        });
+        const stalled = await page(() =>
+        {
+            asked();
+            return new Promise(() => undefined);
+        });
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         try
         {
-            const pending = read(() => new Promise(() => undefined));
+            const pending = stalled();
+            // The page reads the index - real I/O - before it asks the node. Moved any sooner, the
+            // clock would pass the timeout before the page had set it.
+            await waiting;
             await vi.advanceTimersByTimeAsync(3_000);
             expect(((await (await pending).json()) as TransactionDetail).call).toBeNull();
         }

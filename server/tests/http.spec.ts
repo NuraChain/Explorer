@@ -147,7 +147,7 @@ describe('pagination bounds', () =>
     it('refuses a page that is integral only as a double', async () =>
     {
         // Regression. `page` had a minimum and no maximum, so 1e21 passed the integer check,
-        // multiplied out past Number.MAX_SAFE_INTEGER, and sqlite threw binding it - a 500 from
+        // multiplied out past Number.MAX_SAFE_INTEGER, and the database refused to bind it - a 500 from
         // a malformed query string.
         const api = await client();
         for (const page of ['999999999999999999999', '1e21', '9007199254740993'])

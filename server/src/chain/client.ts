@@ -39,9 +39,6 @@ export interface ChainEnv
 
     /** How many JSON-RPC calls ride in one HTTP request. Providers cap this; 100 is common. */
     rpcBatchSize: number;
-
-    /** Where the sqlite index lives; ':memory:' in tests. */
-    dbPath: string;
 }
 
 /** Reads the chain configuration from the environment, with local-anvil defaults. */
@@ -65,8 +62,7 @@ export function loadChainEnv(): ChainEnv
         // there is the ROUND TRIP, and a small window leaves the link idle waiting for it. Batches
         // larger than 100 lose again - providers cap the batch and the retry costs the trip twice.
         concurrency: num('RPC_CONCURRENCY', { default: 1000 }),
-        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 }),
-        dbPath: str('DB_PATH', { default: '.data/index.db' })
+        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 })
     });
     return config;
 }

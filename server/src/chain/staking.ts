@@ -14,7 +14,7 @@ import { selectorOf } from './signatures.ts';
 // what lets a wallet that only speaks Ethereum send a `MsgDelegate`.
 //
 // A validator set is tens of rows where transactions are millions, so none of it is copied into
-// sqlite: a copy would only be one that can be wrong, and the whole set is one request.
+// the index: a copy would only be one that can be wrong, and the whole set is one request.
 
 /** Where cosmos/evm mounts the staking precompile. */
 export const STAKING_PRECOMPILE = '0x0000000000000000000000000000000000000800';

@@ -83,9 +83,9 @@ function paging(query: URLSearchParams): Paging | string
 
     // SAFE integers, not merely integral ones. `Number('999999999999999999999')` is 1e21, which
     // `Number.isInteger` calls an integer because it is integral as a double - and it then rode
-    // through the page arithmetic into a bound sqlite parameter, which refuses a non-safe integer
-    // with "datatype mismatch". That is an unhandled throw, so an absurd page number answered
-    // with a 500 from the one function whose whole job is to refuse absurd input.
+    // through the page arithmetic into a bound database parameter, which refuses a non-safe
+    // integer outright. That is an unhandled throw, so an absurd page number answered with a 500
+    // from the one function whose whole job is to refuse absurd input.
     if (!Number.isSafeInteger(page) || page < 1)
     {
         return 'Error! Invalid page';

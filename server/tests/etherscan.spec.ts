@@ -526,7 +526,7 @@ describe('security of the compatibility surface', () =>
 
     it('survives a sort value chosen to be interpolated into ORDER BY', async () =>
     {
-        // `sort` IS interpolated - sqlite takes no parameter in ORDER BY - so the only thing
+        // `sort` IS interpolated - SQL takes no parameter for a sort direction - so the only thing
         // standing between it and the query is that it is reduced to a boolean first.
         const ask = await surface();
         const answer = await ask(`module=account&action=txlist&address=${ ALICE }&sort=${ encodeURIComponent('asc; DROP TABLE transactions') }`);
@@ -545,8 +545,8 @@ describe('security of the compatibility surface', () =>
     it('refuses a page number that is integral only as a double', async () =>
     {
         // Regression. `Number('999999999999999999999')` is 1e21 and `Number.isInteger` says yes,
-        // so it passed validation, became a non-safe offset, and sqlite threw "datatype mismatch"
-        // binding it - a 500 out of the function whose job is to refuse exactly this.
+        // so it passed validation, became a non-safe offset, and the database refused to bind it
+        // - a 500 out of the function whose job is to refuse exactly this.
         const ask = await surface();
         for (const page of ['999999999999999999999', '9007199254740993', '1e21'])
         {

@@ -2,8 +2,8 @@
 //
 // Every one of them builds the same three things - a chain the test controls, an index filled
 // from it, and an app over that index - so they live here once rather than being copied per file.
-// Nothing in here opens a socket or touches the disk: the store is ':memory:' and the gateway is
-// a plain object, which is what lets the whole suite run offline and in any order.
+// The gateway is a plain object and the index comes from the harness - a schema of its own in the
+// test database - which is what lets the whole suite run without a chain and in any order.
 import { syncOnce } from '../../src/chain/indexer.ts';
 import type { IndexStore } from '../../src/chain/store.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../../src/chain/client.ts';
@@ -11,7 +11,7 @@ import { openTestStore } from './database.ts';
 
 export const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
-    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
+    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10
 };
 
 export const ALICE = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

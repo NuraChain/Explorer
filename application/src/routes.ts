@@ -42,8 +42,8 @@ import TransactionsPage from './pages/txs.page.azeroth';
  * is not a request root, so the api registered on this App is not reachable from it and the
  * typed client throws. A settled block and a settled transaction looked like the two best
  * candidates for a cache in the whole app, and both answered 500 the moment they were given one.
- * They render per request instead, which they can afford - the index is local sqlite, and the
- * node reads behind it are already held by `server/src/chain/cache.ts`.
+ * They render per request instead, which they can afford - the index is the server's own
+ * PostgreSQL, and the node reads behind it are already held by `server/src/chain/cache.ts`.
  *
  * `/docs` is the one page that caches, and only because it asks for nothing.
  */

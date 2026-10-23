@@ -7,7 +7,7 @@ import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/cli
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
-    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
+    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10
 };
 
 const CONTRACT = '0xcccccccccccccccccccccccccccccccccccccccc';

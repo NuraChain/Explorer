@@ -9,6 +9,7 @@ import { loadConfig, num, str, flag } from '@azerothjs/http';
 
 import { describeChain, loadChainEnv } from '../src/chain/client.ts';
 import { DEFAULT_CACHE, loadCacheOptions } from '../src/chain/cache.ts';
+import { loadDatabaseEnv } from '../src/chain/data-source.ts';
 import { ENV } from './support/fixtures.ts';
 
 /** The chain shape, declared exactly as loadChainEnv declares it, but read from a given record. */
@@ -26,8 +27,7 @@ function chainEnvFrom(env: Record<string, string | undefined>): ReturnType<typeo
         pollMs: num('POLL_MS', { default: 2000 }),
         batchSize: num('BATCH_SIZE', { default: 1000 }),
         concurrency: num('RPC_CONCURRENCY', { default: 1000 }),
-        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 }),
-        dbPath: str('DB_PATH', { default: '.data/index.db' })
+        rpcBatchSize: num('RPC_BATCH_SIZE', { default: 100 })
     }, env);
 }
 
@@ -40,7 +40,6 @@ describe('the chain environment', () =>
         expect(config.rpcUrl).toBe('http://127.0.0.1:8545');
         expect(config.chainId).toBe(31337);
         expect(config.startBlock).toBe(0);
-        expect(config.dbPath).toBe('.data/index.db');
     });
 
     it('reads every value the deployment sets', () =>
@@ -52,8 +51,7 @@ describe('the chain environment', () =>
             CURRENCY_SYMBOL: 'NURA',
             CURRENCY_DECIMALS: '18',
             START_BLOCK: '500',
-            BATCH_SIZE: '512',
-            DB_PATH: '/var/lib/nura/index.db'
+            BATCH_SIZE: '512'
         }) as Record<string, unknown>;
 
         expect(config).toMatchObject({
@@ -61,8 +59,7 @@ describe('the chain environment', () =>
             chainId: 1020,
             symbol: 'NURA',
             startBlock: 500,
-            batchSize: 512,
-            dbPath: '/var/lib/nura/index.db'
+            batchSize: 512
         });
     });
 
@@ -119,7 +116,40 @@ describe('the chain environment', () =>
         expect(typeof config.rpcUrl).toBe('string');
         expect(Number.isInteger(config.chainId)).toBe(true);
         expect(Number.isInteger(config.startBlock)).toBe(true);
-        expect(config.dbPath.length).toBeGreaterThan(0);
+    });
+});
+
+describe('the database environment', () =>
+{
+    const CONNECTION = 'postgres://explorer:hunter2@db.example.test:5432/nura_explorer';
+
+    it('refuses to boot without a database, and names the variable it wants', () =>
+    {
+        // No default on purpose: an index silently pointed at the wrong database is worse than a
+        // server that will not start.
+        expect(() => loadDatabaseEnv({})).toThrow('DATABASE_URL');
+        expect(() => loadDatabaseEnv({ DATABASE_URL: '' })).toThrow('DATABASE_URL');
+    });
+
+    it('reads the url, and a pool size that defaults to ten', () =>
+    {
+        expect(loadDatabaseEnv({ DATABASE_URL: CONNECTION })).toMatchObject({ url: CONNECTION, poolSize: 10 });
+        expect(loadDatabaseEnv({ DATABASE_URL: CONNECTION, DATABASE_POOL_SIZE: '25' }).poolSize).toBe(25);
+    });
+
+    it('refuses a malformed pool size at boot', () =>
+    {
+        expect(() => loadDatabaseEnv({ DATABASE_URL: CONNECTION, DATABASE_POOL_SIZE: 'lots' })).toThrow('DATABASE_POOL_SIZE');
+    });
+
+    it('keeps the password out of the configuration\'s own printed forms', () =>
+    {
+        // The url carries the database password. The value is there for the store to use; a
+        // config object logged in a debugging panic must not carry it into the log as well.
+        const config = loadDatabaseEnv({ DATABASE_URL: CONNECTION });
+        expect(config.url).toBe(CONNECTION);
+        expect(JSON.stringify(config)).not.toContain('hunter2');
+        expect(String(config)).not.toContain('hunter2');
     });
 });
 
@@ -217,7 +247,8 @@ describe('the .env example stays in step with the code', () =>
         const declared = [
             'RPC_URL', 'CHAIN_ID', 'CHAIN_NAME', 'CURRENCY_SYMBOL', 'CURRENCY_DECIMALS',
             'CHAIN_SITE_URL', 'EXPLORER_URL', 'START_BLOCK', 'POLL_MS', 'BATCH_SIZE',
-            'RPC_CONCURRENCY', 'RPC_BATCH_SIZE', 'DB_PATH',
+            'RPC_CONCURRENCY', 'RPC_BATCH_SIZE',
+            'DATABASE_URL', 'DATABASE_POOL_SIZE', 'TEST_DATABASE_URL',
             'RPC_CACHE', 'RPC_CACHE_MAX', 'RPC_CACHE_HEAD_MS', 'RPC_CACHE_BALANCE_MS',
             'RPC_CACHE_CALL_MS', 'RPC_CACHE_STORAGE_MS', 'RPC_CACHE_CODE_MS',
             'RPC_CACHE_CODE_ABSENT_MS', 'RPC_CACHE_TOKEN_MS',
@@ -239,6 +270,9 @@ describe('the .env example stays in step with the code', () =>
             expect(text).not.toMatch(/PRIVATE_KEY|MNEMONIC|SECRET\s*=\s*\S/i);
             // A bare `0x` followed by 64 hex digits is a private key shape.
             expect(text).not.toMatch(/0x[0-9a-fA-F]{64}/);
+            // A connection string with a password in it - `scheme://user:password@host` - is a
+            // credential however ordinary the url around it looks.
+            expect(text).not.toMatch(/[a-z]+:\/\/[^\s/:@]+:[^\s@]+@/i);
         });
     });
 });

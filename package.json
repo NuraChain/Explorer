@@ -4,7 +4,7 @@
     "version": "1.6.3",
     "type": "module",
     "engines": {
-        "node": ">=24"
+        "node": ">=24.11.0"
     },
     "workspaces": [
         "application",
@@ -33,6 +33,9 @@
         "lint:fix": "oxlint --fix",
         "format": "oxfmt",
         "format:check": "oxfmt --check"
+    },
+    "dependencies": {
+        "typeorm": "^1.1.2"
     },
     "devDependencies": {
         "@azerothjs/cli": "2.1.0",

@@ -1,7 +1,8 @@
-import { afterEach } from 'vitest';
+import { afterAll, afterEach } from 'vitest';
 
-import { releaseTestStores } from './database.ts';
+import { closeTestDatabase, releaseTestStores } from './database.ts';
 
-// Runs after every test in every file: whatever indexes and followers the test opened are closed
-// here rather than by each spec remembering to.
+// Runs around every test in every file: whatever indexes and followers a test opened are closed
+// here rather than by each spec remembering to, and the worker lets go of the database at the end.
 afterEach(releaseTestStores);
+afterAll(closeTestDatabase);

@@ -12,6 +12,7 @@ import { buildApp, createApi, registerApi, LOCALES } from './app.ts';
 import { CachedChain, loadCacheOptions } from './chain/cache.ts';
 import { ChainReader, loadChainEnv } from './chain/client.ts';
 import { loadCosmosEnv } from './chain/cosmos.ts';
+import { connectionOf, loadDatabaseEnv } from './chain/data-source.ts';
 import { IndexStore } from './chain/store.ts';
 import { startIndexer } from './chain/indexer.ts';
 import { loadPriceEnv, SwapPriceFeed } from './price.ts';
@@ -41,7 +42,7 @@ const log = createLogger({
     fields: { service: 'nura-explorer-server' }
 });
 
-// The indexer half: the chain description, the sqlite index, and the follower that keeps it
+// The indexer half: the chain description, the PostgreSQL index, and the follower that keeps it
 // current. It starts BEFORE the server binds and is never awaited - a backfill of a long chain
 // takes minutes, and the explorer must serve what it already has while the rest arrives. The
 // stats endpoint reports both heads so a reader can see the gap.
@@ -50,7 +51,9 @@ const chainEnv = loadChainEnv();
 // there rather than in the EVM, and the explorer is meant to run beside the node that serves them.
 const cosmosEnv = loadCosmosEnv();
 const chain = new ChainReader(chainEnv);
-const store = await IndexStore.open({ path: chainEnv.dbPath });
+// Opening migrates the index, and fails the boot - loudly, with the reason - when the database is
+// unreachable or unfit; a supervisor's restart policy is what retries it.
+const store = await IndexStore.open({ connection: connectionOf(loadDatabaseEnv()), log });
 const indexer = startIndexer(store, chain, log);
 
 // The API reads the node THROUGH a cache; the indexer above keeps the raw reader. Same node, two
@@ -197,10 +200,10 @@ function within(step: Promise<unknown> | undefined, ms: number): Promise<void>
 /*
  * Shutdown, bounded at every step.
  *
- * The follower owns a timer and a sqlite handle; a shutdown that leaves them running keeps the
- * process alive and the database locked. So it is told to stop before the drain and waited for
- * after it - never in front of the drain, which is what lets go of the port - and the store
- * closes last, once nothing that reads it is left.
+ * The follower owns a timer and the index a pool of connections; a shutdown that leaves them
+ * running keeps the process alive and a transaction open. So the follower is told to stop before
+ * the drain and waited for after it - never in front of the drain, which is what lets go of the
+ * port - and the store closes last, once nothing that reads it is left.
  *
  * Each wait has a cap and a hard exit caps them all, so the process ends on its own inside a
  * thirty-second stop window instead of at Docker's kill: a close that never returns - a

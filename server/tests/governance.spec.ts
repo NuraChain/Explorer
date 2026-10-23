@@ -17,7 +17,7 @@ import type { GovernanceOverview, ProposalDetail, ProposalPage } from '../src/sc
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
-    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10, dbPath: ':memory:'
+    startBlock: 0, pollMs: 1000, batchSize: 10, concurrency: 4, rpcBatchSize: 10
 };
 
 const COSMOS: CosmosEnv = { restUrl: 'http://node.test:1317', rpcUrl: 'http://node.test:26657', timeoutMs: 1000 };
