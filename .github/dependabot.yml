@@ -5,6 +5,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    # @azerothjs/compiler peers `typescript >=5 <7`. A grouped major bump once took both workspaces
+    # to 7 in the lockfile while their manifests still said ^6 - hold the major until the compiler
+    # declares support, and move it in the same commit as the AzerothJS pins.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-dependencies:
         patterns:
