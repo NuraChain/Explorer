@@ -36,6 +36,13 @@
     --animate-rise: rise 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
     --animate-land: land 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 
+    /*
+     * The page column. Every band that spans the document - header row, main, footer - centres
+     * itself on this one measure, so a value changed here re-flows the whole app. 96rem (1536px)
+     * is the width a 1080p screen gives the content with nothing cropped at the sides.
+     */
+    --container-page: 96rem;
+
     @keyframes rise
     {
         from

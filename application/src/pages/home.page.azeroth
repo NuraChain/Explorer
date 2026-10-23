@@ -61,30 +61,39 @@ export default component Home()
     });
 
     <div class="flex flex-col gap-6">
-        <section class="pt-2">
-            {/* Assembled from four catalog slots rather than one sentence with a span in the
-                middle, so a verb-final language can put its verb after the chain name. */}
-            <h1 class="text-[26px] font-bold leading-tight tracking-tight sm:text-[32px]">
-                { locale.t('home.hero.lead') } <span class="text-nur">{ locale.t('home.hero.accent') }</span> { locale.t('home.hero.through') }
-                <Show when={ summary !== undefined } fallback={ <span> { locale.t('home.hero.fallback') }</span> }>
-                { () => <span> { locale.chainName(summary!.chain.name) }</span> }
-                </Show>
-                { locale.t('home.hero.trail') === '' ? '' : ` ${ locale.t('home.hero.trail') }` }
-            </h1>
-            <p class="mt-2 max-w-xl text-[15px] leading-relaxed text-muted">{ locale.t('home.tagline') }</p>
-            {/* Offered once, on the overview: the visitor who wants the chain in their wallet
-                wants it before they start reading, not on a transaction page.
+        <section class="relative pt-4">
+            {/* A pool of accent light behind the headline: the hero states what the product is,
+                and the glow is what makes the statement feel lit rather than printed. Pure CSS,
+                no image, no request - and it fades to nothing on the theme where the accent is
+                darkest, the same way every accent on the page does. Painted first, so the
+                content after it always sits on top; never negative z, which would slip it
+                behind the page's own ground. */}
+            <div aria-hidden="true" role="presentation" class="pointer-events-none absolute -top-24 left-1/2 h-72 w-[46rem] max-w-full -translate-x-1/2 rounded-full bg-nur/10 blur-3xl" />
+            <div class="relative">
+                {/* Assembled from four catalog slots rather than one sentence with a span in the
+                    middle, so a verb-final language can put its verb after the chain name. */}
+                <h1 class="text-[28px] font-bold leading-tight tracking-tight sm:text-[36px] lg:text-[40px]">
+                    { locale.t('home.hero.lead') } <span class="text-nur">{ locale.t('home.hero.accent') }</span> { locale.t('home.hero.through') }
+                    <Show when={ summary !== undefined } fallback={ <span> { locale.t('home.hero.fallback') }</span> }>
+                    { () => <span> { locale.chainName(summary!.chain.name) }</span> }
+                    </Show>
+                    { locale.t('home.hero.trail') === '' ? '' : ` ${ locale.t('home.hero.trail') }` }
+                </h1>
+                <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted sm:text-base">{ locale.t('home.tagline') }</p>
+                {/* Offered once, on the overview: the visitor who wants the chain in their wallet
+                    wants it before they start reading, not on a transaction page.
 
-                NOT inside a `<Show>` that reads `summary`, which is what this used to be.
-                The poll above hands back a new payload every five seconds, and a Show whose
-                child reads it rebuilds that child every time - which is invisible for a plain
-                button and fatal for one that owns a dialog, because the reader's open dialog is
-                swept away mid-choice. Both controls are created ONCE here and take what they
-                need as props; each decides for itself what to render before the first payload
-                lands. */}
-            <div class="mt-4 flex flex-wrap items-center gap-2.5">
-                <AddChainButton chain={ summary?.chain ?? null } />
-                <PriceTicker />
+                    NOT inside a `<Show>` that reads `summary`, which is what this used to be.
+                    The poll above hands back a new payload every five seconds, and a Show whose
+                    child reads it rebuilds that child every time - which is invisible for a plain
+                    button and fatal for one that owns a dialog, because the reader's open dialog is
+                    swept away mid-choice. Both controls are created ONCE here and take what they
+                    need as props; each decides for itself what to render before the first payload
+                    lands. */}
+                <div class="mt-5 flex flex-wrap items-center gap-2.5">
+                    <AddChainButton chain={ summary?.chain ?? null } />
+                    <PriceTicker />
+                </div>
             </div>
         </section>
 
@@ -106,21 +115,46 @@ export default component Home()
         <Show when={ summary !== undefined }>
         { () =>
             <dl class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-                <div class="panel px-4 py-3">
-                    <dt class="text-[13px] text-muted">{ locale.t('home.stat.height') }</dt>
-                    <dd class="amount mt-0.5 text-[18px] font-bold">{ locale.n(summary!.head) }</dd>
+                {/* Each counter leads with the glyph for WHAT it counts: four tiles of bare
+                    numbers read as a spreadsheet, and a reader landing here scans icons before
+                    they read labels. The tile is the one thing on the card allowed to be
+                    decorative, and the border lift on hover is the affordance the numbers
+                    themselves never need - they are not links. */}
+                <div class="panel flex items-start gap-3.5 px-4 py-4 transition-colors duration-150 hover:border-nur/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raised text-nur">
+                        <Icon name="block" size={ 16 } />
+                    </span>
+                    <div class="min-w-0">
+                        <dt class="text-[13px] text-muted">{ locale.t('home.stat.height') }</dt>
+                        <dd class="amount mt-1 text-[19px] font-bold sm:text-[20px]">{ locale.n(summary!.head) }</dd>
+                    </div>
                 </div>
-                <div class="panel px-4 py-3">
-                    <dt class="text-[13px] text-muted">{ locale.t('home.stat.transactions') }</dt>
-                    <dd class="amount mt-0.5 text-[18px] font-bold">{ locale.n(summary!.indexed.transactions) }</dd>
+                <div class="panel flex items-start gap-3.5 px-4 py-4 transition-colors duration-150 hover:border-nur/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raised text-nur">
+                        <Icon name="transaction" size={ 16 } />
+                    </span>
+                    <div class="min-w-0">
+                        <dt class="text-[13px] text-muted">{ locale.t('home.stat.transactions') }</dt>
+                        <dd class="amount mt-1 text-[19px] font-bold sm:text-[20px]">{ locale.n(summary!.indexed.transactions) }</dd>
+                    </div>
                 </div>
-                <div class="panel px-4 py-3">
-                    <dt class="text-[13px] text-muted">{ locale.t('home.stat.blockTime') }</dt>
-                    <dd class="amount mt-0.5 text-[18px] font-bold">{ locale.n(summary!.blockTime, 2) }s</dd>
+                <div class="panel flex items-start gap-3.5 px-4 py-4 transition-colors duration-150 hover:border-nur/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raised text-nur">
+                        <Icon name="activity" size={ 16 } />
+                    </span>
+                    <div class="min-w-0">
+                        <dt class="text-[13px] text-muted">{ locale.t('home.stat.blockTime') }</dt>
+                        <dd class="amount mt-1 text-[19px] font-bold sm:text-[20px]">{ locale.n(summary!.blockTime, 2) }s</dd>
+                    </div>
                 </div>
-                <div class="panel px-4 py-3">
-                    <dt class="text-[13px] text-muted">{ locale.t('home.stat.baseFee') }</dt>
-                    <dd class="amount mt-0.5 text-[18px] font-bold">{ formatGwei(summary!.gasPrice) }</dd>
+                <div class="panel flex items-start gap-3.5 px-4 py-4 transition-colors duration-150 hover:border-nur/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raised text-nur">
+                        <Icon name="gas" size={ 16 } />
+                    </span>
+                    <div class="min-w-0">
+                        <dt class="text-[13px] text-muted">{ locale.t('home.stat.baseFee') }</dt>
+                        <dd class="amount mt-1 text-[19px] font-bold sm:text-[20px]">{ formatGwei(summary!.gasPrice) }</dd>
+                    </div>
                 </div>
             </dl>
         }
@@ -128,14 +162,20 @@ export default component Home()
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <section class="panel overflow-hidden">
-                <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
-                    <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('home.latestBlocks') }</h2>
-                    <Link to="/blocks" class="text-[13px] text-beam no-underline hover:underline">{ locale.t('home.all') }</Link>
+                <div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+                    <h2 class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="block" size={ 15 } class="text-nur" />
+                        { locale.t('home.latestBlocks') }
+                    </h2>
+                    <Link to="/blocks" class="flex items-center gap-1 rounded-md border border-line px-2.5 py-1 text-[12px] text-muted no-underline transition-colors duration-150 hover:border-nur hover:text-nur">
+                        { locale.t('home.all') }
+                        <Icon name="chevron-right" size={ 13 } class="icon-flip" />
+                    </Link>
                 </div>
                 {/* A row on a screen, a card on a phone - the same pair the blocks list carries. */}
                 <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                     <For each={ blocks?.rows ?? [] } key={ (block) => String(block.number) } let={ block }>
-                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-raised px-3 py-2.5 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4">
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-raised px-3 py-2.5 transition-colors duration-150 hover:bg-field sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4 sm:hover:bg-raised/60">
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-field text-nur sm:bg-raised">
                                 <Icon name="block" size={ 15 } />
                             </span>
@@ -163,14 +203,20 @@ export default component Home()
             </section>
 
             <section class="panel overflow-hidden">
-                <div class="flex items-baseline justify-between border-b border-line px-4 py-3">
-                    <h2 class="text-[14px] font-semibold uppercase tracking-[0.14em] text-muted">{ locale.t('home.latestTransactions') }</h2>
-                    <Link to="/txs" class="text-[13px] text-beam no-underline hover:underline">{ locale.t('home.all') }</Link>
+                <div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+                    <h2 class="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        <Icon name="transaction" size={ 15 } class="text-nur" />
+                        { locale.t('home.latestTransactions') }
+                    </h2>
+                    <Link to="/txs" class="flex items-center gap-1 rounded-md border border-line px-2.5 py-1 text-[12px] text-muted no-underline transition-colors duration-150 hover:border-nur hover:text-nur">
+                        { locale.t('home.all') }
+                        <Icon name="chevron-right" size={ 13 } class="icon-flip" />
+                    </Link>
                 </div>
                 {/* A row on a screen, a card on a phone - the same pair the blocks list carries. */}
                 <ul class="flex flex-col gap-2.5 p-3 sm:gap-0 sm:p-0">
                     <For each={ txs?.rows ?? [] } key={ (row) => row.hash } let={ row }>
-                        <li class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4">
+                        <li class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised px-3 py-2.5 transition-colors duration-150 hover:bg-field sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:bg-transparent sm:first:border-t-0 sm:px-4 sm:hover:bg-raised/60">
                             {/* The card's header: what happened and how much moved, the same pair
                                 the transactions list leads with. `sm:contents` hands both back to
                                 the row above the breakpoint, and on a phone it leaves the hash a
