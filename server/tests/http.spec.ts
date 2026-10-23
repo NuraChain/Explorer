@@ -236,7 +236,35 @@ describe('not-found behaviour', () =>
         const api = await client();
         expect((await api.get('/api/blocks/9999')).status).toBe(404);
         expect((await api.get(`/api/txs/0x${ 'f'.repeat(64) }`)).status).toBe(404);
-        expect((await api.get('/api/blocks/not-a-number')).status).toBeGreaterThanOrEqual(400);
+        expect((await api.get('/api/blocks/not-a-number')).status).toBe(404);
+    });
+
+    it('404s a height no block can have, rather than failing on it', async () =>
+    {
+        // A fraction, a negative and a figure past 2^53 - which a double holds only approximately,
+        // so it names no one height - are each a block the index cannot hold. They are the miss
+        // they are, not a value handed to the database for it to refuse.
+        const api = await client();
+        for (const height of ['1.5', '-1', '99999999999999999999'])
+        {
+            expect((await api.get(`/api/blocks/${ height }`)).status, height).toBe(404);
+        }
+    });
+
+    it('404s a hash with a NUL byte in it, rather than failing on it', async () =>
+    {
+        // The path decodes `%00` into a real NUL, which no hash contains and which a database may
+        // refuse to bind at all.
+        const api = await client();
+        expect((await api.get('/api/txs/%00')).status).toBe(404);
+    });
+
+    it('finds nothing for a search by a height no block can have', async () =>
+    {
+        const api = await client();
+        const response = await api.get('/api/search?q=99999999999999999999');
+        expect(response.status).toBe(200);
+        expect((await response.json()) as { kind: string }).toMatchObject({ kind: 'none' });
     });
 
     it('answers an address it has never seen, rather than 404ing an ordinary account', async () =>
@@ -250,6 +278,14 @@ describe('not-found behaviour', () =>
         expect(body.txCount).toBe(0);
         expect(body.transferCount).toBe(0);
         expect(body.isContract).toBe(false);
+    });
+
+    it('answers an address with a NUL byte in it as one it has never seen', async () =>
+    {
+        const api = await client();
+        const response = await api.get('/api/address/%00');
+        expect(response.status).toBe(200);
+        expect(((await response.json()) as { txCount: number }).txCount).toBe(0);
     });
 });
 
@@ -413,7 +449,7 @@ describe('security of the typed API', () =>
     it('does not let a path-traversal address reach the filesystem or the index', async () =>
     {
         const api = await client();
-        for (const attack of ['../../etc/passwd', '..%2f..%2fetc%2fpasswd', '%2e%2e/%2e%2e/secrets'])
+        for (const attack of ['../../etc/passwd', '..%2f..%2fetc%2fpasswd', '%2e%2e/%2e%2e/secrets', '%00'])
         {
             const response = await api.get(`/api/address/${ attack }`);
             // Either refused or answered as the ordinary (empty) address it is not - never a file.

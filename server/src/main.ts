@@ -50,7 +50,7 @@ const chainEnv = loadChainEnv();
 // there rather than in the EVM, and the explorer is meant to run beside the node that serves them.
 const cosmosEnv = loadCosmosEnv();
 const chain = new ChainReader(chainEnv);
-const store = new IndexStore(chainEnv.dbPath);
+const store = await IndexStore.open({ path: chainEnv.dbPath });
 const indexer = startIndexer(store, chain, log);
 
 // The API reads the node THROUGH a cache; the indexer above keeps the raw reader. Same node, two
@@ -164,14 +164,71 @@ const served = await serve(handler, {
 // its own origin and a tab survives the process restarting.
 session?.attach(served.server);
 
-handleShutdownSignals(served, { beforeExit: () => session?.close() });
-
-// The follower owns a timer and a sqlite handle; a shutdown that leaves them running keeps the
-// process alive and the database locked.
-process.on('exit', () =>
+/**
+ * Waits for one shutdown step, but never longer than `ms`. A step still running when its time is
+ * up is left behind, and a rejection it lands later is dropped - the sequence has moved on, and
+ * there is nobody left to tell.
+ */
+function within(step: Promise<unknown> | undefined, ms: number): Promise<void>
 {
-    indexer.stop();
-    store.close();
+    return new Promise<void>((resolve, reject) =>
+    {
+        if (step === undefined)
+        {
+            resolve();
+            return;
+        }
+        // Unref'd: a cap must never be the thing that keeps a finished process alive.
+        const timer = setTimeout(resolve, ms).unref();
+        step.then(
+            () =>
+            {
+                clearTimeout(timer);
+                resolve();
+            },
+            (error: unknown) =>
+            {
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
+
+/*
+ * Shutdown, bounded at every step.
+ *
+ * The follower owns a timer and a sqlite handle; a shutdown that leaves them running keeps the
+ * process alive and the database locked. So it is told to stop before the drain and waited for
+ * after it - never in front of the drain, which is what lets go of the port - and the store
+ * closes last, once nothing that reads it is left.
+ *
+ * Each wait has a cap and a hard exit caps them all, so the process ends on its own inside a
+ * thirty-second stop window instead of at Docker's kill: a close that never returns - a
+ * transaction that never settles, a hung pool - must not hold the port until then. Exiting with
+ * the store still open loses nothing, because the cursor commits with the rows it covers and the
+ * next boot resumes from it.
+ */
+let stopping: Promise<void> | undefined;
+handleShutdownSignals(served, {
+    gracePeriodMs: 8_000,
+    beforeShutdown: () =>
+    {
+        setTimeout(() => process.exit(1), 25_000).unref();
+        stopping = indexer.stop();
+    },
+    beforeExit: async () =>
+    {
+        try
+        {
+            await within(stopping, 5_000);
+            await within(session?.close(), 2_000);
+        }
+        finally
+        {
+            await within(store.close(), 5_000);
+        }
+    },
+    onError: (error: unknown) => log.error('shutdown failed', { error: String(error) })
 });
 
 // The panel's Server tab connects here and mirrors the server's reactive graph: request roots,

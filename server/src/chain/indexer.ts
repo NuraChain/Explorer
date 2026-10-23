@@ -5,12 +5,11 @@ import {
     normalize,
     TRANSFER_SINGLE_TOPIC,
     TRANSFER_TOPIC,
-    type BlockRow,
-    type IndexStore,
+    type BlockEntry,
     type TokenRow,
-    type TransactionRow,
     type TransferRow
-} from './store.ts';
+} from './rows.ts';
+import type { IndexStore } from './store.ts';
 
 // The sync loop: catch up from the cursor to the head in batches, then follow. Blocks are the
 // unit of work rather than logs, because native value moves leave no log - and native value is
@@ -18,9 +17,14 @@ import {
 
 export interface IndexerHandle
 {
-    /** Resolves once the index has caught up to the head for the first time. */
+    /** Resolves once the index has caught up to the head for the first time - never, if stopped first. */
     ready: Promise<void>;
-    stop(): void;
+
+    /**
+     * Stops following, and resolves once the loop has let go of the store: a node call in flight
+     * is abandoned, a write in flight is let finish. A second call waits for the same loop.
+     */
+    stop(): Promise<void>;
 }
 
 /** How far back a reorg is allowed to rewrite before we treat the chain as unrecognisable. */
@@ -28,56 +32,96 @@ const MAX_REORG_DEPTH = 64;
 
 export function startIndexer(store: IndexStore, chain: ChainGateway, log: Logger): IndexerHandle
 {
-    let running = true;
+    const controller = new AbortController();
+    const signal = controller.signal;
     let resolveReady = (): void => undefined;
     const ready = new Promise<void>((resolve) =>
     {
         resolveReady = resolve;
     });
 
+    // The wait between polls, cut short by stop() so a shutdown never sits out the interval.
+    let wake = (): void => undefined;
+    const pause = (ms: number): Promise<void> => new Promise<void>((resolve) =>
+    {
+        if (signal.aborted)
+        {
+            resolve();
+            return;
+        }
+        const timer = setTimeout(resolve, ms);
+        wake = (): void =>
+        {
+            clearTimeout(timer);
+            resolve();
+        };
+    });
+
     const loop = async (): Promise<void> =>
     {
         try
         {
-            if (store.ensureChain(await chain.genesisHash()))
+            if (await store.ensureChain(await abortable(chain.genesisHash(), signal)))
             {
                 log.warn('chain changed under the index - wiped and resyncing');
             }
         }
         catch (error)
         {
-            log.error('cannot reach the chain', { error: String(error) });
+            if (!signal.aborted)
+            {
+                log.error('cannot reach the chain', { error: String(error) });
+            }
         }
 
-        while (running)
+        while (!signal.aborted)
         {
             try
             {
-                await syncOnce(store, chain, log);
-                resolveReady();
+                await syncOnce(store, chain, log, signal);
+                // A pass the stop cut short has caught up to nothing.
+                if (!signal.aborted)
+                {
+                    resolveReady();
+                }
             }
             catch (error)
             {
-                log.error('sync failed', { error: String(error) });
+                // Being told to stop is not a failure, and the pass it ended is not one to report.
+                if (!signal.aborted)
+                {
+                    log.error('sync failed', { error: String(error) });
+                }
             }
-            await new Promise((resolve) => setTimeout(resolve, chain.env.pollMs));
+            await pause(chain.env.pollMs);
         }
     };
-    void loop();
+    const running = loop();
 
-    return { ready, stop: () =>
-    {
-        running = false;
-    } };
+    return {
+        ready,
+        stop: async (): Promise<void> =>
+        {
+            controller.abort();
+            wake();
+            await running;
+        }
+    };
 }
 
-/** One catch-up pass: cursor+1 .. head, in batches, rewinding first if the chain reorganised. */
-export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logger): Promise<void>
+/**
+ * One catch-up pass: cursor+1 .. head, in batches, rewinding first if the chain reorganised.
+ *
+ * `signal` ends it at the next node call or batch boundary, rejecting with the signal's reason. A
+ * write already under way is let finish: each batch is one transaction, and a stop must never be
+ * what leaves half of one behind.
+ */
+export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logger, signal?: AbortSignal): Promise<void>
 {
-    const head = await chain.head();
-    await rewindIfReorged(store, chain, log);
+    const head = await abortable(chain.head(), signal);
+    await rewindIfReorged(store, chain, log, signal);
 
-    let from = Math.max(store.cursor(chain.env.startBlock) + 1, chain.env.startBlock);
+    let from = Math.max(await store.cursor(chain.env.startBlock) + 1, chain.env.startBlock);
     if (from > head)
     {
         return;
@@ -89,7 +133,7 @@ export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logg
     let indexed = 0;
 
     // The NEXT range is asked for before the current one is written, so the node is answering
-    // while the disk is writing instead of the two taking turns. On a remote RPC the fetch
+    // while the index is writing instead of the two taking turns. On a remote RPC the fetch
     // dominates, and this is most of the difference between the two.
     let pending: Promise<BlockWithReceipts[]> | null = chain.range(from, lastOf(from));
 
@@ -97,29 +141,26 @@ export async function syncOnce(store: IndexStore, chain: ChainGateway, log: Logg
     {
         while (from <= head)
         {
+            signal?.throwIfAborted();
             const to = lastOf(from);
-            const blocks = await pending!;
+            const blocks = await abortable(pending!, signal);
+            signal?.throwIfAborted();
             const ahead = to + 1;
             pending = ahead <= head ? chain.range(ahead, lastOf(ahead)) : null;
 
-            // Decode first, describe unknown tokens second, write last. Nothing awaits inside the
-            // transaction: a write transaction held open across a network call blocks every
-            // reader on this database for as long as the node takes to answer.
+            // Decode first, describe unknown tokens second, write last. Only the store is awaited
+            // inside the transaction: a write transaction held open across a network call blocks
+            // every reader on this database for as long as the node takes to answer.
             const prepared = blocks.map(block => prepare(block));
-            const unknown = new Set(prepared.flatMap(entry => [...entry.tokens]).filter(token => !store.knownToken(token)));
-            const described = await describeTokens(chain, unknown, log);
+            const unknown = await store.unknownTokens(prepared.flatMap(entry => [...entry.tokens]));
+            const described = await abortable(describeTokens(chain, unknown, log), signal);
+            signal?.throwIfAborted();
 
-            store.transaction(() =>
+            await store.transaction(async () =>
             {
-                for (const token of described)
-                {
-                    store.upsertToken(token);
-                }
-                for (const entry of prepared)
-                {
-                    store.insertBlock(entry.block, entry.transactions, entry.transfers);
-                }
-                store.setCursor(to);
+                await store.upsertTokens(described);
+                await store.insertBlocks(prepared);
+                await store.setCursor(to);
             });
 
             indexed += blocks.length;
@@ -159,9 +200,9 @@ function report(log: Logger, at: {
  * drops everything from the first divergence. Without this an explorer keeps serving
  * transactions that were un-mined - it would report money as moved when it never was.
  */
-async function rewindIfReorged(store: IndexStore, chain: ChainGateway, log: Logger): Promise<void>
+async function rewindIfReorged(store: IndexStore, chain: ChainGateway, log: Logger, signal: AbortSignal | undefined): Promise<void>
 {
-    const cursor = store.cursor(chain.env.startBlock);
+    const cursor = await store.cursor(chain.env.startBlock);
     if (cursor < chain.env.startBlock)
     {
         return;
@@ -174,36 +215,81 @@ async function rewindIfReorged(store: IndexStore, chain: ChainGateway, log: Logg
         {
             return;
         }
-        const stored = store.blockHash(height);
+        const stored = await store.blockHash(height);
         if (stored === null)
         {
             return;
         }
-        const live = await chain.blockHashAt(height);
+        const live = await abortable(chain.blockHashAt(height), signal);
         if (live !== null && live === stored)
         {
             if (depth > 0)
             {
+                signal?.throwIfAborted();
                 log.warn('reorg: rolling back', { from: height + 1, depth });
-                store.rollbackFrom(height + 1);
-                store.setCursor(height);
+                // The rows and the cursor in ONE transaction: a rollback that lands without its
+                // cursor leaves the cursor above a hole, and the next pass resumes past it.
+                await store.transaction(async () =>
+                {
+                    await store.rollbackFrom(height + 1);
+                    await store.setCursor(height);
+                });
             }
             return;
         }
     }
 
+    signal?.throwIfAborted();
     // Deeper than we are willing to reconcile: the safe read is that this is a different chain.
     log.error('reorg deeper than the reconcile window - wiping the index', { depth: MAX_REORG_DEPTH });
-    store.rollbackFrom(chain.env.startBlock);
-    store.setCursor(chain.env.startBlock - 1);
+    await store.transaction(async () =>
+    {
+        await store.rollbackFrom(chain.env.startBlock);
+        await store.setCursor(chain.env.startBlock - 1);
+    });
+}
+
+/**
+ * `work`, or the signal's reason the moment the indexer is told to stop - whichever comes first.
+ *
+ * Only ever around a NODE call, which is left to finish on its own with nobody listening. A store
+ * call is never raced: abandoning a write half-way is what the transaction exists to prevent.
+ */
+function abortable<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T>
+{
+    if (signal === undefined)
+    {
+        return work;
+    }
+    return new Promise<T>((resolve, reject) =>
+    {
+        const abort = (): void => reject(signal.reason);
+        if (signal.aborted)
+        {
+            abort();
+        }
+        else
+        {
+            signal.addEventListener('abort', abort, { once: true });
+        }
+        // Subscribed either way, so a call that fails after the stop is not an unhandled rejection.
+        work.then(
+            (value) =>
+            {
+                signal.removeEventListener('abort', abort);
+                resolve(value);
+            },
+            (error: unknown) =>
+            {
+                signal.removeEventListener('abort', abort);
+                reject(error);
+            });
+    });
 }
 
 /** One block turned into rows, ready to write. Pure: no database, no network. */
-interface PreparedBlock
+interface PreparedBlock extends BlockEntry
 {
-    block: BlockRow;
-    transactions: TransactionRow[];
-    transfers: TransferRow[];
     tokens: Set<string>;
 }
 

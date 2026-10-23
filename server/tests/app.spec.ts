@@ -2,6 +2,7 @@
 // only way to exercise the paths a live node will not reproduce on demand (a reorg, a receipt the
 // node never returned, an address with more rows than one page).
 import { describe, it, expect, vi } from 'vitest';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import { toFunctionSelector } from 'viem';
 
 import { buildApp } from '../src/app.ts';
@@ -9,7 +10,8 @@ import { analyze, describeFunctions, detectStandards } from '../src/chain/contra
 import { encodeCall } from '../src/chain/values.ts';
 import { FUNCTION_BY_SELECTOR, selectorOf } from '../src/chain/signatures.ts';
 import { syncOnce } from '../src/chain/indexer.ts';
-import { IndexStore, TRANSFER_TOPIC } from '../src/chain/store.ts';
+import { TRANSFER_TOPIC } from '../src/chain/rows.ts';
+import type { IndexStore } from '../src/chain/store.ts';
 import { classify, meanBlockTime, pageCount, presentTransaction } from '../src/present.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../src/chain/client.ts';
 import type {
@@ -26,6 +28,8 @@ import type {
     TransactionPage,
     TransferPage
 } from '../src/schemas.ts';
+
+import { openTestStore, type TestStoreOptions } from './support/database.ts';
 
 const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
@@ -106,11 +110,16 @@ function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): ChainGate
 
 const silent = { info: () => undefined, warn: () => undefined, error: () => undefined, debug: () => undefined } as never;
 
-async function indexed(blocks: BlockWithReceipts[], stub: ChainStub = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
+/** An index filled from `blocks`, plus the gateway it was filled from. Closed after the test. */
+async function indexed(
+    blocks: BlockWithReceipts[],
+    stub: ChainStub = {},
+    options: TestStoreOptions = {}
+): Promise<{ store: IndexStore; chain: ChainGateway }>
 {
-    const store = new IndexStore(':memory:');
+    const store = await openTestStore(options);
     const chain = stubChain(blocks, stub);
-    store.ensureChain(await chain.genesisHash());
+    await store.ensureChain(await chain.genesisHash());
     await syncOnce(store, chain, silent);
     return { store, chain };
 }
@@ -174,7 +183,7 @@ describe('the index', () =>
     it('records every block and transaction the chain reported', async () =>
     {
         const { store } = await indexed(CHAIN);
-        const stats = store.stats();
+        const stats = await store.stats();
         expect(stats.blocks).toBe(3);
         expect(stats.transactions).toBe(4);
         expect(stats.head).toBe(2);
@@ -184,17 +193,17 @@ describe('the index', () =>
     {
         const { store } = await indexed(CHAIN);
         // Alice sent all four; Bob received all four. Both must see the same four rows.
-        expect(store.transactionsOfAddress(ALICE, 10, 0).total).toBe(4);
-        expect(store.transactionsOfAddress(BOB, 10, 0).total).toBe(4);
+        expect((await store.transactionsOfAddress(ALICE, 10, 0)).total).toBe(4);
+        expect((await store.transactionsOfAddress(BOB, 10, 0)).total).toBe(4);
         // Checksummed input must not miss rows stored lower-cased.
-        expect(store.transactionsOfAddress(ALICE.toUpperCase(), 10, 0).total).toBe(4);
+        expect((await store.transactionsOfAddress(ALICE.toUpperCase(), 10, 0)).total).toBe(4);
     });
 
     it('pages without losing or repeating a row', async () =>
     {
         const { store } = await indexed(CHAIN);
-        const first = store.transactionsOfAddress(ALICE, 3, 0);
-        const second = store.transactionsOfAddress(ALICE, 3, 3);
+        const first = await store.transactionsOfAddress(ALICE, 3, 0);
+        const second = await store.transactionsOfAddress(ALICE, 3, 3);
         expect(first.rows).toHaveLength(3);
         expect(second.rows).toHaveLength(1);
         const seen = new Set([...first.rows, ...second.rows].map(row => row.hash));
@@ -207,17 +216,17 @@ describe('the index', () =>
         // two parties alone showed a token's page nothing at all - the bug this covers.
         const { store } = await indexed([...CHAIN, tokenBlock(3, '0xb2', '0xb3')]);
 
-        expect(store.transfersOfAddress(ALICE, 10, 0).total).toBe(1);
-        expect(store.transfersOfAddress(BOB, 10, 0).total).toBe(1);
+        expect((await store.transfersOfAddress(ALICE, 10, 0)).total).toBe(1);
+        expect((await store.transfersOfAddress(BOB, 10, 0)).total).toBe(1);
 
-        const emitted = store.transfersOfAddress(TOKEN, 10, 0);
+        const emitted = await store.transfersOfAddress(TOKEN, 10, 0);
         expect(emitted.total).toBe(1);
         expect(emitted.rows[0]!.token).toBe(TOKEN);
         expect(emitted.rows[0]!.value).toBe((10n ** 18n).toString());
         // Checksummed input must not miss rows stored lower-cased, on this column too.
-        expect(store.transfersOfAddress(TOKEN.toUpperCase(), 10, 0).total).toBe(1);
+        expect((await store.transfersOfAddress(TOKEN.toUpperCase(), 10, 0)).total).toBe(1);
         // An address that is none of the three still sees nothing.
-        expect(store.transfersOfAddress('0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', 10, 0).total).toBe(0);
+        expect((await store.transfersOfAddress('0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', 10, 0)).total).toBe(0);
     });
 
     it('counts a transfer once, even when the token is also a party to it', async () =>
@@ -228,16 +237,16 @@ describe('the index', () =>
             index: 0, address: TOKEN, topics: [TRANSFER_TOPIC, topic(ALICE), topic(TOKEN)], data: '0x01'
         }];
         const { store } = await indexed([...CHAIN, selfSend]);
-        expect(store.transfersOfAddress(TOKEN, 10, 0).total).toBe(1);
+        expect((await store.transfersOfAddress(TOKEN, 10, 0)).total).toBe(1);
     });
 
     it('sums native flow in each direction', async () =>
     {
         const { store } = await indexed(CHAIN);
-        const flow = store.flowOfAddress(ALICE);
+        const flow = await store.flowOfAddress(ALICE);
         expect(flow.out).toBe((4n * 10n ** 18n).toString());
         expect(flow.in).toBe('0');
-        expect(store.flowOfAddress(BOB).in).toBe((4n * 10n ** 18n).toString());
+        expect((await store.flowOfAddress(BOB)).in).toBe((4n * 10n ** 18n).toString());
     });
 
     it('pages a block\'s transactions instead of shipping every one', async () =>
@@ -247,14 +256,15 @@ describe('the index', () =>
         const { store } = await indexed(CHAIN);
         // Whichever block the fixture loaded most heavily - the assertion is about paging, not
         // about which block happens to be busy.
-        const busiest = [0, 1, 2]
-            .map((number) => ({ number, total: store.transactionsOfBlock(number, 100, 0).total }))
+        const busiest = (await Promise.all([0, 1, 2]
+            .map(async (number) => ({ number, total: (await store.transactionsOfBlock(number, 100, 0)).total }))))
             .sort((a, b) => b.total - a.total)[0]!;
-        const all = store.transactionsOfBlock(busiest.number, 100, 0);
+        const all = await store.transactionsOfBlock(busiest.number, 100, 0);
         expect(all.total).toBeGreaterThan(1);
 
         // One row per page: every page reports the SAME total, and the rows do not repeat.
-        const pages = Array.from({ length: all.total }, (_row, index) => store.transactionsOfBlock(busiest.number, 1, index));
+        const pages = await Promise.all(
+            Array.from({ length: all.total }, (_row, index) => store.transactionsOfBlock(busiest.number, 1, index)));
         for (const slice of pages)
         {
             expect(slice.rows).toHaveLength(1);
@@ -263,14 +273,14 @@ describe('the index', () =>
         expect(new Set(pages.map((slice) => slice.rows[0]!.hash)).size).toBe(all.total);
 
         // Past the end is empty, not an error.
-        expect(store.transactionsOfBlock(busiest.number, 10, all.total).rows).toHaveLength(0);
+        expect((await store.transactionsOfBlock(busiest.number, 10, all.total)).rows).toHaveLength(0);
     });
 
     it('rolls back a reorg instead of serving transactions that were un-mined', async () =>
     {
         const { store } = await indexed(CHAIN);
-        const orphaned = store.transactionsOfBlock(2, 100, 0).rows[0]!.hash;
-        expect(store.stats().transactions).toBe(4);
+        const orphaned = (await store.transactionsOfBlock(2, 100, 0)).rows[0]!.hash;
+        expect((await store.stats()).transactions).toBe(4);
 
         // The chain re-writes block 2: a different hash, and transactions that share NO hash
         // with the ones it replaced. Reusing a hash would let ON CONFLICT DO NOTHING hide a
@@ -281,20 +291,20 @@ describe('the index', () =>
         }));
         await syncOnce(store, stubChain([CHAIN[0]!, CHAIN[1]!, fork]), silent);
 
-        expect(store.blockHash(2)).toBe('0xb2-fork');
+        expect(await store.blockHash(2)).toBe('0xb2-fork');
         // The orphaned transaction is GONE - not merged alongside the replacements.
-        expect(store.transactionByHash(orphaned)).toBeNull();
-        expect(store.transactionsOfBlock(2, 100, 0).rows).toHaveLength(3);
-        expect(store.stats().transactions).toBe(6);
-        expect(store.stats().blocks).toBe(3);
+        expect(await store.transactionByHash(orphaned)).toBeNull();
+        expect((await store.transactionsOfBlock(2, 100, 0)).rows).toHaveLength(3);
+        expect((await store.stats()).transactions).toBe(6);
+        expect((await store.stats()).blocks).toBe(3);
     });
 
     it('wipes the index when the chain behind the RPC is a different one', async () =>
     {
         const { store } = await indexed(CHAIN);
-        expect(store.ensureChain('0xb0')).toBe(false);
-        expect(store.ensureChain('0xsomeotherchain')).toBe(true);
-        expect(store.stats().blocks).toBe(0);
+        expect(await store.ensureChain('0xb0')).toBe(false);
+        expect(await store.ensureChain('0xsomeotherchain')).toBe(true);
+        expect((await store.stats()).blocks).toBe(0);
     });
 });
 
@@ -305,6 +315,23 @@ describe('the API over the index', () =>
         const { store, chain } = await indexed(blocks);
         const app = buildApp({ dev: false, store, chain });
         return (path) => app.handle(new Request(`http://local${ path }`));
+    }
+
+    /**
+     * `read`, made to answer only after a turn of the event loop.
+     *
+     * Everything a stubbed request does settles in microtasks, so a rebuild left alone could be
+     * over before a second request even looked - and a cache answers that one whether or not it
+     * would have joined the rebuild. Held for a turn, the second request is certainly in while the
+     * first rebuild is still running, which is the case under test.
+     */
+    function heldOneTurn<T>(read: () => Promise<T>): () => Promise<T>
+    {
+        return async () =>
+        {
+            await nextTurn();
+            return read();
+        };
     }
 
     it('reports BOTH heads, so a backfill in progress is visible', async () =>
@@ -412,6 +439,39 @@ describe('the API over the index', () =>
         expect(nothing.total).toBe(0);
         // Still one page, so the pager has something coherent to draw over an empty list.
         expect(nothing.pages).toBe(1);
+    });
+
+    it('ranks the rich list ONCE for two readers who arrive together', async () =>
+    {
+        // Two requests on one store at once, on purpose - so a store that queues the second caller
+        // rather than refusing it.
+        const { store, chain } = await indexed(CHAIN, {}, { strict: false });
+        const app = buildApp({ dev: false, store, chain });
+        const read = store.distinctAddresses.bind(store);
+        const gathered = vi.spyOn(store, 'distinctAddresses').mockImplementationOnce(heldOneTurn(read));
+        const at = (): Promise<Response> => app.handle(new Request('http://local/api/accounts/top?limit=10'));
+
+        const [first, second] = await Promise.all([at(), at()]);
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(await second.json()).toEqual(await first.json());
+        // One ranking is one live balance read per address. Two would be the balance storm the
+        // cache is there to prevent, set off by the readers it was meant to serve.
+        expect(gathered).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not keep a rich list that failed to build', async () =>
+    {
+        const { store, chain } = await indexed(CHAIN);
+        const app = buildApp({ dev: false, store, chain });
+        const gathered = vi.spyOn(store, 'distinctAddresses').mockRejectedValueOnce(new Error('the index went away'));
+        const at = (): Promise<Response> => app.handle(new Request('http://local/api/accounts/top?limit=10'));
+
+        expect((await at()).status).toBe(500);
+        const retried = await at();
+        expect(retried.status).toBe(200);
+        expect(((await retried.json()) as TopAccounts).rows.length).toBeGreaterThan(0);
+        expect(gathered).toHaveBeenCalledTimes(2);
     });
 
     it('serves a token contract its OWN transfers rather than an empty ledger', async () =>
@@ -566,7 +626,10 @@ describe('the API over the index', () =>
         const hash = carrier.transactions[0]!.hash;
         const read = async (input: (hash: string) => Promise<string>): Promise<Response> =>
         {
-            const { store, chain } = await indexed([...CHAIN, carrier], { input });
+            // The last read runs on a fake clock that jumps three seconds at once. Under the
+            // harness's two-second lock timeout, a call still waiting for its turn at that jump
+            // would fail for a wait that took no real time at all.
+            const { store, chain } = await indexed([...CHAIN, carrier], { input }, { lockTimeoutMs: 60_000 });
             return buildApp({ dev: false, store, chain }).handle(new Request(`http://local/api/txs/${ hash }`));
         };
 
@@ -723,6 +786,40 @@ describe('the API over the index', () =>
         // A different window is a different entry, not a re-use of the one already held.
         const wider = (await (await get('/api/stats/charts?days=14')).json()) as ChartsSummary;
         expect(wider.days).toBe(14);
+    });
+
+    it('rebuilds the charts ONCE for two readers who arrive together', async () =>
+    {
+        // Two requests on one store at once, on purpose, as with the rich list above.
+        const { store, chain } = await indexed(CHAIN, {}, { strict: false });
+        const app = buildApp({ dev: false, store, chain });
+        const read = store.totals.bind(store);
+        const totals = vi.spyOn(store, 'totals').mockImplementationOnce(heldOneTurn(read));
+        const at = (): Promise<Response> => app.handle(new Request('http://local/api/stats/charts?days=7'));
+
+        const [first, second] = await Promise.all([at(), at()]);
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(await second.json()).toEqual(await first.json());
+        // The second joined the rebuild already running. A cold cache meets a burst of readers
+        // exactly when the most expensive read this server does is least wanted twice.
+        expect(totals).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not keep a charts rebuild that failed', async () =>
+    {
+        const { store, chain } = await indexed(CHAIN);
+        const app = buildApp({ dev: false, store, chain });
+        const totals = vi.spyOn(store, 'totals').mockRejectedValueOnce(new Error('the index went away'));
+        const at = (): Promise<Response> => app.handle(new Request('http://local/api/stats/charts?days=7'));
+
+        expect((await at()).status).toBe(500);
+        // A failure is not an answer. Held, it would be served to every reader for as long as the
+        // cache keeps a payload; dropped, the next reader simply asks again.
+        const retried = await at();
+        expect(retried.status).toBe(200);
+        expect(((await retried.json()) as ChartsSummary).days).toBe(7);
+        expect(totals).toHaveBeenCalledTimes(2);
     });
 
     it('404s an unknown block rather than inventing one', async () =>

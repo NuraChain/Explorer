@@ -11,7 +11,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { buildApp } from '../src/app.ts';
 import { bech32ToHex, hexToBech32 } from '../src/chain/bech32.ts';
 import { STAKING_PRECOMPILE } from '../src/chain/staking.ts';
-import { IndexStore } from '../src/chain/store.ts';
+import { openTestStore } from './support/database.ts';
 import type { ChainEnv, ChainGateway } from '../src/chain/client.ts';
 import type { CosmosEnv } from '../src/chain/cosmos.ts';
 import type { DelegatorStake, StakingOverview, ValidatorPage } from '../src/schemas.ts';
@@ -170,12 +170,12 @@ function stubChain(writable = false): ChainGateway
     };
 }
 
-function api(stub: NodeStub = {}): (path: string) => Promise<Response>
+async function api(stub: NodeStub = {}): Promise<(path: string) => Promise<Response>>
 {
     stubNode(stub);
     const app = buildApp({
         dev: false,
-        store: new IndexStore(':memory:'),
+        store: await openTestStore(),
         chain: stubChain(stub.writable === true),
         cosmos: COSMOS
     });
@@ -221,7 +221,7 @@ describe('the staking overview', () =>
 {
     it('reports the module, the pool and the set', async () =>
     {
-        const overview = await (await api()('/api/staking')).json() as StakingOverview;
+        const overview = await (await (await api())('/api/staking')).json() as StakingOverview;
 
         expect(overview.enabled).toBe(true);
         expect(overview.params).toMatchObject({ unbondingTime: 1_814_400, maxValidators: 100, bondDenom: 'anura' });
@@ -232,7 +232,7 @@ describe('the staking overview', () =>
 
     it('leaves a jailed validator out of the active count but not out of the set', async () =>
     {
-        const overview = await (await api()('/api/staking')).json() as StakingOverview;
+        const overview = await (await (await api())('/api/staking')).json() as StakingOverview;
 
         // Three validators, all three bonded; one of them jailed and so not securing anything.
         expect(overview.total).toBe(3);
@@ -241,18 +241,18 @@ describe('the staking overview', () =>
 
     it('says a chain can be read without being staked on', async () =>
     {
-        const readable = await (await api()('/api/staking')).json() as StakingOverview;
+        const readable = await (await (await api())('/api/staking')).json() as StakingOverview;
         expect(readable.enabled).toBe(true);
         expect(readable.writable).toBe(false);
 
-        const both = await (await api({ writable: true })('/api/staking')).json() as StakingOverview;
+        const both = await (await (await api({ writable: true }))('/api/staking')).json() as StakingOverview;
         expect(both.enabled).toBe(true);
         expect(both.writable).toBe(true);
     });
 
     it('sends the two precompile addresses and the six selectors', async () =>
     {
-        const overview = await (await api()('/api/staking')).json() as StakingOverview;
+        const overview = await (await (await api())('/api/staking')).json() as StakingOverview;
 
         // Two modules, two addresses - a claim sent to the staking one would go nowhere.
         expect(overview.stakingPrecompile).toBe('0x0000000000000000000000000000000000000800');
@@ -266,13 +266,13 @@ describe('the staking overview', () =>
 
     it('is off, rather than empty, when the module\'s api does not answer', async () =>
     {
-        const down = await (await api({ restDown: true })('/api/staking')).json() as StakingOverview;
+        const down = await (await (await api({ restDown: true }))('/api/staking')).json() as StakingOverview;
         expect(down.enabled).toBe(false);
         expect(down.params).toBeNull();
         // Nothing was established about the chain's own spelling, so nothing is claimed about it.
         expect(down.prefix).toBe('');
 
-        const gone = await (await api({ up: false })('/api/staking')).json() as StakingOverview;
+        const gone = await (await (await api({ up: false }))('/api/staking')).json() as StakingOverview;
         expect(gone.enabled).toBe(false);
         expect(gone.total).toBe(0);
     });
@@ -281,7 +281,7 @@ describe('the staking overview', () =>
     {
         // `nuravaloper1…` carries the account prefix with `valoper` stuck on the end, so a chain
         // whose auth module is too old to state it has still said it.
-        const overview = await (await api({ authPrefix: false })('/api/staking')).json() as StakingOverview;
+        const overview = await (await (await api({ authPrefix: false }))('/api/staking')).json() as StakingOverview;
         expect(overview.prefix).toBe('nura');
     });
 });
@@ -290,7 +290,7 @@ describe('the validator list', () =>
 {
     it('is ordered by stake, heaviest first', async () =>
     {
-        const page = await (await api()('/api/staking/validators?status=all')).json() as ValidatorPage;
+        const page = await (await (await api())('/api/staking/validators?status=all')).json() as ValidatorPage;
 
         expect(page.rows.map((row) => row.moniker)).toEqual(['alpha', 'beta', 'gamma']);
         expect(page.total).toBe(3);
@@ -298,10 +298,10 @@ describe('the validator list', () =>
 
     it('narrows to the validators actually producing blocks', async () =>
     {
-        const active = await (await api()('/api/staking/validators?status=active')).json() as ValidatorPage;
+        const active = await (await (await api())('/api/staking/validators?status=active')).json() as ValidatorPage;
         expect(active.rows.map((row) => row.moniker)).toEqual(['alpha', 'beta']);
 
-        const inactive = await (await api()('/api/staking/validators?status=inactive')).json() as ValidatorPage;
+        const inactive = await (await (await api())('/api/staking/validators?status=inactive')).json() as ValidatorPage;
         expect(inactive.rows.map((row) => row.moniker)).toEqual(['gamma']);
         expect(inactive.rows[0]?.jailed).toBe(true);
         // Jailed, and STILL bonded - which is exactly why the filter cannot read the status alone.
@@ -310,7 +310,7 @@ describe('the validator list', () =>
 
     it('carries the operator address in both spellings', async () =>
     {
-        const page = await (await api()('/api/staking/validators?status=all')).json() as ValidatorPage;
+        const page = await (await (await api())('/api/staking/validators?status=all')).json() as ValidatorPage;
         const alpha = page.rows.find((row) => row.moniker === 'alpha')!;
 
         expect(alpha.operatorAddress).toBe(ALPHA);
@@ -320,7 +320,7 @@ describe('the validator list', () =>
 
     it('keeps commission as the module\'s own fixed point', async () =>
     {
-        const page = await (await api()('/api/staking/validators?status=all')).json() as ValidatorPage;
+        const page = await (await (await api())('/api/staking/validators?status=all')).json() as ValidatorPage;
         const gamma = page.rows.find((row) => row.moniker === 'gamma')!;
 
         // A string, not a number: eighteen places do not survive a double, and a commission is
@@ -331,7 +331,7 @@ describe('the validator list', () =>
 
     it('pages', async () =>
     {
-        const page = await (await api()('/api/staking/validators?status=all&limit=2&page=2')).json() as ValidatorPage;
+        const page = await (await (await api())('/api/staking/validators?status=all&limit=2&page=2')).json() as ValidatorPage;
 
         expect(page.rows.map((row) => row.moniker)).toEqual(['gamma']);
         expect(page).toMatchObject({ total: 3, page: 2, pages: 2 });
@@ -365,7 +365,7 @@ describe('one delegator\'s position', () =>
 
     it('asks the module under the account\'s bech32 spelling', async () =>
     {
-        await api(POSITION)(`/api/staking/delegations?address=${ DELEGATOR_HEX }`);
+        await (await api(POSITION))(`/api/staking/delegations?address=${ DELEGATOR_HEX }`);
 
         // The browser only ever has the hex; the module is keyed on the other one. If this
         // conversion were wrong the answer would be a real account's - somebody else's.
@@ -375,7 +375,7 @@ describe('one delegator\'s position', () =>
 
     it('reports what is staked, and says so in the chain\'s own spelling', async () =>
     {
-        const stake = await (await api(POSITION)(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
+        const stake = await (await (await api(POSITION))(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
 
         expect(stake.address).toBe(DELEGATOR);
         expect(stake.delegations).toEqual([
@@ -385,7 +385,7 @@ describe('one delegator\'s position', () =>
 
     it('truncates a reward rather than carrying its fraction', async () =>
     {
-        const stake = await (await api(POSITION)(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
+        const stake = await (await (await api(POSITION))(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
 
         // Rewards accrue as DecCoin. Everything else on this wire is a whole number of base
         // units, and the module itself truncates when it pays - so '1234.5678' is 1234 here, and
@@ -397,7 +397,7 @@ describe('one delegator\'s position', () =>
 
     it('gives one row per unbonding ENTRY, not per validator', async () =>
     {
-        const stake = await (await api(POSITION)(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
+        const stake = await (await (await api(POSITION))(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
 
         // Two withdrawals from the same validator are two clocks, and the creation height is the
         // only thing that tells them apart - it is also what cancelling one takes.
@@ -408,15 +408,15 @@ describe('one delegator\'s position', () =>
 
     it('answers an account that has staked nothing without inventing a position', async () =>
     {
-        const stake = await (await api()(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
+        const stake = await (await (await api())(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).json() as DelegatorStake;
 
         expect(stake).toMatchObject({ address: DELEGATOR, delegations: [], unbonding: [], rewards: [], totalRewards: [] });
     });
 
     it('refuses what is not an address, and says so when the module is unreachable', async () =>
     {
-        expect((await api()('/api/staking/delegations?address=nura1nope')).status).toBe(404);
-        expect((await api()('/api/staking/delegations?address=0x1234')).status).toBe(404);
-        expect((await api({ restDown: true })(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).status).toBe(404);
+        expect((await (await api())('/api/staking/delegations?address=nura1nope')).status).toBe(404);
+        expect((await (await api())('/api/staking/delegations?address=0x1234')).status).toBe(404);
+        expect((await (await api({ restDown: true }))(`/api/staking/delegations?address=${ DELEGATOR_HEX }`)).status).toBe(404);
     });
 });

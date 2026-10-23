@@ -9,6 +9,8 @@ export default defineConfig({
         environment: 'node',
         // Fixtures live under tests/support and are not themselves tests.
         include: ['tests/**/*.spec.ts'],
+        // Closes every index (and stops every follower) a test opened - see tests/support/database.ts.
+        setupFiles: ['tests/support/setup.ts'],
         coverage:
         {
             provider: 'v8',

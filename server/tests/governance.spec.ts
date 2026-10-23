@@ -10,7 +10,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { buildApp } from '../src/app.ts';
 import { bech32ToHex } from '../src/chain/bech32.ts';
 import { GOV_PRECOMPILE } from '../src/chain/gov.ts';
-import { IndexStore } from '../src/chain/store.ts';
+import { openTestStore } from './support/database.ts';
 import type { ChainEnv, ChainGateway } from '../src/chain/client.ts';
 import type { CosmosEnv } from '../src/chain/cosmos.ts';
 import type { GovernanceOverview, ProposalDetail, ProposalPage } from '../src/schemas.ts';
@@ -172,12 +172,12 @@ function stubChain(writable = false): ChainGateway
     };
 }
 
-function api(stub: NodeStub = {}): (path: string) => Promise<Response>
+async function api(stub: NodeStub = {}): Promise<(path: string) => Promise<Response>>
 {
     stubNode(stub);
     const app = buildApp({
         dev: false,
-        store: new IndexStore(':memory:'),
+        store: await openTestStore(),
         chain: stubChain(stub.writable === true),
         cosmos: COSMOS
     });
@@ -220,7 +220,7 @@ describe('a node that is not answering', () =>
 {
     it('says governance is unreachable rather than showing an empty chain', async () =>
     {
-        const get = api({ up: false });
+        const get = await api({ up: false });
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
         expect(overview.enabled).toBe(false);
@@ -231,7 +231,7 @@ describe('a node that is not answering', () =>
 
     it('says the same when only the REST api is off', async () =>
     {
-        const get = api({ restDown: true });
+        const get = await api({ restDown: true });
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
         expect(overview.enabled).toBe(false);
@@ -245,7 +245,7 @@ describe('the governance overview', () =>
 {
     it('counts the proposals by what became of them', async () =>
     {
-        const get = api();
+        const get = await api();
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
         expect(overview.enabled).toBe(true);
@@ -257,7 +257,7 @@ describe('the governance overview', () =>
 
     it('reads the module\'s parameters, turning its durations into seconds', async () =>
     {
-        const get = api();
+        const get = await api();
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
         expect(overview.params).toEqual({
@@ -273,7 +273,7 @@ describe('the governance overview', () =>
 
     it('carries the staked supply a quorum is measured against, and the node it read from', async () =>
     {
-        const get = api();
+        const get = await api();
         const overview = (await (await get('/api/governance')).json()) as GovernanceOverview;
 
         expect(overview.bondedTokens).toBe(NURA(2_000_000n));
@@ -285,11 +285,11 @@ describe('the governance overview', () =>
         // Reading needs the node's api; casting a vote needs the gov precompile, which is a chain
         // setting. A reader can follow a proposal either way and is told plainly when they cannot
         // act on it.
-        const readOnly = (await (await api()('/api/governance')).json()) as GovernanceOverview;
+        const readOnly = (await (await (await api())('/api/governance')).json()) as GovernanceOverview;
         expect(readOnly.enabled).toBe(true);
         expect(readOnly.writable).toBe(false);
 
-        const both = (await (await api({ writable: true })('/api/governance')).json()) as GovernanceOverview;
+        const both = (await (await (await api({ writable: true }))('/api/governance')).json()) as GovernanceOverview;
         expect(both.enabled).toBe(true);
         expect(both.writable).toBe(true);
         expect(both.precompile).toBe(GOV_PRECOMPILE);
@@ -300,7 +300,7 @@ describe('the proposal list', () =>
 {
     it('reads a proposal field for field, in both spellings of its proposer', async () =>
     {
-        const get = api();
+        const get = await api();
         const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
 
         expect(page.total).toBe(3);
@@ -317,7 +317,7 @@ describe('the proposal list', () =>
 
     it('keeps the whole message, not only which module it addresses', async () =>
     {
-        const get = api();
+        const get = await api();
         const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
         const [message] = page.rows[0]!.messages;
 
@@ -329,7 +329,7 @@ describe('the proposal list', () =>
 
     it('normalises the module\'s nanosecond timestamps', async () =>
     {
-        const get = api();
+        const get = await api();
         const page = (await (await get('/api/governance/proposals')).json()) as ProposalPage;
 
         expect(page.rows[0]!.submitTime).toBe('2026-08-28T19:42:31.441Z');
@@ -338,7 +338,7 @@ describe('the proposal list', () =>
 
     it('files each state under the outcome it belongs to', async () =>
     {
-        const get = api();
+        const get = await api();
         const at = async (query: string): Promise<ProposalPage> =>
             (await (await get(`/api/governance/proposals?${ query }`)).json()) as ProposalPage;
 
@@ -352,7 +352,7 @@ describe('the proposal list', () =>
     {
         // The module leaves a proposal's own tally at zero until its vote closes, so the one row
         // a reader scans for the shape of would be drawn empty. The open rows are counted live.
-        const get = api({
+        const get = await api({
             tally: {
                 yes_count: NURA(620_000n), abstain_count: NURA(90_000n),
                 no_count: NURA(240_000n), no_with_veto_count: NURA(50_000n)
@@ -373,7 +373,7 @@ describe('one proposal', () =>
 {
     it('prefers the RUNNING tally over the final one while a vote is open', async () =>
     {
-        const get = api({
+        const get = await api({
             tally: {
                 yes_count: NURA(620_000n), abstain_count: NURA(90_000n),
                 no_count: NURA(240_000n), no_with_veto_count: NURA(50_000n)
@@ -389,7 +389,7 @@ describe('one proposal', () =>
 
     it('flattens a weighted vote into the options it split across', async () =>
     {
-        const get = api({
+        const get = await api({
             votes: [
                 { proposal_id: '3', voter: VOTER, metadata: 'split', options: [
                     { option: 'VOTE_OPTION_YES', weight: '0.600000000000000000' },
@@ -412,7 +412,7 @@ describe('one proposal', () =>
 
     it('reads an option answered as the enum\'s number as well as by name', async () =>
     {
-        const get = api({
+        const get = await api({
             votes: [{ proposal_id: '3', voter: VOTER, metadata: '', options: [{ option: '4', weight: '1.000000000000000000' }] }]
         });
         const detail = (await (await get('/api/governance/proposals/3')).json()) as ProposalDetail;
@@ -422,7 +422,7 @@ describe('one proposal', () =>
 
     it('shows who has put a deposit behind it', async () =>
     {
-        const get = api({
+        const get = await api({
             deposits: [{ proposal_id: '3', depositor: PROPOSER, amount: [{ denom: 'anura', amount: NURA(100_000n) }] }]
         });
         const detail = (await (await get('/api/governance/proposals/3')).json()) as ProposalDetail;
@@ -436,14 +436,14 @@ describe('one proposal', () =>
 
     it('404s an id the module does not hold, and one that is not an id at all', async () =>
     {
-        const get = api();
+        const get = await api();
         expect((await get('/api/governance/proposals/999')).status).toBe(404);
         expect((await get('/api/governance/proposals/abc')).status).toBe(404);
     });
 
     it('exposes the governance routes on the manifest the client reads', async () =>
     {
-        const get = api();
+        const get = await api();
         const manifest = (await (await get('/api/_manifest')).json()) as Record<string, unknown>;
         expect(JSON.stringify(manifest)).toContain('/governance/proposals');
     });

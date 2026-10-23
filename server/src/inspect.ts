@@ -2,8 +2,9 @@ import { BadRequestError } from '@azerothjs/http';
 
 import type { ChainGateway } from './chain/client.ts';
 import { analyze, describeCall, describeEvents, describeFunctions, detectStandards } from './chain/contract.ts';
+import { normalize, type TransactionRow } from './chain/rows.ts';
 import { FUNCTION_BY_SELECTOR, READABLE_CALLS, selectorOf, type KnownFunction } from './chain/signatures.ts';
-import { normalize, type IndexStore, type TransactionRow } from './chain/store.ts';
+import type { IndexStore } from './chain/store.ts';
 import { ArgumentError, decodeReturn, encodeCall } from './chain/values.ts';
 import { iso } from './present.ts';
 import type { ContractCallResult, ContractDetail, ContractRead, DecodedCall, ProxyKind } from './schemas.ts';
@@ -227,7 +228,7 @@ export async function inspectContract({ store, chain }: InspectDeps, target: str
     const address = normalize(target);
     const code = await chain.code(address).catch(() => '0x');
     const facts = analyze(code);
-    const creation = store.contractCreation(address);
+    const creation = await store.contractCreation(address);
 
     const deployment = creation === null
         ? null

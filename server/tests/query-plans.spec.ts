@@ -25,15 +25,15 @@ import { IndexStore } from '../src/chain/store.ts';
 /** A real file, because a plan is read from a second connection and ':memory:' is per-connection. */
 const made: string[] = [];
 
-function schema(): DatabaseSync
+async function schema(): Promise<DatabaseSync>
 {
     const directory = mkdtempSync(join(tmpdir(), 'nura-plan-'));
     made.push(directory);
 
-    // The store writes the schema, indexes included, on construction.
+    // The store writes the schema, indexes included, when it opens.
     const path = join(directory, 'index.db');
-    const store = new IndexStore(path);
-    store.close();
+    const store = await IndexStore.open({ path });
+    await store.close();
 
     return new DatabaseSync(path, { readOnly: true });
 }
@@ -54,9 +54,9 @@ const planOf = (db: DatabaseSync, sql: string, ...args: Array<string | number>):
 
 describe('the charts aggregation reads indexes, not tables', () =>
 {
-    it('rolls days up from a COVERING index, touching no block row', () =>
+    it('rolls days up from a COVERING index, touching no block row', async () =>
     {
-        const db = schema();
+        const db = await schema();
 
         // The query `statsDaily` runs: a timestamp window grouped by day, reading size and gas.
         const plan = planOf(db, `
@@ -75,9 +75,9 @@ describe('the charts aggregation reads indexes, not tables', () =>
         expect(plan).not.toMatch(/SCAN blocks(?! USING)/);
     });
 
-    it('counts distinct addresses without scanning every block', () =>
+    it('counts distinct addresses without scanning every block', async () =>
     {
-        const db = schema();
+        const db = await schema();
 
         // The `addresses` half of `totals()`. `miner` is the column that made this expensive:
         // every block carries one, and this chain has two distinct values across a million rows.

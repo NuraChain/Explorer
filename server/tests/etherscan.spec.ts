@@ -8,7 +8,7 @@
 // Everything here goes through the real HTTP handler rather than the module's internals, because
 // the routing (`/api` and `/v2/api` EXACTLY, never shadowing `/api/blocks`) is part of the
 // contract too.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import { buildApp } from '../src/app.ts';
 import { createEtherscanApi } from '../src/etherscan.ts';
@@ -375,6 +375,58 @@ describe('account: token transfers', () =>
     {
         const ask = await surface(chain);
         expect((await ask(`module=account&action=tokentx&address=${ ALICE }&contractaddress=0x123`)).message).toBe('NOTOK');
+    });
+});
+
+describe('the cost of a page', () =>
+{
+    it('reads a page\'s blocks, parents and tokens once per page, never once per row', async () =>
+    {
+        // A page is up to ten thousand rows, and every row names its block - a transfer its
+        // transaction and its token as well. Looked up row by row, that was thirty thousand
+        // statements behind one request.
+        const blocks = [
+            block(0, '0x00', '0xb0'),
+            tokenBlock(1, '0xb0', '0xb1', { count: 3 }),
+            tokenBlock(2, '0xb1', '0xb2', { count: 2 }),
+            tokenBlock(3, '0xb2', '0xb3')
+        ];
+        const { store, chain } = await indexed(blocks, {
+            tokenMetadata: async () => ({ name: 'Token', symbol: 'TKN', decimals: 18 })
+        });
+        const perRow = [vi.spyOn(store, 'blockByNumber'), vi.spyOn(store, 'transactionByHash'), vi.spyOn(store, 'token')];
+        const heights = vi.spyOn(store, 'blockHashes');
+        const parents = vi.spyOn(store, 'transactionsByHash');
+        const tokens = vi.spyOn(store, 'tokensOf');
+        const api = createEtherscanApi({ store, chain });
+        const ask = async (query: string): Promise<Array<Record<string, string>>> =>
+            ((await (await api(new URLSearchParams(query))).json()) as Envelope).result as Array<Record<string, string>>;
+
+        // Seven transactions over four blocks: one lookup for all four heights.
+        const transactions = await ask(`module=account&action=txlist&address=${ ALICE }`);
+        expect(transactions).toHaveLength(7);
+        expect(heights).toHaveBeenCalledOnce();
+        for (const row of transactions)
+        {
+            expect(row.blockHash).toBe(`0xb${ row.blockNumber }`);
+        }
+
+        // Three transfers over three blocks: one lookup each for their heights, parents and tokens.
+        heights.mockClear();
+        const transfers = await ask(`module=account&action=tokentx&address=${ ALICE }`);
+        expect(transfers).toHaveLength(3);
+        expect(heights).toHaveBeenCalledOnce();
+        expect(parents).toHaveBeenCalledOnce();
+        expect(tokens).toHaveBeenCalledOnce();
+        for (const row of transfers)
+        {
+            expect(row).toMatchObject({ blockHash: `0xb${ row.blockNumber }`, nonce: '0', tokenSymbol: 'TKN', tokenDecimal: '18' });
+        }
+
+        for (const spy of perRow)
+        {
+            expect(spy).not.toHaveBeenCalled();
+        }
     });
 });
 

@@ -5,8 +5,9 @@
 // Nothing in here opens a socket or touches the disk: the store is ':memory:' and the gateway is
 // a plain object, which is what lets the whole suite run offline and in any order.
 import { syncOnce } from '../../src/chain/indexer.ts';
-import { IndexStore } from '../../src/chain/store.ts';
+import type { IndexStore } from '../../src/chain/store.ts';
 import type { BlockWithReceipts, ChainEnv, ChainGateway } from '../../src/chain/client.ts';
+import { openTestStore } from './database.ts';
 
 export const ENV: ChainEnv = {
     rpcUrl: 'stub', chainId: 1020, name: 'NuraChain', symbol: 'NURA', decimals: 18, siteUrl: '', explorerUrl: '',
@@ -134,18 +135,18 @@ export function stubChain(blocks: BlockWithReceipts[], stub: ChainStub = {}): Ch
     };
 }
 
-/** An empty in-memory index. The caller closes it. */
-export function freshStore(): IndexStore
+/** An empty index, closed after the test. */
+export function freshStore(): Promise<IndexStore>
 {
-    return new IndexStore(':memory:');
+    return openTestStore();
 }
 
-/** An index filled from `blocks`, plus the gateway it was filled from. */
+/** An index filled from `blocks`, plus the gateway it was filled from. Closed after the test. */
 export async function indexed(blocks: BlockWithReceipts[], stub: ChainStub = {}): Promise<{ store: IndexStore; chain: ChainGateway }>
 {
-    const store = new IndexStore(':memory:');
+    const store = await openTestStore();
     const chain = stubChain(blocks, stub);
-    store.ensureChain(await chain.genesisHash());
+    await store.ensureChain(await chain.genesisHash());
     await syncOnce(store, chain, silent);
     return { store, chain };
 }

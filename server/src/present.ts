@@ -1,5 +1,5 @@
 import type { CosmosDeposit, CosmosProposal, CosmosVote } from './chain/cosmos.ts';
-import type { BlockRow, TokenRow, TransactionRow, TransferRow } from './chain/store.ts';
+import type { BlockRow, TokenRow, TransactionRow, TransferRow } from './chain/rows.ts';
 import type { Block, GovDeposit, Proposal, ProposalStatus, Transaction, Transfer, Vote, VoteOption } from './schemas.ts';
 
 // Row -> wire. The index stores what the chain said; these functions decide what a reader is

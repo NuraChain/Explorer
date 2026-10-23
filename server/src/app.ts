@@ -3,6 +3,7 @@ import { feature, manifestOf, register } from '@azerothjs/http/api';
 import { mountPages, type KitOptions } from '@azerothjs/kit';
 import type { LocaleConfig } from 'azerothjs';
 
+import { TtlCache } from './chain/cache.ts';
 import type { ChainGateway } from './chain/client.ts';
 import {
     readBondedTokens,
@@ -19,6 +20,7 @@ import {
     type CosmosStatus
 } from './chain/cosmos.ts';
 import { GOV_PRECOMPILE, precompileEnabled } from './chain/gov.ts';
+import { normalize, silentDay, type DailyStats, type TransferRow } from './chain/rows.ts';
 import { selectorOf } from './chain/signatures.ts';
 import {
     readBech32Prefix,
@@ -33,7 +35,7 @@ import {
     type StakingPool,
     type StakingValidator
 } from './chain/staking.ts';
-import { normalize, silentDay, type DailyStats, type IndexStore } from './chain/store.ts';
+import type { IndexStore } from './chain/store.ts';
 import { createEtherscanApi } from './etherscan.ts';
 import { calldataFor, inspectContract, readContract, readTransactionCall } from './inspect.ts';
 import {
@@ -214,17 +216,10 @@ export function createApi(deps: ApiDeps): ReturnType<typeof build>
 function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
 {
     /** Attaches the token metadata each transfer row needs, reading each token at most once. */
-    const withTokens = (rows: ReturnType<IndexStore['transfersOfAddress']>['rows']): Transfer[] =>
+    const withTokens = async (rows: TransferRow[]): Promise<Transfer[]> =>
     {
-        const cache = new Map<string, ReturnType<IndexStore['token']>>();
-        return rows.map((row) =>
-        {
-            if (!cache.has(row.token))
-            {
-                cache.set(row.token, store.token(row.token));
-            }
-            return presentTransfer(row, cache.get(row.token) ?? null);
-        });
+        const tokens = await store.tokensOf(rows.map((row) => row.token));
+        return rows.map((row) => presentTransfer(row, tokens.get(row.token) ?? null));
     };
 
     let governanceCache: {
@@ -362,8 +357,33 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
     // The rich list. Balances are live, and reading the node for every address on every request
     // would turn one page view into a balance storm, so the ranked list is cached for a few
     // seconds. The cache keeps every NON-zero balance; the route slices to the requested limit.
-    let rankedAccounts: { at: number; rows: TopAccount[] } | null = null;
+    //
+    // Held in the same single-flight cache the node reads go through: a request that misses while
+    // a rebuild runs joins it instead of starting a storm of its own, a rebuild that failed is never
+    // held, and the hold counts from when the rebuild FINISHED - a balance per address can take
+    // longer than the hold itself, and a list counted from the miss would arrive already expired.
+    const rankedAccounts = new TtlCache<TopAccount[]>(1);
     const RANKED_TTL_MS = 10_000;
+
+    /** Every address the index has seen that holds a balance, richest first. */
+    const rankAccounts = async (): Promise<TopAccount[]> =>
+    {
+        const addresses = await store.distinctAddresses();
+        const rows = await Promise.all(addresses.map(async (address) => ({
+            address,
+            balance: await chain.balance(address).then((value) => value.toString()).catch(() => '0')
+        })));
+        rows.sort((left, right) =>
+        {
+            const a = BigInt(left.balance);
+            const b = BigInt(right.balance);
+            return a > b ? -1 : a < b ? 1 : 0;
+        });
+        // Ranked HERE, once, over the whole list - see `rank` in schemas.ts. Doing it
+        // after the search would hand the first match the first place.
+        return rows.filter((row) => row.balance !== '0')
+            .map((row, index) => ({ ...row, rank: index + 1 }));
+    };
 
     /*
      * The charts, per window length.
@@ -377,8 +397,12 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
      *
      * The indexes in `chain/store.ts` are what made the rebuild cheap; this is what makes it
      * rare. Both were needed: a cheap query run constantly is still a queue.
+     *
+     * Held as the PROMISE, from the moment of the miss: a request that arrives while a rebuild
+     * runs shares it rather than starting a second, and a rebuild that failed is dropped rather
+     * than being the answer for five minutes.
      */
-    const chartsCache = new Map<number, { at: number; payload: ChartsSummary }>();
+    const chartsCache = new Map<number, { at: number; payload: Promise<ChartsSummary> }>();
     const CHARTS_TTL_MS = 300_000;
 
     /** A day index back into the instant it started, which is what a chart point is labelled by. */
@@ -413,10 +437,10 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
      * chain's own history drew exactly the picture of the range below it, and the axis under a
      * "90 days" chart quietly began at the first block instead.
      */
-    const dailyRows = (from: number, to: number): DailyStats[] =>
+    const dailyRows = async (from: number, to: number): Promise<DailyStats[]> =>
     {
-        const reach = store.stats();
-        const rows = new Map(store.statsDaily(from, to).map((row) => [row.day, row]));
+        const reach = await store.stats();
+        const rows = new Map((await store.statsDaily(from, to)).map((row) => [row.day, row]));
         const first = Math.max(Math.floor(from / DAY_SECONDS), Math.floor(reach.firstTime / DAY_SECONDS));
         const last = Math.min(Math.floor(to / DAY_SECONDS), Math.floor(reach.headTime / DAY_SECONDS));
         for (let day = first; day <= last; day++)
@@ -430,12 +454,16 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
     };
 
     /** The whole payload for one window length, computed from the index. */
-    const summarize = (days: number, nowSeconds: number): ChartsSummary =>
+    const summarize = async (days: number, nowSeconds: number): Promise<ChartsSummary> =>
     {
-        const total = store.totals();
-        const dayWindow = store.statsWindow(nowSeconds - DAY_SECONDS, nowSeconds);
-        const before = store.statsWindow(nowSeconds - 2 * DAY_SECONDS, nowSeconds - DAY_SECONDS);
-        const rows = dailyRows(nowSeconds - days * DAY_SECONDS, nowSeconds);
+        // Every figure from ONE state of the index, read in turn and never at once: a read still
+        // running when the snapshot settles would outlive it.
+        const { total, dayWindow, before, rows } = await store.snapshot(async () => ({
+            total: await store.totals(),
+            dayWindow: await store.statsWindow(nowSeconds - DAY_SECONDS, nowSeconds),
+            before: await store.statsWindow(nowSeconds - 2 * DAY_SECONDS, nowSeconds - DAY_SECONDS),
+            rows: await dailyRows(nowSeconds - days * DAY_SECONDS, nowSeconds)
+        }));
 
         const share = (whole: number, added: number): StatFigure =>
             ({ value: String(whole), change: whole === 0 ? null : added / whole });
@@ -493,11 +521,11 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
         stats: feature('/stats', (routes) => ({
             summary: routes.get('/', { output: summary }, async () =>
             {
-                const indexed = store.stats();
+                const indexed = await store.stats();
                 // The node's head, not the index's: a reader must be able to see that a
                 // backfill is still running rather than believe the chain stopped.
                 const chainHead = await chain.head().catch(() => indexed.head);
-                const recent = store.recentBlocks(20);
+                const recent = await store.recentBlocks(20);
                 return {
                     chain: {
                         chainId: chain.env.chainId,
@@ -533,9 +561,9 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
             price: routes.get('/price', { output: nativePrice }, () => quotes.read()),
 
             /** The cadence strip's data: the most recent blocks, oldest-first for drawing. */
-            cadence: routes.get('/cadence', { output: blockPage }, () =>
+            cadence: routes.get('/cadence', { output: blockPage }, async () =>
             {
-                const rows = store.recentBlocks(60);
+                const rows = await store.recentBlocks(60);
                 return {
                     rows: rows.map(presentBlock).reverse(),
                     total: rows.length,
@@ -553,7 +581,7 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
              * does not move between two visitors, and the fee sum behind it is the most expensive
              * read this server does.
              */
-            charts: routes.get('/charts', { query: chartsQuery, output: chartsSummary }, ({ query }) =>
+            charts: routes.get('/charts', { query: chartsQuery, output: chartsSummary }, async ({ query }) =>
             {
                 const days = query.days ?? DEFAULT_CHART_DAYS;
                 const now = Date.now();
@@ -562,29 +590,36 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
                 {
                     return cached.payload;
                 }
-                const payload = summarize(days, Math.floor(now / 1000));
-                chartsCache.set(days, { at: now, payload });
-                return payload;
+                const entry = { at: now, payload: summarize(days, Math.floor(now / 1000)) };
+                chartsCache.set(days, entry);
+                entry.payload.catch(() =>
+                {
+                    if (chartsCache.get(days) === entry)
+                    {
+                        chartsCache.delete(days);
+                    }
+                });
+                return entry.payload;
             })
         })),
 
         blocks: feature('/blocks', (routes) => ({
-            list: routes.get('/', { query: blockListQuery, output: blockPage }, ({ query }) =>
+            list: routes.get('/', { query: blockListQuery, output: blockPage }, async ({ query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.blocksPage(limit, offset, query.content ?? 'all');
+                const { rows, total } = await store.blocksPage(limit, offset, query.content ?? 'all');
                 return { rows: rows.map(presentBlock), total, page, pages: pageCount(total, limit) };
             }),
 
-            one: routes.get('/:number', { query: pageQuery, output: blockDetail }, ({ params, query }) =>
+            one: routes.get('/:number', { query: pageQuery, output: blockDetail }, async ({ params, query }) =>
             {
-                const found = store.blockByNumber(Number(params.number));
+                const found = await store.blockByNumber(Number(params.number));
                 if (found === null)
                 {
                     throw new NotFoundError(`No block ${ params.number } in the index.`);
                 }
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transactionsOfBlock(found.number, limit, offset);
+                const { rows, total } = await store.transactionsOfBlock(found.number, limit, offset);
                 return {
                     block: presentBlock(found),
                     transactions: rows.map(presentTransaction),
@@ -596,26 +631,26 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
         })),
 
         txs: feature('/txs', (routes) => ({
-            list: routes.get('/', { query: transactionListQuery, output: transactionPage }, ({ query }) =>
+            list: routes.get('/', { query: transactionListQuery, output: transactionPage }, async ({ query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transactionsPage(limit, offset, query.status ?? 'all');
+                const { rows, total } = await store.transactionsPage(limit, offset, query.status ?? 'all');
                 return { rows: rows.map(presentTransaction), total, page, pages: pageCount(total, limit) };
             }),
 
             one: routes.get('/:hash', { query: pageQuery, output: transactionDetail }, async ({ params, query }) =>
             {
-                const found = store.transactionByHash(params.hash);
+                const found = await store.transactionByHash(params.hash);
                 if (found === null)
                 {
                     throw new NotFoundError('No such transaction in the index.');
                 }
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transfersOfTransaction(found.hash, limit, offset);
+                const { rows, total } = await store.transfersOfTransaction(found.hash, limit, offset);
                 return {
                     transaction: presentTransaction(found),
                     call: await readTransactionCall(chain, found),
-                    transfers: withTokens(rows),
+                    transfers: await withTokens(rows),
                     total,
                     page,
                     pages: pageCount(total, limit)
@@ -627,36 +662,39 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
             summary: routes.get('/:address', { output: account }, async ({ params }) =>
             {
                 const address = normalize(params.address);
-                const [balance, isContract] = await Promise.all([
+                const [balance, isContract, token, transactions, transfers, flow] = await Promise.all([
                     chain.balance(address).then(value => value.toString()).catch(() => '0'),
-                    chain.isContract(address).catch(() => false)
+                    chain.isContract(address).catch(() => false),
+                    store.token(address),
+                    store.transactionsOfAddress(address, 1, 0),
+                    store.transfersOfAddress(address, 1, 0),
+                    store.flowOfAddress(address)
                 ]);
-                const token = store.token(address);
                 return {
                     address,
                     balance,
                     isContract,
-                    txCount: store.transactionsOfAddress(address, 1, 0).total,
-                    transferCount: store.transfersOfAddress(address, 1, 0).total,
-                    flow: store.flowOfAddress(address),
+                    txCount: transactions.total,
+                    transferCount: transfers.total,
+                    flow,
                     token: token === null
                         ? null
                         : { name: token.name, symbol: token.symbol, decimals: token.decimals }
                 };
             }),
 
-            transactions: routes.get('/:address/txs', { query: addressListQuery, output: transactionPage }, ({ params, query }) =>
+            transactions: routes.get('/:address/txs', { query: addressListQuery, output: transactionPage }, async ({ params, query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transactionsOfAddress(params.address, limit, offset, query.direction ?? 'all');
+                const { rows, total } = await store.transactionsOfAddress(params.address, limit, offset, query.direction ?? 'all');
                 return { rows: rows.map(presentTransaction), total, page, pages: pageCount(total, limit) };
             }),
 
-            transfers: routes.get('/:address/transfers', { query: pageQuery, output: transferPage }, ({ params, query }) =>
+            transfers: routes.get('/:address/transfers', { query: pageQuery, output: transferPage }, async ({ params, query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const { rows, total } = store.transfersOfAddress(params.address, limit, offset);
-                return { rows: withTokens(rows), total, page, pages: pageCount(total, limit) };
+                const { rows, total } = await store.transfersOfAddress(params.address, limit, offset);
+                return { rows: await withTokens(rows), total, page, pages: pageCount(total, limit) };
             }),
 
             // The one read that is mostly NOT from the index: a contract's code, what its getters
@@ -684,7 +722,7 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
         })),
 
         search: feature('/search', (routes) => ({
-            resolve: routes.get('/', { query: searchQuery, output: searchResult }, ({ query }) =>
+            resolve: routes.get('/', { query: searchQuery, output: searchResult }, async ({ query }) =>
             {
                 // Shape narrows the candidates; the index decides. A 32-byte hash is a
                 // transaction OR a block, and only a lookup can say which - guessing would
@@ -698,18 +736,18 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
                 }
                 if (kind === 'height')
                 {
-                    const found = store.blockByNumber(Number(term));
+                    const found = await store.blockByNumber(Number(term));
                     return found === null
                         ? { kind: 'none' as const, path: null }
                         : { kind: 'block' as const, path: `/block/${ found.number }` };
                 }
                 if (kind === 'hash')
                 {
-                    if (store.transactionByHash(term) !== null)
+                    if ((await store.transactionByHash(term)) !== null)
                     {
                         return { kind: 'transaction' as const, path: `/tx/${ term.toLowerCase() }` };
                     }
-                    const asBlock = store.blockByHash(term);
+                    const asBlock = await store.blockByHash(term);
                     return asBlock === null
                         ? { kind: 'none' as const, path: null }
                         : { kind: 'block' as const, path: `/block/${ asBlock.number }` };
@@ -722,34 +760,13 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
             top: routes.get('/top', { query: accountListQuery, output: topAccounts }, async ({ query }) =>
             {
                 const { limit, offset, page } = paging(query);
-                const now = Date.now();
-                if (rankedAccounts === null || now - rankedAccounts.at >= RANKED_TTL_MS)
-                {
-                    const addresses = store.distinctAddresses();
-                    const rows = await Promise.all(addresses.map(async (address) => ({
-                        address,
-                        balance: await chain.balance(address).then((value) => value.toString()).catch(() => '0')
-                    })));
-                    rows.sort((left, right) =>
-                    {
-                        const a = BigInt(left.balance);
-                        const b = BigInt(right.balance);
-                        return a > b ? -1 : a < b ? 1 : 0;
-                    });
-                    // Ranked HERE, once, over the whole list - see `rank` in schemas.ts. Doing it
-                    // after the search would hand the first match the first place.
-                    rankedAccounts = {
-                        at: now,
-                        rows: rows.filter((row) => row.balance !== '0')
-                            .map((row, index) => ({ ...row, rank: index + 1 }))
-                    };
-                }
+                const ranked = await rankedAccounts.read('ranked', RANKED_TTL_MS, rankAccounts);
                 // Lower-cased on the way in: the index stores addresses lower-cased, and a
                 // checksummed address pasted into the field must not miss its own row.
                 const term = (query.q ?? '').trim().toLowerCase();
                 const matched = term === ''
-                    ? rankedAccounts.rows
-                    : rankedAccounts.rows.filter((row) => row.address.includes(term));
+                    ? ranked
+                    : ranked.filter((row) => row.address.includes(term));
                 return {
                     rows: matched.slice(offset, offset + limit),
                     total: matched.length,
@@ -982,10 +999,12 @@ export const LOCALES: LocaleConfig = {
  */
 export function registerApi(app: App, api: Api, deps: ApiDeps): void
 {
-    app.get('/api/healthz', () => json({
+    app.get('/api/healthz', async () => json({
         ok: true,
         at: new Date().toISOString(),
-        head: deps.store.stats().head
+        // The head alone, one seek: `stats()` counts three tables, and the image's health check
+        // gives up after five seconds.
+        head: await deps.store.head()
     }));
 
     register(app, api);

@@ -14,7 +14,8 @@
 import { json } from '@azerothjs/http';
 
 import type { ChainGateway } from './chain/client.ts';
-import { normalize, type IndexStore, type TransactionRow, type TransferRow } from './chain/store.ts';
+import { normalize, type TokenRow, type TransactionRow, type TransferRow } from './chain/rows.ts';
+import type { IndexStore } from './chain/store.ts';
 
 /** The widest block range Etherscan's own examples use, and the default when none is given. */
 const MAX_BLOCK = 999_999_999;
@@ -126,6 +127,30 @@ function address(query: URLSearchParams, key = 'address'): string | null
     return value !== null && ADDRESS.test(value) ? normalize(value) : null;
 }
 
+/**
+ * What a page of rows is mapped against, read once for the whole page.
+ *
+ * Looked up a row at a time, one full page of token transfers was three queries a row - thirty
+ * thousand for a single response. Read as sets, a page costs the same few queries at any size.
+ */
+interface PageReads
+{
+    /**
+     * Read AFTER the rows: an ingest batch can commit between two reads, and a head read first
+     * could be older than a row on the page - which would then count no confirmations at all,
+     * the answer a wallet reads as "still pending".
+     */
+    head: number;
+    blockHashes: ReadonlyMap<number, string>;
+}
+
+/** A token transfer is also described by its parent transaction and by the token itself. */
+interface TransferReads extends PageReads
+{
+    parents: ReadonlyMap<string, TransactionRow>;
+    tokens: ReadonlyMap<string, TokenRow>;
+}
+
 export interface EtherscanDeps
 {
     store: IndexStore;
@@ -137,9 +162,9 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
     /** Confirmations count the including block itself, matching Etherscan's own arithmetic. */
     const confirmationsAt = (height: number, head: number): string => String(Math.max(0, head - height + 1));
 
-    const transaction = (row: TransactionRow, head: number): Record<string, string> => ({
+    const transaction = (row: TransactionRow, reads: PageReads): Record<string, string> => ({
         blockNumber: String(row.block_number),
-        blockHash: store.blockByNumber(row.block_number)?.hash ?? '',
+        blockHash: reads.blockHashes.get(row.block_number) ?? '',
         timeStamp: String(row.timestamp),
         hash: row.hash,
         nonce: String(row.nonce),
@@ -159,22 +184,22 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
         contractAddress: row.contract_address ?? '',
         cumulativeGasUsed: '',
         gasUsed: row.gas_used,
-        confirmations: confirmationsAt(row.block_number, head),
+        confirmations: confirmationsAt(row.block_number, reads.head),
         // Two spellings of the same fact, because clients read one or the other.
         txreceipt_status: row.status === 1 ? '1' : '0',
         isError: row.status === 1 ? '0' : '1'
     });
 
-    const transfer = (row: TransferRow, head: number): Record<string, string> =>
+    const transfer = (row: TransferRow, reads: TransferReads): Record<string, string> =>
     {
-        const parent = store.transactionByHash(row.tx_hash);
-        const token = store.token(row.token);
+        const parent = reads.parents.get(row.tx_hash.toLowerCase()) ?? null;
+        const token = reads.tokens.get(normalize(row.token)) ?? null;
         return {
             blockNumber: String(row.block_number),
             timeStamp: String(row.timestamp),
             hash: row.tx_hash,
             nonce: parent === null ? '' : String(parent.nonce),
-            blockHash: store.blockByNumber(row.block_number)?.hash ?? '',
+            blockHash: reads.blockHashes.get(row.block_number) ?? '',
             from: row.from_addr,
             contractAddress: row.token,
             to: row.to_addr,
@@ -189,7 +214,7 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
             cumulativeGasUsed: '',
             // Etherscan returns this literal for token transfers; it is not a placeholder of ours.
             input: 'deprecated',
-            confirmations: confirmationsAt(row.block_number, head)
+            confirmations: confirmationsAt(row.block_number, reads.head)
         };
     };
 
@@ -212,11 +237,10 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
             return fail('Error! Invalid contract address format');
         }
 
-        const head = store.stats().head;
         // Filtered AFTER the range query rather than in SQL: `kind` is not indexed, and the three
         // token standards share one table, so the page size is applied to the mixed set first.
-        const rows = store
-            .addressTransfersInRange(account, page.from, page.to, page.limit, page.offset, page.ascending, contract)
+        const rows = (await store
+            .addressTransfersInRange(account, page.from, page.to, page.limit, page.offset, page.ascending, contract))
             .filter((row) => row.kind === kind);
 
         if (rows.length === 0)
@@ -224,9 +248,17 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
             return none('No transactions found');
         }
 
+        const head = await store.head();
+        const [blockHashes, parents, tokens] = await Promise.all([
+            store.blockHashes(rows.map((row) => row.block_number)),
+            store.transactionsByHash(rows.map((row) => row.tx_hash)),
+            store.tokensOf(rows.map((row) => row.token))
+        ]);
+        const reads: TransferReads = { head, blockHashes, parents, tokens };
+
         return ok(rows.map((row) =>
         {
-            const base = transfer(row, head);
+            const base = transfer(row, reads);
             if (kind === 'erc20')
             {
                 return base;
@@ -277,9 +309,15 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
             {
                 return fail(page);
             }
-            const head = store.stats().head;
-            const rows = store.addressTransactionsInRange(who, page.from, page.to, page.limit, page.offset, page.ascending);
-            return rows.length === 0 ? none('No transactions found') : ok(rows.map((row) => transaction(row, head)));
+            const rows = await store.addressTransactionsInRange(who, page.from, page.to, page.limit, page.offset, page.ascending);
+            if (rows.length === 0)
+            {
+                return none('No transactions found');
+            }
+            const head = await store.head();
+            const blockHashes = await store.blockHashes(rows.map((row) => row.block_number));
+            const reads: PageReads = { head, blockHashes };
+            return ok(rows.map((row) => transaction(row, reads)));
         }
 
         if (action === 'txlistinternal')
@@ -306,14 +344,14 @@ export function createEtherscanApi({ store, chain }: EtherscanDeps): (query: URL
         return fail('Error! Missing or unsupported action');
     };
 
-    const transactionModule = (action: string, query: URLSearchParams): Response =>
+    const transactionModule = async (action: string, query: URLSearchParams): Promise<Response> =>
     {
         const hash = query.get('txhash');
         if (hash === null || !HASH.test(hash))
         {
             return fail('Error! Invalid transaction hash format');
         }
-        const row = store.transactionByHash(hash.toLowerCase());
+        const row = await store.transactionByHash(hash.toLowerCase());
 
         if (action === 'gettxreceiptstatus')
         {
