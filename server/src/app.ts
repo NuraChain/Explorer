@@ -386,12 +386,9 @@ function build({ store, chain, price, cosmos = NO_COSMOS }: ApiDeps)
      * The charts, per window length.
      *
      * Five minutes, not thirty seconds. This payload is thirteen series of DAILY buckets plus a
-     * rolling twenty-four-hour figure: nothing in it can visibly move in half a minute, so the
-     * old window bought no freshness a reader could see and paid for it thirteen series at a
-     * time. On the synchronous sqlite index it cost the whole server: the rebuild blocked the
-     * event loop, and on a million-block chain a request for any other page issued during one
-     * waited the full seven to ten seconds with it. PostgreSQL runs it off the loop, but it still
-     * scans a window of the whole chain on a pooled connection of its own.
+     * rolling twenty-four-hour figure: nothing in it can visibly move in half a minute, so a
+     * shorter window would buy no freshness a reader could see and pay for it thirteen series at
+     * a time - every rebuild scans a window of the whole chain on a pooled connection of its own.
      *
      * The indexes in the index's migration are what make the rebuild cheap; this is what makes it
      * rare. Both were needed: a cheap query run constantly is still a queue.

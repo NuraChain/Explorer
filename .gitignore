@@ -12,7 +12,6 @@ Thumbs.db
 .idea
 .vscode
 .claude/settings.local.json
-.data
 
 # Playwright MCP scratch output (page snapshots, traces) - never part of the app.
 .playwright-mcp/

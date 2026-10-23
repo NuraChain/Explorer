@@ -7,10 +7,8 @@
 // right one slowly, and only on a chain long enough for anybody to notice.
 //
 // The production symptom that prompted them: the charts endpoint took seven to ten seconds on a
-// 1.08-million-block chain, and on the synchronous sqlite index those seconds stalled every other
-// request with it - a trivial /api/healthz issued during one took 7.3 seconds. Two queries were
-// reading the whole `blocks` table. Both are covered by an index, and these fail the moment either
-// stops being.
+// 1.08-million-block chain, because two of its queries read the whole `blocks` table. Both are
+// covered by an index, and these fail the moment either stops being.
 //
 // They explain the store's OWN statements, not copies of them. On a near-empty table the planner
 // rightly prefers a sequential scan whatever indexes exist, so the cheaper alternatives are switched

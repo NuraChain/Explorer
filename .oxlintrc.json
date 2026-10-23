@@ -14,8 +14,7 @@
         "**/dist-server/**",
         "**/coverage/**",
         "**/node_modules/**",
-        "**/.playwright-mcp/**",
-        "**/.data/**"
+        "**/.playwright-mcp/**"
     ],
     "rules": {
         "typescript/no-explicit-any": "error",

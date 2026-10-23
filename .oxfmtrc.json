@@ -17,7 +17,6 @@
         "dist-server/",
         "coverage/",
         ".playwright-mcp/",
-        ".data/",
         "logs/",
         "*.azeroth"
     ]
