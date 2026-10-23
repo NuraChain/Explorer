@@ -1,17 +1,21 @@
 # syntax=docker/dockerfile:1
 
 # The whole explorer in one image: the server IS the service - it runs the api and the indexer, and
-# in production serves the built client itself, so there is one process and one port.
+# in production serves the built client itself, so there is one process and one port. The index is
+# a PostgreSQL database beside it: `docker compose up` (compose.yaml) runs the two together, or the
+# image runs alone against a database of your own:
 #
 #   docker build -t nura-explorer .
-#   docker run -d --name nura-explorer --restart unless-stopped \
+#   docker run -d --name nura-explorer --restart unless-stopped --stop-timeout 30 \
 #       --env-file server/.env -e PORT=4300 -p 4300:4300 \
-#       -v nura-index:/app/server/.data \
+#       -e DATABASE_URL=postgres://explorer:<password>@host.docker.internal:5432/nura_explorer \
 #       --add-host host.docker.internal:host-gateway \
 #       nura-explorer
 #
-# `-e PORT` wins over the env file, which was written for a checkout and may name another port -
-# and the port published must be the one the server binds. The volume is the index.
+# `-e PORT` and `-e DATABASE_URL` win over the env file, which was written for a checkout: it may
+# name another port, and a database on 127.0.0.1 - which inside a container is the container. The
+# port published must be the one the server binds, and `--stop-timeout` covers the server's own
+# bounded shutdown, which may take longer than Docker's default ten seconds.
 #
 # Governance and staking read the node's Cosmos REST api and CometBFT rpc, and both default to
 # 127.0.0.1 - which inside a container is the CONTAINER, so a node running on the host is not
@@ -55,8 +59,8 @@ ENV NODE_ENV=production \
     PORT=4300
 
 # The layout mirrors the checkout, and the server runs from server/ exactly as the systemd unit
-# does: `.env`, CLIENT_DIR, SSR_ENTRY, DB_PATH and logs/ all resolve from the working directory,
-# so the paths in a server/.env written for a checkout are correct here unchanged.
+# does: `.env`, CLIENT_DIR, SSR_ENTRY and logs/ all resolve from the working directory, so the
+# paths in a server/.env written for a checkout are correct here unchanged.
 WORKDIR /app/server
 
 COPY --from=deps /app /app
@@ -65,13 +69,11 @@ COPY server/src src
 COPY --from=build /app/application/dist /app/application/dist
 COPY --from=build /app/application/dist-server /app/application/dist-server
 
-# sqlite creates the database file but the user has to be able to write the directory; logs/ is
-# the NDJSON half of the log (the terminal half is stdout, which is what `docker logs` shows).
-RUN mkdir -p .data logs && chown node:node .data logs
+# logs/ is the NDJSON half of the log (the terminal half is stdout, which is what `docker logs`
+# shows). The index is not in the image at all: it is the PostgreSQL that DATABASE_URL names.
+RUN mkdir -p logs && chown node:node logs
 USER node
 
-# The index. Without a volume every new container replays the chain from START_BLOCK.
-VOLUME ["/app/server/.data"]
 EXPOSE 4300
 
 # slim ships no curl; the runtime's own fetch asks the route that exists for this. exitCode rather
@@ -80,5 +82,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/api/healthz').then((r) => { process.exitCode = r.ok ? 0 : 1; }, () => { process.exitCode = 1; })"]
 
 # Exec form, so SIGTERM reaches the process: the shutdown handler stops the indexer and closes the
-# sqlite handle, and a shell in between would swallow the signal until the kill.
+# database pool, and a shell in between would swallow the signal until the kill.
 CMD ["node", "src/main.ts"]

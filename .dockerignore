@@ -9,10 +9,9 @@
 **/coverage
 
 # Configuration and state belong to the deployment, never to the image: .env is read at RUN time
-# (env_file / --env-file), and the index lives on a volume.
+# (env_file / --env-file), and the index lives in PostgreSQL.
 **/.env
 **/*.local
-**/.data
 **/logs
 
 .git

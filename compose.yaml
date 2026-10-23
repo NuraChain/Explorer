@@ -1,0 +1,67 @@
+# The explorer beside its PostgreSQL index, on the network compose makes for them.
+#
+#   cp server/.env.example server/.env       # the chain to index, the node's Cosmos endpoints
+#   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
+#   docker compose up -d --build
+#
+# The .env beside this file is compose's own - it is read for ${POSTGRES_PASSWORD} below, git
+# ignores it and the image never sees it. The password is spliced into a connection url, so keep it
+# to url-safe characters; hex is.
+#
+# The database publishes no port. Only the explorer reaches it, over the compose network, and the
+# index is the `index` volume: removing the containers keeps it, `docker compose down -v` does not
+# (which is safe - the indexer replays the chain from START_BLOCK).
+name: nura-explorer
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: explorer
+      POSTGRES_DB: nura_explorer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the .env beside compose.yaml}
+      # UTF8, which the index refuses to open without, and byte-order collation.
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+    volumes:
+      # The 18 images keep their data in /var/lib/postgresql/18/docker and declare the volume one
+      # level up - a volume on the older /var/lib/postgresql/data would hold nothing.
+      - index:/var/lib/postgresql
+    healthcheck:
+      # Over TCP: while the image initialises, its temporary server listens on the socket only,
+      # and a socket check would call it healthy before the explorer could connect.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U explorer -d nura_explorer']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 30s
+
+  explorer:
+    build: .
+    image: nura-explorer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: server/.env
+        required: false
+    environment:
+      # Pinned here because env_file would otherwise win over the image: a server/.env written for
+      # a checkout names its own port and a database on 127.0.0.1, which inside a container is the
+      # container itself.
+      NODE_ENV: production
+      PORT: '4300'
+      DATABASE_URL: postgres://explorer:${POSTGRES_PASSWORD}@postgres:5432/nura_explorer
+    # A node running on the host is host.docker.internal from in here - point COSMOS_REST_URL and
+    # COMETBFT_RPC_URL at it in server/.env (see the Dockerfile's header).
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - '4300:4300'
+    # Long enough for the server's own bounded shutdown: drain, stop the follower, close the pool.
+    stop_grace_period: 30s
+
+volumes:
+  index:
