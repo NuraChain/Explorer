@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1
+
+### Chores
+
+- `.coderabbit.yaml` and the `.claude/` agents and skills are gone
+
 ## 1.7.0
 
 ### Features
