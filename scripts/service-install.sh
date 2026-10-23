@@ -37,6 +37,10 @@ fi
 
 if [ ! -f "$SERVICE_PATH/.env" ]; then
   echo "warning: server/.env is missing - the service would boot against the defaults, not your chain" >&2
+elif ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*=' "$SERVICE_PATH/.env"; then
+  # The one key with no default: without it the server refuses to boot and restart-loops. The
+  # pattern takes every spelling process.loadEnvFile() does - an `export` prefix, spaces round `=`.
+  echo "warning: server/.env sets no DATABASE_URL - the service needs a PostgreSQL to keep its index in" >&2
 fi
 
 # systemd does not create the directory it is told to log into.
@@ -47,7 +51,11 @@ echo "> Installing systemd service (${SERVICE_FILE})..."
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=Nura Explorer
-After=network.target
+# After the network is UP rather than merely configured, and after a local PostgreSQL when there is
+# one - ordering only, never Requires: the database may live on another host, and a Debian
+# postgresql.service reports started before its cluster does. Restart=always covers that race.
+Wants=network-online.target
+After=network-online.target postgresql.service
 
 [Service]
 RestartSec=5
