@@ -149,6 +149,22 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string, string?]> =
     ['OPERATOR_ROLE()', 'view', 'bytes32'],
     ['ADMIN_ROLE()', 'view', 'bytes32'],
 
+    // --- AccessControlDefaultAdminRules ------------------------------------------------------
+    // OpenZeppelin's one-owner form of AccessControl: DEFAULT_ADMIN_ROLE has exactly one holder,
+    // and handing it over takes two transactions - `beginDefaultAdminTransfer` names the next
+    // owner, nothing changes until that address calls `acceptDefaultAdminTransfer`. The delay
+    // between the two is itself changed on a schedule, which is what the `*Delay` entries read.
+    ['defaultAdmin()', 'view', 'address'],
+    ['pendingDefaultAdmin()', 'view', 'address,uint48'],
+    ['defaultAdminDelay()', 'view', 'uint48'],
+    ['pendingDefaultAdminDelay()', 'view', 'uint48,uint48'],
+    ['defaultAdminDelayIncreaseWait()', 'view', 'uint48'],
+    ['beginDefaultAdminTransfer(address)', 'nonpayable', '', 'address newAdmin'],
+    ['acceptDefaultAdminTransfer()', 'nonpayable', ''],
+    ['cancelDefaultAdminTransfer()', 'nonpayable', ''],
+    ['changeDefaultAdminDelay(uint48)', 'nonpayable', '', 'uint48 newDelay'],
+    ['rollbackDefaultAdminDelay()', 'nonpayable', ''],
+
     // --- ERC-5805 / ERC-6372 (votes and the clock they count on) ----------------------------
     ['delegate(address)', 'nonpayable', ''],
     ['delegates(address)', 'view', 'address'],
@@ -860,6 +876,95 @@ const FUNCTIONS: ReadonlyArray<readonly [string, Mutability, string, string?]> =
     ['verifiedHandle(uint256,string)', 'view', 'string', 'uint256 profileId, string platform'],
     ['verifyHandle(uint256,string,string,uint256,bytes)', 'nonpayable', '', 'uint256 profileId, string platform, string handle, uint256 deadline, bytes signature'],
 
+    // --- Arcade achievements ------------------------------------------------------------------
+    // An ERC-1155 with one token id per achievement, id = keccak256(key) of the backend's own key.
+    // `achievements(id)` answers (defined, soulbound, awarded): whether the id exists, whether
+    // its tokens can move, and how many players hold it. Everything else is ERC-1155 above.
+    ['achievements(uint256)', 'view', 'bool,bool,uint64', 'uint256 id'],
+    ['award(address,uint256)', 'nonpayable', '', 'address player, uint256 id'],
+    ['defineAchievement(string,bool,string)', 'nonpayable', 'uint256', 'string key, bool soulbound, string metadataURI'],
+    ['earned(address,uint256)', 'view', 'bool', 'address player, uint256 id'],
+    ['setAchievementURI(uint256,string)', 'nonpayable', '', 'uint256 id, string metadataURI'],
+    ['setURI(string)', 'nonpayable', '', 'string newUri'],
+
+    // --- Arcade shop ----------------------------------------------------------------------------
+    // Sells looks for native NURA against a `Quote` the Arcade server signs (EIP-712) - order,
+    // buyer, item, price, referrer, deadline - so `buy` carries the quote and its signature, and
+    // `quoteDigest` is the hash that was signed. `saleOf(order)` is what the server reads back
+    // before it hands the look over: (buyer, paidAt, refunded, referrer, price, cut).
+    //
+    // The shop also answers `claim()` and `withdraw(address,uint256)`, which are named above. Its
+    // `claim()` returns nothing where the prediction market's returns the amount; one selector
+    // holds one shape, so the market's keeps it, and a shop claim is still named correctly.
+    ['MAX_QUOTE_LIFE()', 'view', 'uint256'],
+    // The vault answers this one too, with the same meaning.
+    ['MAX_REFERRAL_BPS()', 'view', 'uint16'],
+    ['SELLER_ROLE()', 'view', 'bytes32'],
+    ['buy((bytes32,address,bytes32,uint256,address,uint64),bytes)', 'payable', '', '(bytes32 order, address buyer, bytes32 item, uint256 price, address referrer, uint64 deadline) quote, bytes signature'],
+    ['earnings(address)', 'view', 'uint256', 'address referrer'],
+    ['quoteDigest((bytes32,address,bytes32,uint256,address,uint64))', 'view', 'bytes32', '(bytes32 order, address buyer, bytes32 item, uint256 price, address referrer, uint64 deadline) quote'],
+    ['referralBps()', 'view', 'uint16'],
+    // A shop order or a vault game - the two contracts name the argument differently, so it is
+    // left unnamed here.
+    ['refund(bytes32)', 'nonpayable', ''],
+    ['revenue()', 'view', 'uint256'],
+    ['saleOf(bytes32)', 'view', 'address,uint64,bool,address,uint256,uint256', 'bytes32 order'],
+    ['seller()', 'view', 'address'],
+    ['setReferralBps(uint16)', 'nonpayable', '', 'uint16 newBps'],
+    ['setSeller(address)', 'nonpayable', '', 'address newSeller'],
+    ['solvent()', 'view', 'bool'],
+    ['totalEarnings()', 'view', 'uint256'],
+
+    // --- Arcade tips ----------------------------------------------------------------------------
+    // A watcher's gift to a player, forwarded whole in the same call and recorded under the
+    // giver and the id the server made for it - `tipOf(from, id)` is (to, amount, givenAt).
+    ['tip(bytes32,address,uint64)', 'payable', '', 'bytes32 id, address to, uint64 deadline'],
+    ['tipOf(address,bytes32)', 'view', 'address,uint256,uint64', 'address from, bytes32 id'],
+
+    // --- Arcade vault ---------------------------------------------------------------------------
+    // Holds the stakes of paid tables. A player deposits once; the REFEREE_ROLE server `open`s a
+    // game with every seat's signed stake (EIP-712, see `stakeDigest`), `settle`s it with the
+    // secrets that open the seats' commitments, or `refund`s it. If the referee never does,
+    // anybody can `reclaim` it once `reclaimAfter()` has passed.
+    //
+    // `gameOf(id)` answers (status, feeBps, openedAt, amount, players, referralShare). The vault
+    // also answers `fee()`, as a uint16 where the Uniswap V3 pool's is a uint24 - the pool keeps
+    // the entry, and a uint16 decodes the same through the wider type.
+    ['MAX_RECLAIM_AFTER()', 'view', 'uint256'],
+    ['MAX_SEATS()', 'view', 'uint256'],
+    ['MAX_STAKE_LIFE()', 'view', 'uint256'],
+    ['MIN_FEE_BPS()', 'view', 'uint16'],
+    ['MIN_RECLAIM_AFTER()', 'view', 'uint256'],
+    ['MIN_REFERRAL_BPS()', 'view', 'uint16'],
+    ['MIN_SEATS()', 'view', 'uint256'],
+    ['REFEREE_ROLE()', 'view', 'bytes32'],
+    ['cancel(bytes32)', 'nonpayable', '', 'bytes32 nonce'],
+    ['deposit(address)', 'payable', '', 'address referrer'],
+    ['feeOf(string)', 'view', 'uint16', 'string game'],
+    ['fees()', 'view', 'uint256'],
+    ['gameFee(bytes32)', 'view', 'uint16', 'bytes32 gameHash'],
+    ['gameOf(bytes32)', 'view', 'uint8,uint16,uint64,uint256,address[],uint16', 'bytes32 id'],
+    ['lockedOf(address)', 'view', 'uint256', 'address player'],
+    ['maxStake()', 'view', 'uint256'],
+    ['nonceUsed(address,bytes32)', 'view', 'bool', 'address player, bytes32 nonce'],
+    ['open(bytes32,string,uint256,uint16,(address,bytes32,bytes32,uint64,bytes)[])', 'nonpayable', '', 'bytes32 id, string game, uint256 amount, uint16 feeBps, (address player, bytes32 commit, bytes32 nonce, uint64 deadline, bytes signature)[] seats'],
+    ['reclaim(bytes32)', 'nonpayable', '', 'bytes32 id'],
+    ['reclaimAfter()', 'view', 'uint256'],
+    ['referee()', 'view', 'address'],
+    ['referralEarned(address)', 'view', 'uint256', 'address referrer'],
+    ['referralShare()', 'view', 'uint16'],
+    ['referrerOf(address)', 'view', 'address', 'address player'],
+    ['setFee(uint16)', 'nonpayable', '', 'uint16 newFee'],
+    ['setGameFee(string,uint16)', 'nonpayable', '', 'string game, uint16 newFee'],
+    ['setMaxStake(uint256)', 'nonpayable', '', 'uint256 newMaxStake'],
+    ['setReferee(address)', 'nonpayable', '', 'address newReferee'],
+    ['setReferralShare(uint16)', 'nonpayable', '', 'uint16 newShare'],
+    ['settle(bytes32,uint256,bytes32[])', 'nonpayable', '', 'bytes32 id, uint256 winners, bytes32[] secrets'],
+    ['stakeDigest(address,string,uint256,uint16,bytes32,bytes32,uint64)', 'view', 'bytes32', 'address player, string game, uint256 amount, uint16 feeBps, bytes32 commit, bytes32 nonce, uint64 deadline'],
+    ['totalBalances()', 'view', 'uint256'],
+    ['totalLocked()', 'view', 'uint256'],
+    ['withdrawFees(address,uint256)', 'nonpayable', '', 'address to, uint256 amount'],
+
     // --- Uniswap V3 callbacks and the interfaces around them ----------------------------------
     // The flash callback completes the set beside the mint and swap ones above. The other three
     // are interfaces a periphery contract requires of its counterparty rather than calls a reader
@@ -1015,6 +1120,37 @@ const EVENTS: readonly string[] = [
     'WebsiteAdded(uint256,uint256,string,string)',
     'WebsiteRemoved(uint256,uint256)',
     'WebsiteUpdated(uint256,uint256,string,string)',
+    // AccessControlDefaultAdminRules - the two-step owner handover.
+    'DefaultAdminDelayChangeCanceled()',
+    'DefaultAdminDelayChangeScheduled(uint48,uint48)',
+    'DefaultAdminTransferCanceled()',
+    'DefaultAdminTransferScheduled(address,uint48)',
+    // Arcade - achievements, the shop, tips and the vault. `Deposited` and `Refunded` here are
+    // shorter than the collateral vault's and the shop's own, and so are different topics.
+    'AchievementDefined(uint256,string,bool)',
+    'Bought(bytes32,address,bytes32,uint256,address,uint256)',
+    'Cancelled(address,bytes32)',
+    'Claimed(address,uint256)',
+    'Deposited(address,uint256)',
+    'FeeChanged(uint16,uint16)',
+    'FeesWithdrawn(address,uint256)',
+    'GameFeeChanged(bytes32,string,uint16,uint16)',
+    'MaxStakeChanged(uint256,uint256)',
+    'Opened(bytes32,string,uint256,uint16,address[],bytes32[])',
+    'Paid(bytes32,address,uint256)',
+    'Reclaimed(bytes32,address)',
+    'RefereeChanged(address,address)',
+    'ReferralBpsChanged(uint16,uint16)',
+    'ReferralPaid(bytes32,address,address,uint256)',
+    'ReferralShareChanged(uint16,uint16)',
+    'ReferrerSet(address,address)',
+    'Refunded(bytes32)',
+    'Refunded(bytes32,address,uint256,uint256)',
+    'Returned(bytes32,address,uint256)',
+    'SellerChanged(address,address)',
+    'Settled(bytes32,uint256,uint256,uint256,bytes32[])',
+    'Staked(bytes32,address,uint256)',
+    'Tipped(address,bytes32,address,uint256)',
     // The Uniswap V3 pool, and deliberately not the V2 pair's: `Mint`, `Burn`, `Swap` and
     // `Collect` are spelled differently here and hash to different topics, so both sets are named.
     'Burn(address,int24,int24,uint128,uint256,uint256)',
