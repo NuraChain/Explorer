@@ -66,7 +66,3 @@ A Dockerfile is included at the repository root for building the application ima
 - [Nura Wallet](https://github.com/NuraChain/Wallet)
 - [Nura Swap](https://swap.nurachain.net)
 - [Nura Smart Contracts](https://github.com/NuraChain/SmartContract)
-
-## License
-
-See the repository's [LICENSE](LICENSE) file.
